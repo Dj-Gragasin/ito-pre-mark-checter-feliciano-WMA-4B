@@ -1529,3 +1529,469 @@ ion-segment-button.segment-button-checked {
     margin: 0;
   }
 }
+
+/* ============= MODERN UI STYLES (Summary Bar, Day Selector, Accordion) ============= */
+
+/* Summary Bar - Persistent top summary */
+.mp-summary-bar {
+  display: flex;
+  gap: 16px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #181818;
+  color: #fff;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  margin-bottom: 12px;
+}
+
+.mp-summary-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.mp-icon {
+  font-size: 20px;
+}
+
+.mp-summary-item > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.mp-label {
+  font-size: 12px;
+  opacity: 0.8;
+  color: #b0b0b0;
+}
+
+.mp-value {
+  font-weight: 700;
+  color: #7efc6a;
+  font-size: 14px;
+}
+
+/* Day Selector - Horizontal scrollable tabs */
+.mp-day-selector-wrapper {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.mp-day-selector {
+  display: flex;
+  overflow-x: auto;
+  gap: 8px;
+  padding: 8px 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #7efc6a rgba(255, 255, 255, 0.1);
+}
+
+.mp-day-selector::-webkit-scrollbar {
+  height: 4px;
+}
+
+.mp-day-selector::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.mp-day-selector::-webkit-scrollbar-thumb {
+  background: #7efc6a;
+  border-radius: 4px;
+}
+
+.mp-day-tab {
+  padding: 8px 12px;
+  border-radius: 20px;
+  border: 0;
+  background: transparent;
+  color: #cfcfcf;
+  white-space: nowrap;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.mp-day-tab.active {
+  background: linear-gradient(90deg, #00ff88 0%, #7efc6a 100%);
+  color: #000;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(126, 252, 106, 0.3);
+}
+
+.mp-day-tab:hover:not(.active) {
+  background: rgba(126, 252, 106, 0.1);
+  color: #7efc6a;
+}
+
+/* Meal Accordion - Expandable meal rows */
+.mp-meal-accordion {
+  margin: 8px 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #252525;
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.mp-meal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-left: 6px solid #8be04b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mp-meal-header:hover {
+  background: #2d2d2d;
+}
+
+.mp-meal-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: rgba(126, 252, 106, 0.15);
+  flex-shrink: 0;
+}
+
+.mp-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.mp-title {
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.mp-stats {
+  font-size: 12px;
+  color: #888;
+  display: flex;
+  gap: 8px;
+}
+
+.mp-chev {
+  font-size: 16px;
+  color: #666;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.mp-meal-accordion.open .mp-chev {
+  transform: scaleY(-1);
+}
+
+.mp-meal-body {
+  padding: 8px 12px 12px 12px;
+  background: #1d1d1d;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.mp-meal-body ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.mp-meal-body li {
+  color: #b0b0b0;
+  font-size: 13px;
+  padding: 4px 0;
+  padding-left: 12px;
+  position: relative;
+}
+
+.mp-meal-body li::before {
+  content: "▸";
+  color: #7efc6a;
+  position: absolute;
+  left: 0;
+}
+
+/* ============= REDESIGNED DAILY VIEW STYLES =============*/
+
+.daily-view-compact {
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Summary Bar */
+.daily-summary-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 12px;
+  background: linear-gradient(135deg, #1a1a1a 0%, #232323 100%);
+  border-radius: 8px;
+  border: 1px solid rgba(126, 252, 106, 0.2);
+}
+
+.summary-item {
+  text-align: center;
+  padding: 8px;
+  background: rgba(0, 230, 118, 0.05);
+  border-radius: 6px;
+  border: 1px solid rgba(126, 252, 106, 0.15);
+}
+
+.summary-label {
+  font-size: 11px;
+  color: #b0b0b0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.summary-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #00e676;
+}
+
+/* Meal Category Tabs */
+.daily-tabs-container {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+
+.daily-tab {
+  flex: 1;
+  min-width: 70px;
+  padding: 10px 12px;
+  border: 2px solid rgba(126, 252, 106, 0.3);
+  background: transparent;
+  color: #b0b0b0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.daily-tab:hover {
+  border-color: rgba(126, 252, 106, 0.6);
+  color: #00e676;
+}
+
+.daily-tab.active {
+  background: linear-gradient(135deg, #00e676 0%, #7efc6a 100%);
+  color: #000;
+  border-color: #00e676;
+  box-shadow: 0 0 12px rgba(0, 230, 118, 0.4);
+}
+
+/* Meal Content Display */
+.daily-meal-content {
+  min-height: 300px;
+}
+
+.snacks-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.daily-meal-card {
+  background: linear-gradient(135deg, #1a1a1a 0%, #232323 100%);
+  border: 1px solid rgba(126, 252, 106, 0.2);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.daily-meal-card ion-card-content {
+  padding: 0;
+}
+
+.daily-meal-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 12px 0;
+  line-height: 1.2;
+}
+
+.daily-meal-macros {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+
+.daily-meal-macros span {
+  background: rgba(0, 230, 118, 0.08);
+  padding: 6px 8px;
+  border-radius: 4px;
+  color: #7efc6a;
+  text-align: center;
+  border: 1px solid rgba(126, 252, 106, 0.15);
+}
+
+.daily-meal-ingredients {
+  color: #b0b0b0;
+  font-size: 13px;
+  margin: 8px 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-left: 3px solid #7efc6a;
+  border-radius: 3px;
+}
+
+.daily-meal-ingredients strong {
+  color: #00e676;
+}
+
+.daily-meal-portion {
+  color: #b0b0b0;
+  font-size: 12px;
+  margin: 8px 0;
+}
+
+.daily-meal-portion strong {
+  color: #7efc6a;
+}
+
+.daily-meal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.daily-meal-actions ion-button {
+  flex: 1;
+}
+
+/* ============= REDESIGNED WEEKLY GRID VIEW STYLES =============*/
+
+.weekly-grid-view {
+  padding: 12px;
+  overflow-x: auto;
+  display: block;
+}
+
+.week-grid-header {
+  display: grid;
+  grid-template-columns: 60px repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.grid-header-cell {
+  padding: 12px 8px;
+  background: linear-gradient(135deg, #1a1a1a 0%, #232323 100%);
+  border: 1px solid rgba(126, 252, 106, 0.3);
+  border-radius: 6px;
+  text-align: center;
+  font-weight: 700;
+  color: #00e676;
+  font-size: 12px;
+}
+
+.day-header {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.week-grid-row {
+  display: grid;
+  grid-template-columns: 60px repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+  align-items: start;
+}
+
+.grid-cell {
+  min-height: 80px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.grid-meal-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1a1a1a 0%, #232323 100%);
+  border: 1px solid rgba(126, 252, 106, 0.3);
+  padding: 8px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #b0b0b0;
+  gap: 4px;
+  text-align: center;
+}
+
+.meal-type-icon {
+  font-size: 18px;
+}
+
+.meal-type-name {
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #7efc6a;
+}
+
+.grid-meal-cell {
+  background: linear-gradient(135deg, #1a1a1a 0%, #232323 100%);
+  border: 2px solid rgba(126, 252, 106, 0.2);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.grid-meal-cell:hover {
+  border-color: rgba(126, 252, 106, 0.6);
+  background: rgba(0, 230, 118, 0.08);
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.2);
+  transform: translateY(-2px);
+}
+
+.meal-grid-item {
+  width: 100%;
+}
+
+.meal-grid-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.meal-grid-calories {
+  font-size: 11px;
+  color: #7efc6a;
+  font-weight: 600;
+}
+
+.meal-grid-empty {
+  color: #666;
+  font-size: 18px;
+  font-weight: 300;
+}
+
+/* ============= END MODERN UI STYLES =============*/

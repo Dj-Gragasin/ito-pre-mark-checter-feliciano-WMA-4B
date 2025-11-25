@@ -120,6 +120,41 @@ const trustedFilipinoMealsDetailed = [
   { name: "Pochero", ingredients: ["pork/beef","plantains","vegetables"], calories: 500, protein: 28, carbs: 54, fats: 16, fiber: 5, recipe: "" },
 ];
 
+// Filipino Snacks List - SPECIFICALLY for snack1 and snack2
+const filipinoSnacks = [
+  { name: "Banana Cue", ingredients: ["banana","brown sugar","oil"], calories: 180, protein: 1, carbs: 35, fats: 5, fiber: 2, recipe: "" },
+  { name: "Camote Cue", ingredients: ["sweet potato","brown sugar","oil"], calories: 160, protein: 1, carbs: 32, fats: 4, fiber: 3, recipe: "" },
+  { name: "Fishball", ingredients: ["fish","cornstarch","seasonings"], calories: 120, protein: 10, carbs: 12, fats: 3, fiber: 0, recipe: "" },
+  { name: "Siomai", ingredients: ["pork","shrimp","wonton wrapper"], calories: 140, protein: 8, carbs: 14, fats: 5, fiber: 0, recipe: "" },
+  { name: "Lumpia Shanghai", ingredients: ["pork","vegetables","spring roll wrapper"], calories: 150, protein: 7, carbs: 16, fats: 6, fiber: 1, recipe: "" },
+  { name: "Turon", ingredients: ["banana","brown sugar","spring roll wrapper"], calories: 170, protein: 1, carbs: 32, fats: 5, fiber: 2, recipe: "" },
+  { name: "Halo-Halo", ingredients: ["ice","evaporated milk","fruits","beans","palm seeds"], calories: 220, protein: 3, carbs: 45, fats: 4, fiber: 3, recipe: "" },
+  { name: "Bibingka", ingredients: ["rice flour","coconut","brown sugar","egg"], calories: 240, protein: 4, carbs: 38, fats: 8, fiber: 1, recipe: "" },
+  { name: "Puto", ingredients: ["rice flour","sugar","baking powder"], calories: 180, protein: 3, carbs: 36, fats: 2, fiber: 1, recipe: "" },
+  { name: "Balut", ingredients: ["duck egg","salt"], calories: 190, protein: 14, carbs: 1, fats: 14, fiber: 0, recipe: "" },
+  { name: "Kwek-Kwek", ingredients: ["quail eggs","flour batter"], calories: 130, protein: 7, carbs: 12, fats: 5, fiber: 0, recipe: "" },
+  { name: "Tokneneng", ingredients: ["quail eggs","flour batter","sweet sauce"], calories: 150, protein: 8, carbs: 14, fats: 6, fiber: 0, recipe: "" },
+  { name: "Empanada", ingredients: ["flour dough","meat filling","vegetable"], calories: 240, protein: 8, carbs: 28, fats: 10, fiber: 2, recipe: "" },
+  { name: "Pastry Puto Bumbong", ingredients: ["rice flour","coconut milk","brown sugar"], calories: 210, protein: 2, carbs: 40, fats: 5, fiber: 2, recipe: "" },
+  { name: "Aroz Caldo Balls", ingredients: ["rice flour","chicken","ginger"], calories: 140, protein: 6, carbs: 22, fats: 2, fiber: 1, recipe: "" },
+  { name: "Taiyaki", ingredients: ["flour","sugar","banana filling"], calories: 200, protein: 3, carbs: 38, fats: 4, fiber: 1, recipe: "" },
+  { name: "Okoy", ingredients: ["shrimp","potato","flour"], calories: 180, protein: 8, carbs: 20, fats: 7, fiber: 2, recipe: "" },
+  { name: "Cassava Cake", ingredients: ["cassava","coconut milk","sugar"], calories: 250, protein: 2, carbs: 42, fats: 8, fiber: 2, recipe: "" },
+  { name: "Ube Cake", ingredients: ["ube","flour","sugar","egg"], calories: 260, protein: 4, carbs: 44, fats: 8, fiber: 1, recipe: "" },
+  { name: "Choco Pie", ingredients: ["graham crackers","chocolate","condensed milk"], calories: 210, protein: 2, carbs: 32, fats: 9, fiber: 1, recipe: "" },
+  { name: "Langka Jam Pastry", ingredients: ["langka jam","pastry dough"], calories: 190, protein: 2, carbs: 36, fats: 5, fiber: 1, recipe: "" },
+  { name: "Tinutuan", ingredients: ["rice","chicken","ginger","egg"], calories: 200, protein: 8, carbs: 28, fats: 4, fiber: 1, recipe: "" },
+  { name: "Lumpiang Togue", ingredients: ["bean sprouts","pork","spring roll wrapper"], calories: 140, protein: 7, carbs: 16, fats: 4, fiber: 2, recipe: "" },
+  { name: "Dilis (Dried Anchovies)", ingredients: ["anchovies","salt"], calories: 120, protein: 20, carbs: 0, fats: 4, fiber: 0, recipe: "" },
+  { name: "Bagnet Bits", ingredients: ["pork belly","salt"], calories: 280, protein: 16, carbs: 0, fats: 23, fiber: 0, recipe: "" },
+  { name: "Peanut Brittle", ingredients: ["peanuts","sugar","corn syrup"], calories: 220, protein: 8, carbs: 28, fats: 10, fiber: 2, recipe: "" },
+  { name: "Sweet Corn Ice Cream", ingredients: ["corn","milk","sugar"], calories: 180, protein: 4, carbs: 26, fats: 7, fiber: 1, recipe: "" },
+  { name: "Egg Pie", ingredients: ["egg custard","pie crust"], calories: 240, protein: 6, carbs: 32, fats: 10, fiber: 1, recipe: "" },
+  { name: "Fried Spring Roll", ingredients: ["vegetables","pork","spring roll wrapper"], calories: 160, protein: 6, carbs: 18, fats: 7, fiber: 2, recipe: "" },
+  { name: "Garlic Bread Stick", ingredients: ["bread","garlic","butter"], calories: 180, protein: 4, carbs: 24, fats: 8, fiber: 1, recipe: "" },
+];
+
+
 // ===== AUTHENTICATION MIDDLEWARE =====
 interface AuthRequest extends Request {
   user?: any;
@@ -347,6 +382,7 @@ function pickUniqueMeals(source: any[], used: Set<string>, count: number) {
 function generateWeekPlan(aiDay: any | null, targets: any, goal: string) {
   const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   const used = new Set<string>();
+  const usedSnacks = new Set<string>();
   const weekPlan: any[] = [];
 
   if (aiDay && aiDay.meals) {
@@ -374,19 +410,24 @@ function generateWeekPlan(aiDay: any | null, targets: any, goal: string) {
       continue;
     }
 
-    const picks = pickUniqueMeals(trustedFilipinoMealsDetailed, used, 5);
+    // Pick 3 main meals (breakfast, lunch, dinner) from meals list
+    const picks = pickUniqueMeals(trustedFilipinoMealsDetailed, used, 3);
 
-    while (picks.length < 5) {
+    while (picks.length < 3) {
       const fallback = trustedFilipinoMealsDetailed[Math.floor(Math.random() * trustedFilipinoMealsDetailed.length)];
       if (!picks.find(p => p.name === fallback.name)) picks.push(fallback);
     }
+
+    // Pick 2 snacks from SNACKS list only
+    const snack1 = pickUniqueMeals(filipinoSnacks, usedSnacks, 1)[0];
+    const snack2 = pickUniqueMeals(filipinoSnacks, usedSnacks, 1)[0];
 
     const mealsObj: any = {
       breakfast: createMealObject(picks[0]),
       lunch: createMealObject(picks[1]),
       dinner: createMealObject(picks[2]),
-      snack1: createMealObject(picks[3]),
-      snack2: createMealObject(picks[4]),
+      snack1: createMealObject(snack1),
+      snack2: createMealObject(snack2),
     };
 
     const totals = sumMacros(Object.values(mealsObj));
@@ -1431,16 +1472,26 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
 
     // Determine category for dish selection
     const category = mealTypeKey || mealType || mealKey || null;
+    const isSnack = category === 'snack1' || category === 'snack2' || category === 'snacks';
 
     // Get dishes by category if category provided else fetch all
     let dishes: any[] = [];
-    if (category) {
+    
+    // Use snacks list if this is a snack regeneration
+    if (isSnack) {
+      dishes = filipinoSnacks;
+    } else if (category) {
       const [rows] = await pool.query<any[]>('SELECT * FROM filipino_dishes WHERE category = ?', [category]);
       dishes = rows || [];
     }
+    
     if (!Array.isArray(dishes) || dishes.length === 0) {
-      const [rows] = await pool.query<any[]>('SELECT * FROM filipino_dishes ORDER BY name');
-      dishes = rows || [];
+      if (isSnack) {
+        dishes = filipinoSnacks;
+      } else {
+        const [rows] = await pool.query<any[]>('SELECT * FROM filipino_dishes ORDER BY name');
+        dishes = rows || [];
+      }
     }
 
     // Normalize excluded names (lowercase)
@@ -1451,7 +1502,9 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
 
     // Fallback sample if no DB dishes
     if (!Array.isArray(dishes) || dishes.length === 0) {
-      const fallbackDish = trustedFilipinoMealsDetailed[Math.floor(Math.random() * trustedFilipinoMealsDetailed.length)];
+      const fallbackDish = isSnack 
+        ? filipinoSnacks[Math.floor(Math.random() * filipinoSnacks.length)]
+        : trustedFilipinoMealsDetailed[Math.floor(Math.random() * trustedFilipinoMealsDetailed.length)];
       return res.json({ success: true, newMeal: createMealObject(fallbackDish), source: 'fallback' });
     }
 
@@ -1470,7 +1523,7 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
     const dishListJson = JSON.stringify(dishes.map(d => ({ name: d.name, calories: d.calories, protein: d.protein, carbs: d.carbs, fats: d.fats })));
     const excludeText = excludeArr.length > 0 ? `\nDo NOT return these dish names: ${excludeArr.join(', ')}` : '';
     const prompt = `
-You are a nutritionist. Choose a single dish best suited for the user's ${String(category || mealType || 'meal')} from the list below.
+You are a Filipino nutritionist. Choose a single ${isSnack ? 'snack' : String(category || mealType || 'meal')} best suited for the user from the list below.
 User targets: ${targets?.calories ?? 2000} kcal, ${targets?.protein ?? 150}g protein, ${targets?.carbs ?? 250}g carbs, ${targets?.fats ?? 70}g fats.
 Dietary restrictions: ${dietaryRestrictions || 'none'}.
 ${excludeText}
