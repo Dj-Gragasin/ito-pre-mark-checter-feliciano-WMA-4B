@@ -206,6 +206,7 @@ const MealPlanner: React.FC = () => {
   const [lifestyle, setLifestyle] = useState<string>("moderate");
   const [mealType, setMealType] = useState<string>("balanced");
   const [goal, setGoal] = useState<string>("muscle_gain");
+  const [diet, setDiet] = useState<string>(""); 
   const [dietaryRestrictions, setDietaryRestrictions] = useState<string>("");
   const [calorieTarget, setCalorieTarget] = useState<number>(2000);
   const [proteinTarget, setProteinTarget] = useState<number>(150);
@@ -320,6 +321,7 @@ const MealPlanner: React.FC = () => {
         lifestyle,
         mealType,
         goal,
+        diet, // NEW: Add diet to the request
         dietaryRestrictions,
         targets: {
           calories: calorieTarget,
@@ -1027,6 +1029,25 @@ const MealPlanner: React.FC = () => {
                   </IonItem>
                 </div>
 
+                <div className="form-group">
+                  <IonItem className="custom-item">
+                    <IonLabel position="stacked">
+                      <IonIcon icon={restaurant} /> Diet Type (Optional)
+                    </IonLabel>
+                    <IonSelect value={diet} onIonChange={(e) => setDiet(e.detail.value!)}>
+                      <IonSelectOption value="">🍽️ No Specific Diet</IonSelectOption>
+                      <IonSelectOption value="low_carb">🥗 Low Carb</IonSelectOption>
+                      <IonSelectOption value="low_fat">🐔 Low Fat</IonSelectOption>
+                      <IonSelectOption value="vegetarian">🥬 Vegetarian</IonSelectOption>
+                      <IonSelectOption value="vegan">🌱 Vegan</IonSelectOption>
+                      <IonSelectOption value="keto">🥑 Keto</IonSelectOption>
+                      <IonSelectOption value="paleo">🍖 Paleo</IonSelectOption>
+                      <IonSelectOption value="low_sodium">🧂 Low Sodium</IonSelectOption>
+                      <IonSelectOption value="high_protein">💪 High Protein</IonSelectOption>
+                    </IonSelect>
+                  </IonItem>
+                </div>
+
                 {/* Allergies/Restrictions Section */}
                 <div className="form-group">
                   <IonItem className="custom-item">
@@ -1525,33 +1546,29 @@ const MealPlanner: React.FC = () => {
                 </div>
 
                 <div className="recipe-section">
-                  <h4 className="section-heading">Ingredients</h4>
+                  <h4 className="section-heading">📍 Portion Size</h4>
+                  <p className="recipe-text">{selectedMeal.meal.portionSize || "1 serving"}</p>
+                </div>
+
+                <div className="recipe-section">
+                  <h4 className="section-heading">🛒 Ingredients</h4>
                   <ul className="ingredients-list">
-                    {/* Removed inline const; use recipeIngredients declared above */}
                     {recipeIngredients.map((ing, idx) => (
                       <li key={idx}>{ing}</li>
                     ))}
                   </ul>
                 </div>
 
-                {/* Show both recipe and AI-provided instructions when available */}
-                {selectedMeal.meal.recipe && (
+                {selectedMeal.meal.recipe && selectedMeal.meal.recipe.trim() !== '' && (
                   <div className="recipe-section">
-                    <h4 className="section-heading">Recipe</h4>
-                    <p className="recipe-text">{selectedMeal.meal.recipe}</p>
+                    <h4 className="section-heading">👨‍🍳 Cooking Instructions</h4>
+                    <div className="recipe-instructions">
+                      {selectedMeal.meal.recipe.split('\n').filter((line: string) => line.trim()).map((line: string, idx: number) => (
+                        <p key={idx} className="instruction-step">{line}</p>
+                      ))}
+                    </div>
                   </div>
                 )}
-                {selectedMeal.meal.instructions && selectedMeal.meal.instructions !== selectedMeal.meal.recipe && (
-                  <div className="recipe-section">
-                    <h4 className="section-heading">AI Instructions</h4>
-                    <p className="recipe-text">{selectedMeal.meal.instructions}</p>
-                  </div>
-                )}
-
-                <div className="recipe-section">
-                  <h4 className="section-heading">Portion Size</h4>
-                  <p className="recipe-text">{selectedMeal.meal.portionSize}</p>
-                </div>
               </div>
             )}
           </IonContent>

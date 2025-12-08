@@ -37,6 +37,8 @@ import AdminAttendance from "./pages/AdminAttendance";
 import EquipmentManagement from "./pages/EquipmentManagement";
 import AdminPayments from "./pages/AdminPayments";
 import PaymentReturn from "./pages/PaymentReturn";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentFailed from "./pages/PaymentFailed";
 
 /* Import role-based route */
 import PrivateRoute from "./components/PrivateRoute";
@@ -143,6 +145,18 @@ const App: React.FC = () => {
           {/* Payment Routes */}
           <Route path="/payment/success" component={PaymentReturn} />
           <Route path="/payment/failed" component={PaymentReturn} />
+          <PrivateRoute
+            exact
+            path="/member/payment/success"
+            component={PaymentSuccess}
+            role="member"
+          />
+          <PrivateRoute
+            exact
+            path="/member/payment/failed"
+            component={PaymentFailed}
+            role="member"
+          />
 
           {/* Default redirect */}
           <Route exact path="/" render={() => <Redirect to="/home" />} />

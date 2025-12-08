@@ -86,76 +86,70 @@ const MemberPayment: React.FC = () => {
     return diffDays;
   };
 
-  const handleGCashPayment = async () => {
+  const handlePayPalPayment = async () => {
     if (isProcessing) return;
     
     setIsProcessing(true);
     try {
       const amount = MEMBERSHIP_PRICES[selectedPlan];
-      const userId = localStorage.getItem('userId');
+      
+      // Get userId from stored user object
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      const userId = user?.id;
 
-      console.log('💳 Processing GCash payment (AUTO-APPROVAL):', {
+      console.log('💳 Creating PayPal order:', {
         userId,
         membershipType: selectedPlan,
         amount,
-        paymentMethod: 'gcash'
+        paymentMethod: 'paypal'
       });
 
-      // Use the auto-approval gcash endpoint
-      const response = await fetch(`${API_URL}/member/payment/gcash`, {
+      if (!userId) {
+        throw new Error('User ID not found. Please log in again.');
+      }
+
+      // Call PayPal create-order endpoint
+      const response = await fetch(`${API_URL}/payments/paypal/create-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
         body: JSON.stringify({
-          userId,
-          membershipType: selectedPlan,
           amount,
-          paymentMethod: 'gcash',
+          plan: selectedPlan,
         }),
       });
 
       const result = await response.json();
 
-      if (response.ok && result.success) {
-        // Show success message
+      if (response.ok && result.success && result.approvalLink) {
+        console.log('✅ PayPal order created, redirecting to approval:', result.orderId);
+        
+        // Show notification that redirecting to PayPal
         presentToast({
-          message: result.message || '✅ Payment successful! Your subscription is now active.',
-          duration: 5000,
-          color: 'success',
-          position: 'top',
-          icon: checkmarkCircle
+          message: '🔄 Redirecting to PayPal...',
+          duration: 2000,
+          color: 'primary',
+          position: 'top'
         });
 
-        // Reload subscription to show updated status
-        setTimeout(async () => {
-          await loadSubscription();
-        }, 1000);
-
-        // Show subscription details
-        if (result.subscription) {
-          setTimeout(() => {
-            presentToast({
-              message: `🎉 Active until: ${new Date(result.subscription.end).toLocaleDateString()}`,
-              duration: 4000,
-              color: 'success',
-              position: 'bottom'
-            });
-          }, 1500);
-        }
+        // Redirect to PayPal approval page
+        setTimeout(() => {
+          window.location.href = result.approvalLink;
+        }, 500);
       } else {
-        throw new Error(result.message || 'Payment failed');
+        throw new Error(result.message || 'Failed to create PayPal order');
       }
     } catch (error: any) {
-      console.error('❌ GCash payment error:', error);
+      console.error('❌ PayPal payment error:', error);
       presentToast({
-        message: error.message || '❌ Payment failed. Please try again.',
+        message: error.message || '❌ Failed to start payment. Please try again.',
         duration: 3000,
         color: 'danger',
         position: 'top'
       });
-    } finally {
       setIsProcessing(false);
     }
   };
@@ -286,11 +280,11 @@ const MemberPayment: React.FC = () => {
               <div className="payment-options">
                 <h3 className="options-title">Payment Options</h3>
 
-                {/* GCash Payment Button - AUTO APPROVED */}
+                {/* PayPal Payment Button */}
                 <IonButton
                   expand="block"
-                  className="gcash-button"
-                  onClick={handleGCashPayment}
+                  className="paypal-button"
+                  onClick={handlePayPalPayment}
                   disabled={isProcessing}
                 >
                   {isProcessing ? (
@@ -301,7 +295,7 @@ const MemberPayment: React.FC = () => {
                   ) : (
                     <>
                       <IonIcon icon={wallet} slot="start" />
-                      Pay with GCash - Instant Activation ⚡
+                      Pay with PayPal - Instant Activation ⚡
                     </>
                   )}
                 </IonButton>

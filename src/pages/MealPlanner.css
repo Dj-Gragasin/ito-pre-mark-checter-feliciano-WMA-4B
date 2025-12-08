@@ -1282,6 +1282,23 @@ ion-segment-button.segment-button-checked {
   line-height: 1.7;
 }
 
+.recipe-instructions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.instruction-step {
+  background: rgba(0, 230, 118, 0.08);
+  border-left: 3px solid #7efc6a;
+  padding: 10px 12px;
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
 /* Saved Plans Modal */
 .saved-plans-list {
   padding: 2rem 1rem;

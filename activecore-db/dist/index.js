@@ -104,59 +104,56 @@ const trustedFilipinoMeals = [
 ];
 // Extended trustedFilipinoMealsDetailed with more meals and macros
 const trustedFilipinoMealsDetailed = [
-    { name: "Chicken Adobo", ingredients: ["chicken", "soy sauce", "vinegar"], calories: 480, protein: 36, carbs: 50, fats: 14, fiber: 2, recipe: "" },
-    { name: "Pork Adobo", ingredients: ["pork", "soy", "vinegar"], calories: 520, protein: 32, carbs: 52, fats: 22, fiber: 2, recipe: "" },
-    { name: "Tapsilog", ingredients: ["beef tapa", "garlic rice", "egg"], calories: 520, protein: 36, carbs: 48, fats: 16, fiber: 2, recipe: "" },
-    { name: "Bangus Sinigang", ingredients: ["bangus", "sinigang mix", "vegetables"], calories: 410, protein: 32, carbs: 46, fats: 10, fiber: 3, recipe: "" },
-    { name: "Tinolang Manok", ingredients: ["chicken", "ginger", "malunggay"], calories: 390, protein: 34, carbs: 44, fats: 8, fiber: 3, recipe: "" },
-    { name: "Laing", ingredients: ["gabi leaves", "coconut milk"], calories: 350, protein: 12, carbs: 38, fats: 16, fiber: 5, recipe: "" },
-    { name: "Pinakbet", ingredients: ["eggplant", "ampalaya", "sitaw", "okra", "shrimp paste"], calories: 300, protein: 12, carbs: 30, fats: 10, fiber: 6, recipe: "" },
-    { name: "Pancit Bihon", ingredients: ["bihon noodles", "chicken", "carrots", "cabbage"], calories: 420, protein: 18, carbs: 62, fats: 8, fiber: 4, recipe: "" },
-    { name: "Arroz Caldo", ingredients: ["rice", "chicken", "ginger", "egg"], calories: 390, protein: 20, carbs: 54, fats: 8, fiber: 2, recipe: "" },
-    { name: "Kare-Kare", ingredients: ["oxtail", "peanut sauce", "vegetables"], calories: 540, protein: 28, carbs: 52, fats: 22, fiber: 5, recipe: "" },
-    { name: "Lumpiang Sariwa", ingredients: ["spring roll wrapper", "mixed vegetables", "peanut sauce"], calories: 260, protein: 8, carbs: 38, fats: 8, fiber: 4, recipe: "" },
-    { name: "Daing na Bangus", ingredients: ["bangus", "vinegar", "garlic"], calories: 410, protein: 32, carbs: 44, fats: 10, fiber: 2, recipe: "" },
-    { name: "Chicken Inasal", ingredients: ["chicken leg", "annatto oil", "vinegar"], calories: 420, protein: 34, carbs: 44, fats: 10, fiber: 2, recipe: "" },
-    { name: "Ginisang Monggo", ingredients: ["mung beans", "garlic", "pork bits", "spinach"], calories: 340, protein: 18, carbs: 44, fats: 8, fiber: 6, recipe: "" },
-    { name: "La Paz Batchoy", ingredients: ["egg noodles", "pork", "liver", "egg"], calories: 480, protein: 22, carbs: 60, fats: 14, fiber: 2, recipe: "" },
-    { name: "Bicol Express", ingredients: ["pork", "coconut milk", "chili", "shrimp paste"], calories: 520, protein: 24, carbs: 52, fats: 22, fiber: 3, recipe: "" },
-    { name: "Paksiw na Bangus", ingredients: ["bangus", "vinegar", "eggplant"], calories: 380, protein: 28, carbs: 40, fats: 10, fiber: 4, recipe: "" },
-    { name: "Bulalo", ingredients: ["beef shank", "corn", "greens"], calories: 520, protein: 32, carbs: 50, fats: 18, fiber: 3, recipe: "" },
-    { name: "Tinolang Isda", ingredients: ["fish", "ginger", "papaya", "greens"], calories: 350, protein: 28, carbs: 38, fats: 8, fiber: 3, recipe: "" },
-    { name: "Pochero", ingredients: ["pork/beef", "plantains", "vegetables"], calories: 500, protein: 28, carbs: 54, fats: 16, fiber: 5, recipe: "" },
+    { name: "Chicken Adobo", ingredients: ["chicken thighs", "soy sauce", "vinegar", "garlic", "bay leaves", "black pepper", "oil", "water"], calories: 480, protein: 36, carbs: 50, fats: 14, fiber: 2, recipe: "" },
+    { name: "Pork Adobo", ingredients: ["pork belly", "soy sauce", "vinegar", "garlic cloves", "bay leaves", "black pepper", "cooking oil", "water"], calories: 520, protein: 32, carbs: 52, fats: 22, fiber: 2, recipe: "" },
+    { name: "Tapsilog", ingredients: ["beef tapa", "garlic", "rice", "egg", "butter", "salt", "pepper"], calories: 520, protein: 36, carbs: 48, fats: 16, fiber: 2, recipe: "" },
+    { name: "Bangus Sinigang", ingredients: ["milkfish", "tamarind paste", "radish", "spinach", "string beans", "ginger", "garlic", "onion", "salt", "pepper"], calories: 410, protein: 32, carbs: 46, fats: 10, fiber: 3, recipe: "" },
+    { name: "Tinolang Manok", ingredients: ["chicken", "ginger", "malunggay leaves", "papaya", "garlic", "onion", "fish sauce", "broth", "oil"], calories: 390, protein: 34, carbs: 44, fats: 8, fiber: 3, recipe: "" },
+    { name: "Laing", ingredients: ["taro leaves", "coconut milk", "garlic", "onion", "ginger", "chili", "shrimp paste", "salt"], calories: 350, protein: 12, carbs: 38, fats: 16, fiber: 5, recipe: "" },
+    { name: "Pinakbet", ingredients: ["eggplant", "ampalaya", "string beans", "okra", "squash", "shrimp paste", "garlic", "onion", "tomato", "anchovy"], calories: 300, protein: 12, carbs: 30, fats: 10, fiber: 6, recipe: "" },
+    { name: "Pancit Bihon", ingredients: ["bihon noodles", "chicken", "carrots", "cabbage", "garlic", "onion", "soy sauce", "cooking oil", "broth"], calories: 420, protein: 18, carbs: 62, fats: 8, fiber: 4, recipe: "" },
+    { name: "Arroz Caldo", ingredients: ["rice", "chicken", "ginger", "egg", "garlic", "onion", "turmeric", "broth", "fish sauce", "oil"], calories: 390, protein: 20, carbs: 54, fats: 8, fiber: 2, recipe: "" },
+    { name: "Kare-Kare", ingredients: ["oxtail", "peanut butter", "vegetables", "garlic", "onion", "vinegar", "salt", "pepper", "oil", "annatto"], calories: 540, protein: 28, carbs: 52, fats: 22, fiber: 5, recipe: "" },
+    { name: "Lumpiang Sariwa", ingredients: ["spring roll wrapper", "vegetables", "peanut sauce", "garlic", "shrimp", "pork", "egg", "vinegar"], calories: 260, protein: 8, carbs: 38, fats: 8, fiber: 4, recipe: "" },
+    { name: "Daing na Bangus", ingredients: ["milkfish", "vinegar", "garlic", "salt", "pepper", "bay leaves", "cooking oil"], calories: 410, protein: 32, carbs: 44, fats: 10, fiber: 2, recipe: "" },
+    { name: "Chicken Inasal", ingredients: ["chicken leg", "annatto oil", "vinegar", "garlic", "ginger", "brown sugar", "salt", "pepper"], calories: 420, protein: 34, carbs: 44, fats: 10, fiber: 2, recipe: "" },
+    { name: "Ginisang Monggo", ingredients: ["mung beans", "garlic", "pork bits", "spinach", "onion", "ginger", "tomato", "oil", "salt"], calories: 340, protein: 18, carbs: 44, fats: 8, fiber: 6, recipe: "" },
+    { name: "La Paz Batchoy", ingredients: ["egg noodles", "pork", "chicken liver", "egg", "garlic", "onion", "carrots", "broth", "lard"], calories: 480, protein: 22, carbs: 60, fats: 14, fiber: 2, recipe: "" },
+    { name: "Bicol Express", ingredients: ["pork", "coconut milk", "long chili", "shrimp paste", "garlic", "onion", "salt", "oil"], calories: 520, protein: 24, carbs: 52, fats: 22, fiber: 3, recipe: "" },
+    { name: "Paksiw na Bangus", ingredients: ["milkfish", "vinegar", "eggplant", "salt", "garlic", "ginger", "bay leaves", "oil"], calories: 380, protein: 28, carbs: 40, fats: 10, fiber: 4, recipe: "" },
+    { name: "Bulalo", ingredients: ["beef shank", "corn", "radish", "spinach", "cabbage", "garlic", "onion", "fish sauce", "broth"], calories: 520, protein: 32, carbs: 50, fats: 18, fiber: 3, recipe: "" },
+    { name: "Tinolang Isda", ingredients: ["fish", "ginger", "papaya", "malunggay leaves", "garlic", "onion", "fish sauce", "broth", "oil"], calories: 350, protein: 28, carbs: 38, fats: 8, fiber: 3, recipe: "" },
+    { name: "Pochero", ingredients: ["pork", "plantains", "chickpeas", "carrots", "potatoes", "cabbage", "garlic", "onion", "broth"], calories: 500, protein: 28, carbs: 54, fats: 16, fiber: 5, recipe: "" },
 ];
 // Filipino Snacks List - SPECIFICALLY for snack1 and snack2
 const filipinoSnacks = [
-    { name: "Banana Cue", ingredients: ["banana", "brown sugar", "oil"], calories: 180, protein: 1, carbs: 35, fats: 5, fiber: 2, recipe: "" },
-    { name: "Camote Cue", ingredients: ["sweet potato", "brown sugar", "oil"], calories: 160, protein: 1, carbs: 32, fats: 4, fiber: 3, recipe: "" },
-    { name: "Fishball", ingredients: ["fish", "cornstarch", "seasonings"], calories: 120, protein: 10, carbs: 12, fats: 3, fiber: 0, recipe: "" },
-    { name: "Siomai", ingredients: ["pork", "shrimp", "wonton wrapper"], calories: 140, protein: 8, carbs: 14, fats: 5, fiber: 0, recipe: "" },
-    { name: "Lumpia Shanghai", ingredients: ["pork", "vegetables", "spring roll wrapper"], calories: 150, protein: 7, carbs: 16, fats: 6, fiber: 1, recipe: "" },
-    { name: "Turon", ingredients: ["banana", "brown sugar", "spring roll wrapper"], calories: 170, protein: 1, carbs: 32, fats: 5, fiber: 2, recipe: "" },
-    { name: "Halo-Halo", ingredients: ["ice", "evaporated milk", "fruits", "beans", "palm seeds"], calories: 220, protein: 3, carbs: 45, fats: 4, fiber: 3, recipe: "" },
-    { name: "Bibingka", ingredients: ["rice flour", "coconut", "brown sugar", "egg"], calories: 240, protein: 4, carbs: 38, fats: 8, fiber: 1, recipe: "" },
-    { name: "Puto", ingredients: ["rice flour", "sugar", "baking powder"], calories: 180, protein: 3, carbs: 36, fats: 2, fiber: 1, recipe: "" },
-    { name: "Balut", ingredients: ["duck egg", "salt"], calories: 190, protein: 14, carbs: 1, fats: 14, fiber: 0, recipe: "" },
-    { name: "Kwek-Kwek", ingredients: ["quail eggs", "flour batter"], calories: 130, protein: 7, carbs: 12, fats: 5, fiber: 0, recipe: "" },
-    { name: "Tokneneng", ingredients: ["quail eggs", "flour batter", "sweet sauce"], calories: 150, protein: 8, carbs: 14, fats: 6, fiber: 0, recipe: "" },
-    { name: "Empanada", ingredients: ["flour dough", "meat filling", "vegetable"], calories: 240, protein: 8, carbs: 28, fats: 10, fiber: 2, recipe: "" },
-    { name: "Pastry Puto Bumbong", ingredients: ["rice flour", "coconut milk", "brown sugar"], calories: 210, protein: 2, carbs: 40, fats: 5, fiber: 2, recipe: "" },
-    { name: "Aroz Caldo Balls", ingredients: ["rice flour", "chicken", "ginger"], calories: 140, protein: 6, carbs: 22, fats: 2, fiber: 1, recipe: "" },
-    { name: "Taiyaki", ingredients: ["flour", "sugar", "banana filling"], calories: 200, protein: 3, carbs: 38, fats: 4, fiber: 1, recipe: "" },
-    { name: "Okoy", ingredients: ["shrimp", "potato", "flour"], calories: 180, protein: 8, carbs: 20, fats: 7, fiber: 2, recipe: "" },
-    { name: "Cassava Cake", ingredients: ["cassava", "coconut milk", "sugar"], calories: 250, protein: 2, carbs: 42, fats: 8, fiber: 2, recipe: "" },
-    { name: "Ube Cake", ingredients: ["ube", "flour", "sugar", "egg"], calories: 260, protein: 4, carbs: 44, fats: 8, fiber: 1, recipe: "" },
-    { name: "Choco Pie", ingredients: ["graham crackers", "chocolate", "condensed milk"], calories: 210, protein: 2, carbs: 32, fats: 9, fiber: 1, recipe: "" },
-    { name: "Langka Jam Pastry", ingredients: ["langka jam", "pastry dough"], calories: 190, protein: 2, carbs: 36, fats: 5, fiber: 1, recipe: "" },
-    { name: "Tinutuan", ingredients: ["rice", "chicken", "ginger", "egg"], calories: 200, protein: 8, carbs: 28, fats: 4, fiber: 1, recipe: "" },
-    { name: "Lumpiang Togue", ingredients: ["bean sprouts", "pork", "spring roll wrapper"], calories: 140, protein: 7, carbs: 16, fats: 4, fiber: 2, recipe: "" },
+    { name: "Banana Cue", ingredients: ["saba banana", "brown sugar", "cooking oil", "salt"], calories: 180, protein: 1, carbs: 35, fats: 5, fiber: 2, recipe: "" },
+    { name: "Camote Cue", ingredients: ["sweet potato", "brown sugar", "cooking oil", "salt"], calories: 160, protein: 1, carbs: 32, fats: 4, fiber: 3, recipe: "" },
+    { name: "Fishball", ingredients: ["fish meat", "cornstarch", "salt", "pepper", "garlic", "vinegar"], calories: 120, protein: 10, carbs: 12, fats: 3, fiber: 0, recipe: "" },
+    { name: "Siomai", ingredients: ["pork", "shrimp", "wonton wrapper", "soy sauce", "ginger", "garlic"], calories: 140, protein: 8, carbs: 14, fats: 5, fiber: 0, recipe: "" },
+    { name: "Lumpia Shanghai", ingredients: ["pork", "cabbage", "carrots", "spring roll wrapper", "garlic", "onion", "soy sauce"], calories: 150, protein: 7, carbs: 16, fats: 6, fiber: 1, recipe: "" },
+    { name: "Turon", ingredients: ["banana", "brown sugar", "spring roll wrapper", "cooking oil", "cinnamon"], calories: 170, protein: 1, carbs: 32, fats: 5, fiber: 2, recipe: "" },
+    { name: "Halo-Halo", ingredients: ["ice", "evaporated milk", "mango", "jackfruit", "palm seeds", "red beans", "vanilla ice cream"], calories: 220, protein: 3, carbs: 45, fats: 4, fiber: 3, recipe: "" },
+    { name: "Bibingka", ingredients: ["rice flour", "coconut", "brown sugar", "egg", "baking powder", "salt", "butter"], calories: 240, protein: 4, carbs: 38, fats: 8, fiber: 1, recipe: "" },
+    { name: "Puto", ingredients: ["rice flour", "sugar", "baking powder", "salt", "egg", "milk", "banana leaves"], calories: 180, protein: 3, carbs: 36, fats: 2, fiber: 1, recipe: "" },
+    { name: "Balut", ingredients: ["duck egg", "salt", "vinegar", "ginger"], calories: 190, protein: 14, carbs: 1, fats: 14, fiber: 0, recipe: "" },
+    { name: "Kwek-Kwek", ingredients: ["quail eggs", "flour", "turmeric", "salt", "baking powder", "oil"], calories: 130, protein: 7, carbs: 12, fats: 5, fiber: 0, recipe: "" },
+    { name: "Tokneneng", ingredients: ["quail eggs", "flour", "turmeric", "sweet chili sauce", "oil", "vinegar"], calories: 150, protein: 8, carbs: 14, fats: 6, fiber: 0, recipe: "" },
+    { name: "Empanada", ingredients: ["flour", "butter", "meat", "potatoes", "garlic", "onion", "egg"], calories: 240, protein: 8, carbs: 28, fats: 10, fiber: 2, recipe: "" },
+    { name: "Puto Bumbong", ingredients: ["rice flour", "coconut milk", "brown sugar", "salt", "banana leaves"], calories: 210, protein: 2, carbs: 40, fats: 5, fiber: 2, recipe: "" },
+    { name: "Tinutuan", ingredients: ["rice", "chicken", "ginger", "egg", "garlic", "onion", "fish sauce"], calories: 200, protein: 8, carbs: 28, fats: 4, fiber: 1, recipe: "" },
+    { name: "Lumpiang Togue", ingredients: ["bean sprouts", "pork", "spring roll wrapper", "garlic", "onion", "soy sauce"], calories: 140, protein: 7, carbs: 16, fats: 4, fiber: 2, recipe: "" },
+    { name: "Okoy", ingredients: ["shrimp", "potato", "flour", "egg", "onion", "oil", "vinegar"], calories: 180, protein: 8, carbs: 20, fats: 7, fiber: 2, recipe: "" },
+    { name: "Cassava Cake", ingredients: ["cassava", "coconut milk", "sugar", "egg", "butter", "salt"], calories: 250, protein: 2, carbs: 42, fats: 8, fiber: 2, recipe: "" },
+    { name: "Ube Cake", ingredients: ["ube", "flour", "sugar", "egg", "butter", "baking powder", "milk"], calories: 260, protein: 4, carbs: 44, fats: 8, fiber: 1, recipe: "" },
+    { name: "Choco Pie", ingredients: ["graham crackers", "chocolate", "condensed milk", "butter", "salt"], calories: 210, protein: 2, carbs: 32, fats: 9, fiber: 1, recipe: "" },
     { name: "Dilis (Dried Anchovies)", ingredients: ["anchovies", "salt"], calories: 120, protein: 20, carbs: 0, fats: 4, fiber: 0, recipe: "" },
-    { name: "Bagnet Bits", ingredients: ["pork belly", "salt"], calories: 280, protein: 16, carbs: 0, fats: 23, fiber: 0, recipe: "" },
-    { name: "Peanut Brittle", ingredients: ["peanuts", "sugar", "corn syrup"], calories: 220, protein: 8, carbs: 28, fats: 10, fiber: 2, recipe: "" },
-    { name: "Sweet Corn Ice Cream", ingredients: ["corn", "milk", "sugar"], calories: 180, protein: 4, carbs: 26, fats: 7, fiber: 1, recipe: "" },
-    { name: "Egg Pie", ingredients: ["egg custard", "pie crust"], calories: 240, protein: 6, carbs: 32, fats: 10, fiber: 1, recipe: "" },
-    { name: "Fried Spring Roll", ingredients: ["vegetables", "pork", "spring roll wrapper"], calories: 160, protein: 6, carbs: 18, fats: 7, fiber: 2, recipe: "" },
-    { name: "Garlic Bread Stick", ingredients: ["bread", "garlic", "butter"], calories: 180, protein: 4, carbs: 24, fats: 8, fiber: 1, recipe: "" },
+    { name: "Bagnet Bits", ingredients: ["pork belly", "salt", "garlic"], calories: 280, protein: 16, carbs: 0, fats: 23, fiber: 0, recipe: "" },
+    { name: "Peanut Brittle", ingredients: ["peanuts", "brown sugar", "corn syrup", "butter", "salt"], calories: 220, protein: 8, carbs: 28, fats: 10, fiber: 2, recipe: "" },
+    { name: "Sweet Corn Ice Cream", ingredients: ["corn", "milk", "sugar", "cream", "vanilla"], calories: 180, protein: 4, carbs: 26, fats: 7, fiber: 1, recipe: "" },
+    { name: "Egg Pie", ingredients: ["egg yolks", "pie crust", "sugar", "condensed milk", "evaporated milk"], calories: 240, protein: 6, carbs: 32, fats: 10, fiber: 1, recipe: "" },
+    { name: "Fried Spring Roll", ingredients: ["cabbage", "carrots", "pork", "spring roll wrapper", "garlic", "soy sauce"], calories: 160, protein: 6, carbs: 18, fats: 7, fiber: 2, recipe: "" },
+    { name: "Garlic Bread Stick", ingredients: ["bread", "garlic", "butter", "parmesan cheese", "salt"], calories: 180, protein: 4, carbs: 24, fats: 8, fiber: 1, recipe: "" },
 ];
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
@@ -497,6 +494,68 @@ function isoDateString(input) {
     if (isNaN(d.getTime()))
         return new Date().toISOString().split('T')[0];
     return d.toISOString().split('T')[0];
+}
+// Generate recipe instructions using OpenAI
+function generateRecipeInstructions(mealName, ingredients) {
+    return __awaiter(this, void 0, void 0, function* () {
+        var _a, _b, _c;
+        if (!openai || !openaiAvailable) {
+            // Return basic instructions if OpenAI not available
+            return `1. Prepare all ingredients\n2. Cook according to traditional Filipino method\n3. Season to taste\n4. Serve hot`;
+        }
+        try {
+            const ingredientsList = ingredients.join(", ");
+            const completion = yield safeOpenAICompletionsCreate({
+                model: OPENAI_MODEL,
+                messages: [
+                    {
+                        role: "system",
+                        content: "You are a Filipino cuisine expert. Provide concise, numbered cooking instructions (3-5 steps max) for traditional Filipino dishes. Keep each step brief and practical."
+                    },
+                    {
+                        role: "user",
+                        content: `Generate simple cooking instructions for "${mealName}" using these ingredients: ${ingredientsList}. Return only the numbered steps, no extra text.`
+                    }
+                ],
+                temperature: 0.7,
+                max_tokens: 300
+            });
+            const recipeText = (((_c = (_b = (_a = completion === null || completion === void 0 ? void 0 : completion.choices) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.message) === null || _c === void 0 ? void 0 : _c.content) || "").trim();
+            return recipeText || `1. Prepare all ingredients\n2. Cook according to traditional Filipino method\n3. Season to taste\n4. Serve hot`;
+        }
+        catch (err) {
+            console.warn('Recipe generation failed:', getErrorMessage(err));
+            return `1. Prepare all ingredients\n2. Cook according to traditional Filipino method\n3. Season to taste\n4. Serve hot`;
+        }
+    });
+}
+// Enrich week plan meals with recipes
+function enrichWeekPlanWithRecipes(weekPlan) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!Array.isArray(weekPlan))
+            return weekPlan;
+        return Promise.all(weekPlan.map((day) => __awaiter(this, void 0, void 0, function* () {
+            if (!day.meals || typeof day.meals !== 'object')
+                return day;
+            const enrichedMeals = {};
+            for (const [mealType, meal] of Object.entries(day.meals)) {
+                if (!meal || typeof meal !== 'object') {
+                    enrichedMeals[mealType] = meal;
+                    continue;
+                }
+                const mealObj = meal;
+                // Only generate recipe if it's empty and we have ingredients
+                if ((!mealObj.recipe || mealObj.recipe.trim() === '') && mealObj.ingredients && Array.isArray(mealObj.ingredients) && mealObj.ingredients.length > 0) {
+                    const recipe = yield generateRecipeInstructions(mealObj.name || "Meal", mealObj.ingredients);
+                    enrichedMeals[mealType] = Object.assign(Object.assign({}, mealObj), { recipe });
+                }
+                else {
+                    enrichedMeals[mealType] = mealObj;
+                }
+            }
+            return Object.assign(Object.assign({}, day), { meals: enrichedMeals });
+        })));
+    });
 }
 // ===== BASIC ROUTES =====
 app.get('/api/health', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -1235,6 +1294,15 @@ Rules:
         catch (err) {
             console.warn('Failed to compute today shopping list:', getErrorMessage(err)); // changed
         }
+        // Enrich week plan with recipes (AWAIT this to ensure recipes are included in response)
+        try {
+            console.log('🔄 Generating recipes for meal plan...');
+            weekPlan = yield enrichWeekPlanWithRecipes(weekPlan);
+            console.log('✅ Recipe generation completed');
+        }
+        catch (err) {
+            console.warn('⚠️ Recipe enrichment failed, continuing without recipes:', getErrorMessage(err));
+        }
         // Save meal plan safely
         try {
             const safePlanName = planName || "Untitled Plan";
@@ -1310,7 +1378,9 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
             const fallbackDish = isSnack
                 ? filipinoSnacks[Math.floor(Math.random() * filipinoSnacks.length)]
                 : trustedFilipinoMealsDetailed[Math.floor(Math.random() * trustedFilipinoMealsDetailed.length)];
-            return res.json({ success: true, newMeal: createMealObject(fallbackDish), source: 'fallback' });
+            const mealObj = createMealObject(fallbackDish);
+            const recipe = yield generateRecipeInstructions(mealObj.name, mealObj.ingredients);
+            return res.json({ success: true, newMeal: Object.assign(Object.assign({}, mealObj), { recipe }), source: 'fallback' });
         }
         // Helper: pick random excluding excludeArr
         function pickRandomExcluding(list, exclude) {
@@ -1358,14 +1428,20 @@ Return JSON: { "newMeal": { "name":"...", "ingredients":[...], "calories":..., "
                     // If AI returns excluded name, fallback
                     if (excludeArr.includes(nameLower)) {
                         const picked = pickRandomExcluding(dishes, excludeArr);
-                        return res.json({ success: true, newMeal: createMealObject(picked), source: 'fallback-excluded' });
+                        const mealObj = createMealObject(picked);
+                        const recipe = yield generateRecipeInstructions(mealObj.name, mealObj.ingredients);
+                        return res.json({ success: true, newMeal: Object.assign(Object.assign({}, mealObj), { recipe }), source: 'fallback-excluded' });
                     }
                     // If DB contains this dish, use DB result for accurate macros
                     const found = dishes.find(d => String(d.name || '').toLowerCase().trim() === nameLower);
                     if (found) {
-                        return res.json({ success: true, newMeal: createMealObject(found), source: 'ai' });
+                        const mealObj = createMealObject(found);
+                        const recipe = yield generateRecipeInstructions(mealObj.name, mealObj.ingredients);
+                        return res.json({ success: true, newMeal: Object.assign(Object.assign({}, mealObj), { recipe }), source: 'ai' });
                     }
-                    return res.json({ success: true, newMeal: createMealObject(parsed.newMeal), source: 'ai' });
+                    const mealObj = createMealObject(parsed.newMeal);
+                    const recipe = yield generateRecipeInstructions(mealObj.name, mealObj.ingredients);
+                    return res.json({ success: true, newMeal: Object.assign(Object.assign({}, mealObj), { recipe }), source: 'ai' });
                 }
             }
             catch (err) {
@@ -1374,7 +1450,9 @@ Return JSON: { "newMeal": { "name":"...", "ingredients":[...], "calories":..., "
         }
         // fallback deterministic pick that avoids excluded names
         const picked = pickRandomExcluding(dishes, excludeArr);
-        return res.json({ success: true, newMeal: createMealObject(picked), source: 'fallback' });
+        const mealObj = createMealObject(picked);
+        const recipe = yield generateRecipeInstructions(mealObj.name, mealObj.ingredients);
+        return res.json({ success: true, newMeal: Object.assign(Object.assign({}, mealObj), { recipe }), source: 'fallback' });
     }
     catch (err) {
         console.error('Regenerate (alias) error:', getErrorMessage(err));

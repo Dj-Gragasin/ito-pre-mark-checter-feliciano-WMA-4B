@@ -10,6 +10,7 @@
     "db:init": "mysql -u root < src/database/init.sql"
   },
   "dependencies": {
+    "@paypal/checkout-server-sdk": "^1.0.3",
     "@types/axios": "^0.9.36",
     "axios": "^1.13.2",
     "bcryptjs": "^2.4.3",
