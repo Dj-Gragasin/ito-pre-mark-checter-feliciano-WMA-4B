@@ -11,7 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
-var _a;
+var _a, _b;
 Object.defineProperty(exports, "__esModule", { value: true });
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
@@ -21,7 +21,9 @@ const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const db_config_1 = require("./config/db.config");
 const axios_1 = __importDefault(require("axios"));
+const uuid_1 = require("uuid");
 const openai_1 = __importDefault(require("openai"));
+const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 // Avoid startup crash if OPENAI_API_KEY missing
 let openai;
 if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim() !== '') {
@@ -33,14 +35,54 @@ else {
     console.log('⚠️ OPENAI_API_KEY not present — OpenAI features disabled');
 }
 const nodemailer_1 = __importDefault(require("nodemailer"));
-const crypto_1 = __importDefault(require("crypto"));
 const app = (0, express_1.default)();
+// ============================================
+// SECURITY: Validate JWT_SECRET at startup
+// ============================================
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+    console.error('\n❌ ========================================');
+    console.error('❌ FATAL: JWT_SECRET CONFIGURATION ERROR');
+    console.error('❌ ========================================');
+    console.error('❌ JWT_SECRET must be:');
+    console.error('❌   1. Set in .env file');
+    console.error('❌   2. At least 32 characters long');
+    console.error('❌ ');
+    console.error('❌ Generate a secure secret:');
+    console.error('❌   openssl rand -base64 32');
+    console.error('❌ ========================================\n');
+    process.exit(1);
+}
 // Track OpenAI availability globally
 let openaiAvailable = true;
+// ============================================
+// RATE LIMITING: Protect against brute force
+// ============================================
+const authLimiter = (0, express_rate_limit_1.default)({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // Limit each IP to 5 login attempts per windowMs
+    message: 'Too many login attempts. Please try again later.',
+    standardHeaders: true, // Return rate limit info in RateLimit-* headers
+    legacyHeaders: false,
+});
+const registerLimiter = (0, express_rate_limit_1.default)({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 10, // Limit each IP to 10 registration attempts per hour
+    message: 'Too many registration attempts. Please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+const generalLimiter = (0, express_rate_limit_1.default)({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 30, // General API limit: 30 requests per minute per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+});
 // Dev CORS: allow all in development for quick debugging
 app.use((0, cors_1.default)({ origin: true, credentials: true }));
 app.options('*', (0, cors_1.default)({ origin: true, credentials: true }));
 app.use(express_1.default.json());
+// Apply general rate limiting to all requests
+app.use(generalLimiter);
 // Debug: log incoming requests and origin so we can diagnose CORS issues
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - Origin: ${req.headers.origin || 'none'}`);
@@ -53,32 +95,41 @@ if (process.env.NODE_ENV === 'development') {
     app.options('*', (0, cors_1.default)({ origin: true, credentials: true }));
 }
 else {
-    const allowedOrigins = (((_a = process.env.FRONTEND_URL) === null || _a === void 0 ? void 0 : _a.split(',')) || ['http://localhost:8100']).map((s) => s.trim().replace(/\/$/, ''));
-    app.use((req, res, next) => {
-        const origin = req.headers.origin || undefined;
-        const originNormalized = origin ? origin.replace(/\/$/, '') : origin;
-        const allowedExplicit = originNormalized && allowedOrigins.includes(originNormalized);
-        const allowedLocal = originNormalized && (originNormalized.includes('localhost') || originNormalized.includes('127.0.0.1') || originNormalized.includes('ngrok.io'));
-        if (!origin || allowedExplicit || allowedLocal) {
-            const allowOrigin = origin || (allowedOrigins.length > 0 ? allowedOrigins[0] : '*');
-            res.header('Access-Control-Allow-Origin', allowOrigin);
-            res.header('Access-Control-Allow-Credentials', 'true');
-            res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-            res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-            if (req.method === 'OPTIONS')
-                return res.sendStatus(204);
-            console.log(`CORS allowed origin: ${origin}`);
-            next();
-        }
-        else {
-            console.warn(`CORS denied origin: ${origin}`);
-            res.status(403).json({ success: false, message: 'CORS origin denied', origin });
-        }
-    });
+    // Production: Use explicit allowlist
+    const allowedOrigins = (((_a = process.env.ALLOWED_ORIGINS) === null || _a === void 0 ? void 0 : _a.split(',')) || ((_b = process.env.FRONTEND_URL) === null || _b === void 0 ? void 0 : _b.split(',')) || ['http://localhost:8100'])
+        .map((s) => s.trim().replace(/\/$/, ''))
+        .filter(Boolean);
+    const corsOptions = {
+        origin: (origin, callback) => {
+            // Allow requests with no origin (like mobile apps or curl requests)
+            if (!origin)
+                return callback(null, true);
+            const originNormalized = origin.replace(/\/$/, '');
+            const isAllowed = allowedOrigins.includes(originNormalized) ||
+                originNormalized.includes('localhost') ||
+                originNormalized.includes('127.0.0.1') ||
+                (process.env.ALLOW_NGROK === 'true' && originNormalized.includes('ngrok.io'));
+            if (isAllowed) {
+                callback(null, true);
+            }
+            else {
+                callback(new Error('CORS not allowed'));
+            }
+        },
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+    };
+    app.use((0, cors_1.default)(corsOptions));
+    app.options('*', (0, cors_1.default)(corsOptions));
 }
-// PayMongo API configuration
-const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY || 'sk_test_your_key_here';
-const PAYMONGO_BASE_URL = 'https://api.paymongo.com/v1';
+// PayPal API configuration
+const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID || '';
+const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET || '';
+const PAYPAL_MODE = process.env.PAYPAL_MODE || 'sandbox'; // 'sandbox' or 'live'
+const PAYPAL_API_URL = PAYPAL_MODE === 'live'
+    ? 'https://api.paypal.com/v2'
+    : 'https://api.sandbox.paypal.com/v2';
 // use env-driven model name so it's easy to switch
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o';
 // Trusted Filipino meals (USDA/DOST-PH)
@@ -104,56 +155,56 @@ const trustedFilipinoMeals = [
 ];
 // Extended trustedFilipinoMealsDetailed with more meals and macros
 const trustedFilipinoMealsDetailed = [
-    { name: "Chicken Adobo", ingredients: ["chicken thighs", "soy sauce", "vinegar", "garlic", "bay leaves", "black pepper", "oil", "water"], calories: 480, protein: 36, carbs: 50, fats: 14, fiber: 2, recipe: "" },
-    { name: "Pork Adobo", ingredients: ["pork belly", "soy sauce", "vinegar", "garlic cloves", "bay leaves", "black pepper", "cooking oil", "water"], calories: 520, protein: 32, carbs: 52, fats: 22, fiber: 2, recipe: "" },
-    { name: "Tapsilog", ingredients: ["beef tapa", "garlic", "rice", "egg", "butter", "salt", "pepper"], calories: 520, protein: 36, carbs: 48, fats: 16, fiber: 2, recipe: "" },
-    { name: "Bangus Sinigang", ingredients: ["milkfish", "tamarind paste", "radish", "spinach", "string beans", "ginger", "garlic", "onion", "salt", "pepper"], calories: 410, protein: 32, carbs: 46, fats: 10, fiber: 3, recipe: "" },
-    { name: "Tinolang Manok", ingredients: ["chicken", "ginger", "malunggay leaves", "papaya", "garlic", "onion", "fish sauce", "broth", "oil"], calories: 390, protein: 34, carbs: 44, fats: 8, fiber: 3, recipe: "" },
-    { name: "Laing", ingredients: ["taro leaves", "coconut milk", "garlic", "onion", "ginger", "chili", "shrimp paste", "salt"], calories: 350, protein: 12, carbs: 38, fats: 16, fiber: 5, recipe: "" },
-    { name: "Pinakbet", ingredients: ["eggplant", "ampalaya", "string beans", "okra", "squash", "shrimp paste", "garlic", "onion", "tomato", "anchovy"], calories: 300, protein: 12, carbs: 30, fats: 10, fiber: 6, recipe: "" },
-    { name: "Pancit Bihon", ingredients: ["bihon noodles", "chicken", "carrots", "cabbage", "garlic", "onion", "soy sauce", "cooking oil", "broth"], calories: 420, protein: 18, carbs: 62, fats: 8, fiber: 4, recipe: "" },
-    { name: "Arroz Caldo", ingredients: ["rice", "chicken", "ginger", "egg", "garlic", "onion", "turmeric", "broth", "fish sauce", "oil"], calories: 390, protein: 20, carbs: 54, fats: 8, fiber: 2, recipe: "" },
-    { name: "Kare-Kare", ingredients: ["oxtail", "peanut butter", "vegetables", "garlic", "onion", "vinegar", "salt", "pepper", "oil", "annatto"], calories: 540, protein: 28, carbs: 52, fats: 22, fiber: 5, recipe: "" },
-    { name: "Lumpiang Sariwa", ingredients: ["spring roll wrapper", "vegetables", "peanut sauce", "garlic", "shrimp", "pork", "egg", "vinegar"], calories: 260, protein: 8, carbs: 38, fats: 8, fiber: 4, recipe: "" },
-    { name: "Daing na Bangus", ingredients: ["milkfish", "vinegar", "garlic", "salt", "pepper", "bay leaves", "cooking oil"], calories: 410, protein: 32, carbs: 44, fats: 10, fiber: 2, recipe: "" },
-    { name: "Chicken Inasal", ingredients: ["chicken leg", "annatto oil", "vinegar", "garlic", "ginger", "brown sugar", "salt", "pepper"], calories: 420, protein: 34, carbs: 44, fats: 10, fiber: 2, recipe: "" },
-    { name: "Ginisang Monggo", ingredients: ["mung beans", "garlic", "pork bits", "spinach", "onion", "ginger", "tomato", "oil", "salt"], calories: 340, protein: 18, carbs: 44, fats: 8, fiber: 6, recipe: "" },
-    { name: "La Paz Batchoy", ingredients: ["egg noodles", "pork", "chicken liver", "egg", "garlic", "onion", "carrots", "broth", "lard"], calories: 480, protein: 22, carbs: 60, fats: 14, fiber: 2, recipe: "" },
-    { name: "Bicol Express", ingredients: ["pork", "coconut milk", "long chili", "shrimp paste", "garlic", "onion", "salt", "oil"], calories: 520, protein: 24, carbs: 52, fats: 22, fiber: 3, recipe: "" },
-    { name: "Paksiw na Bangus", ingredients: ["milkfish", "vinegar", "eggplant", "salt", "garlic", "ginger", "bay leaves", "oil"], calories: 380, protein: 28, carbs: 40, fats: 10, fiber: 4, recipe: "" },
-    { name: "Bulalo", ingredients: ["beef shank", "corn", "radish", "spinach", "cabbage", "garlic", "onion", "fish sauce", "broth"], calories: 520, protein: 32, carbs: 50, fats: 18, fiber: 3, recipe: "" },
-    { name: "Tinolang Isda", ingredients: ["fish", "ginger", "papaya", "malunggay leaves", "garlic", "onion", "fish sauce", "broth", "oil"], calories: 350, protein: 28, carbs: 38, fats: 8, fiber: 3, recipe: "" },
-    { name: "Pochero", ingredients: ["pork", "plantains", "chickpeas", "carrots", "potatoes", "cabbage", "garlic", "onion", "broth"], calories: 500, protein: 28, carbs: 54, fats: 16, fiber: 5, recipe: "" },
+    { name: "Chicken Adobo", ingredients: ["chicken thighs", "soy sauce", "vinegar", "garlic", "bay leaves", "black pepper", "oil", "water"], calories: 480, protein: 36, carbs: 50, fats: 14, fiber: 2, recipe: "1. Heat oil in a pan and sauté garlic until fragrant\n2. Add chicken pieces and brown on all sides\n3. Pour in soy sauce and vinegar, add bay leaves\n4. Simmer covered for 30 minutes until chicken is tender\n5. Season with pepper and serve hot with rice" },
+    { name: "Pork Adobo", ingredients: ["pork belly", "soy sauce", "vinegar", "garlic cloves", "bay leaves", "black pepper", "cooking oil", "water"], calories: 520, protein: 32, carbs: 52, fats: 22, fiber: 2, recipe: "1. Cut pork belly into bite-sized pieces\n2. Heat oil and sauté minced garlic until fragrant\n3. Brown pork pieces on all sides for 5 minutes\n4. Add soy sauce, vinegar, and bay leaves\n5. Simmer for 40 minutes until pork is tender and sauce reduces" },
+    { name: "Tapsilog", ingredients: ["beef tapa", "garlic", "rice", "egg", "butter", "salt", "pepper"], calories: 520, protein: 36, carbs: 48, fats: 16, fiber: 2, recipe: "1. Fry garlic rice: heat butter and sauté minced garlic, add cooked rice\n2. Cook beef tapa on a hot pan until crispy and caramelized\n3. Fry an egg sunny-side up in butter\n4. Plate the garlic rice, tapa, and fried egg together\n5. Season with salt and pepper to taste" },
+    { name: "Bangus Sinigang", ingredients: ["milkfish", "tamarind paste", "radish", "spinach", "string beans", "ginger", "garlic", "onion", "salt", "pepper"], calories: 410, protein: 32, carbs: 46, fats: 10, fiber: 3, recipe: "1. Boil water with tamarind paste and ginger slices for 5 minutes\n2. Add radish and onion, simmer for 5 minutes\n3. Add milkfish and string beans, simmer for 8 minutes\n4. Add spinach and cook until wilted (2 minutes)\n5. Season with salt and pepper, serve hot" },
+    { name: "Tinolang Manok", ingredients: ["chicken", "ginger", "malunggay leaves", "papaya", "garlic", "onion", "fish sauce", "broth", "oil"], calories: 390, protein: 34, carbs: 44, fats: 8, fiber: 3, recipe: "1. Heat oil and sauté ginger, garlic, and onion\n2. Add chicken and cook until no longer pink\n3. Pour in broth and simmer for 15 minutes\n4. Add papaya cubes and simmer for 5 minutes\n5. Add malunggay leaves, fish sauce, and cook for 2 minutes" },
+    { name: "Laing", ingredients: ["taro leaves", "coconut milk", "garlic", "onion", "ginger", "chili", "shrimp paste", "salt"], calories: 350, protein: 12, carbs: 38, fats: 16, fiber: 5, recipe: "1. Blanch taro leaves in boiling salted water for 5 minutes, drain well\n2. Sauté garlic, onion, and ginger in oil\n3. Add shrimp paste and cook for 1 minute\n4. Add taro leaves and coconut milk, simmer for 10 minutes\n5. Add chili and salt to taste, cook for 2 more minutes" },
+    { name: "Pinakbet", ingredients: ["eggplant", "ampalaya", "string beans", "okra", "squash", "shrimp paste", "garlic", "onion", "tomato", "anchovy"], calories: 300, protein: 12, carbs: 30, fats: 10, fiber: 6, recipe: "1. Heat oil and sauté garlic, onion, and shrimp paste\n2. Add ampalaya and cook for 2 minutes\n3. Add squash and tomato, simmer for 5 minutes\n4. Add eggplant, string beans, and okra\n5. Simmer until vegetables are tender (8 minutes), season to taste" },
+    { name: "Pancit Bihon", ingredients: ["bihon noodles", "chicken", "carrots", "cabbage", "garlic", "onion", "soy sauce", "cooking oil", "broth"], calories: 420, protein: 18, carbs: 62, fats: 8, fiber: 4, recipe: "1. Soak bihon noodles in hot water for 5 minutes, drain\n2. Heat oil and sauté garlic and onion\n3. Add chicken and cook until done\n4. Add broth, carrots, and cabbage\n5. Add noodles and soy sauce, toss well and cook until noodles absorb liquid" },
+    { name: "Arroz Caldo", ingredients: ["rice", "chicken", "ginger", "egg", "garlic", "onion", "turmeric", "broth", "fish sauce", "oil"], calories: 390, protein: 20, carbs: 54, fats: 8, fiber: 2, recipe: "1. Heat oil and sauté garlic, onion, and ginger\n2. Add chicken and cook until done, shred finely\n3. Return chicken to pot, add rice and broth\n4. Add turmeric and fish sauce, simmer until rice is tender\n5. Beat egg and drizzle into the pot while stirring gently" },
+    { name: "Kare-Kare", ingredients: ["oxtail", "peanut butter", "vegetables", "garlic", "onion", "vinegar", "salt", "pepper", "oil", "annatto"], calories: 540, protein: 28, carbs: 52, fats: 22, fiber: 5, recipe: "1. Boil oxtail in water with salt and pepper until tender\n2. In a separate pot, sauté garlic, onion, and annatto in oil\n3. Add peanut butter and reserved broth to make sauce\n4. Add vegetables (eggplant, squash, long beans, bok choy)\n5. Simmer until vegetables are cooked, add vinegar to taste" },
+    { name: "Lumpiang Sariwa", ingredients: ["spring roll wrapper", "vegetables", "peanut sauce", "garlic", "shrimp", "pork", "egg", "vinegar"], calories: 260, protein: 8, carbs: 38, fats: 8, fiber: 4, recipe: "1. Blanch vegetables (cabbage, carrots, green beans) until crisp-tender\n2. Cook pork and shrimp, chop finely\n3. Mix cooked vegetables with pork and shrimp\n4. Place filling on spring roll wrapper, roll tightly and seal\n5. Serve with peanut sauce (peanut butter + vinegar + garlic)" },
+    { name: "Daing na Bangus", ingredients: ["milkfish", "vinegar", "garlic", "salt", "pepper", "bay leaves", "cooking oil"], calories: 410, protein: 32, carbs: 44, fats: 10, fiber: 2, recipe: "1. Mix vinegar, salt, pepper, bay leaves, and garlic in a bowl\n2. Place milkfish in a glass dish and pour vinegar mixture over it\n3. Refrigerate for at least 2 hours (preferably overnight)\n4. Heat oil in a pan and fry the marinated milkfish until golden\n5. Serve with the remaining marinade as sauce" },
+    { name: "Chicken Inasal", ingredients: ["chicken leg", "annatto oil", "vinegar", "garlic", "ginger", "brown sugar", "salt", "pepper"], calories: 420, protein: 34, carbs: 44, fats: 10, fiber: 2, recipe: "1. Mix annatto oil, vinegar, garlic, ginger, brown sugar, salt, and pepper\n2. Marinate chicken legs in this mixture for 1 hour\n3. Grill chicken over charcoal or pan-fry on medium heat\n4. Baste with marinade while grilling until cooked through\n5. Serve with sliced calamansi or lime" },
+    { name: "Ginisang Monggo", ingredients: ["mung beans", "garlic", "pork bits", "spinach", "onion", "ginger", "tomato", "oil", "salt"], calories: 340, protein: 18, carbs: 44, fats: 8, fiber: 6, recipe: "1. Boil mung beans until soft, drain\n2. Heat oil and sauté garlic, onion, and ginger\n3. Add pork bits and cook until done\n4. Add cooked mung beans and simmer for 5 minutes\n5. Add spinach and tomato, cook until spinach wilts, season with salt" },
+    { name: "La Paz Batchoy", ingredients: ["egg noodles", "pork", "chicken liver", "egg", "garlic", "onion", "carrots", "broth", "lard"], calories: 480, protein: 22, carbs: 60, fats: 14, fiber: 2, recipe: "1. Cook egg noodles and set aside\n2. Heat lard and sauté garlic, onion, and carrots\n3. Add pork and chicken liver, simmer until cooked\n4. Pour in broth and bring to a boil\n5. Place noodles in bowl, pour broth and toppings, top with raw egg" },
+    { name: "Bicol Express", ingredients: ["pork", "coconut milk", "long chili", "shrimp paste", "garlic", "onion", "salt", "oil"], calories: 520, protein: 24, carbs: 52, fats: 22, fiber: 3, recipe: "1. Heat oil and sauté garlic and onion\n2. Add shrimp paste and cook for 1 minute\n3. Add pork cubes and brown on all sides\n4. Pour in coconut milk and add long chili\n5. Simmer for 20 minutes until pork is tender, season with salt" },
+    { name: "Paksiw na Bangus", ingredients: ["milkfish", "vinegar", "eggplant", "salt", "garlic", "ginger", "bay leaves", "oil"], calories: 380, protein: 28, carbs: 40, fats: 10, fiber: 4, recipe: "1. Layer eggplant slices in a pan with milkfish on top\n2. Mix vinegar, salt, garlic, ginger, and bay leaves, pour over fish\n3. Add oil and bring to a simmer\n4. Cover and cook for 10 minutes until fish is cooked\n5. Serve in a shallow dish with the broth" },
+    { name: "Bulalo", ingredients: ["beef shank", "corn", "radish", "spinach", "cabbage", "garlic", "onion", "fish sauce", "broth"], calories: 520, protein: 32, carbs: 50, fats: 18, fiber: 3, recipe: "1. Boil beef shank with garlic and onion for 45 minutes until tender\n2. Add radish cubes and simmer for 10 minutes\n3. Add corn and cabbage, simmer for 5 minutes\n4. Add spinach and fish sauce\n5. Cook until spinach wilts (2 minutes), season and serve hot" },
+    { name: "Tinolang Isda", ingredients: ["fish", "ginger", "papaya", "malunggay leaves", "garlic", "onion", "fish sauce", "broth", "oil"], calories: 350, protein: 28, carbs: 38, fats: 8, fiber: 3, recipe: "1. Heat oil and sauté ginger, garlic, and onion\n2. Add fish and cook briefly on both sides\n3. Pour in broth and add papaya cubes\n4. Simmer for 8 minutes until papaya is tender\n5. Add malunggay leaves and fish sauce, cook for 2 minutes" },
+    { name: "Pochero", ingredients: ["pork", "plantains", "chickpeas", "carrots", "potatoes", "cabbage", "garlic", "onion", "broth"], calories: 500, protein: 28, carbs: 54, fats: 16, fiber: 5, recipe: "1. Boil pork with garlic and onion until partially cooked\n2. Add potatoes, carrots, and plantains\n3. Simmer for 10 minutes\n4. Add cabbage and chickpeas\n5. Continue cooking until all vegetables are tender (10 minutes)" },
 ];
 // Filipino Snacks List - SPECIFICALLY for snack1 and snack2
 const filipinoSnacks = [
-    { name: "Banana Cue", ingredients: ["saba banana", "brown sugar", "cooking oil", "salt"], calories: 180, protein: 1, carbs: 35, fats: 5, fiber: 2, recipe: "" },
-    { name: "Camote Cue", ingredients: ["sweet potato", "brown sugar", "cooking oil", "salt"], calories: 160, protein: 1, carbs: 32, fats: 4, fiber: 3, recipe: "" },
-    { name: "Fishball", ingredients: ["fish meat", "cornstarch", "salt", "pepper", "garlic", "vinegar"], calories: 120, protein: 10, carbs: 12, fats: 3, fiber: 0, recipe: "" },
-    { name: "Siomai", ingredients: ["pork", "shrimp", "wonton wrapper", "soy sauce", "ginger", "garlic"], calories: 140, protein: 8, carbs: 14, fats: 5, fiber: 0, recipe: "" },
-    { name: "Lumpia Shanghai", ingredients: ["pork", "cabbage", "carrots", "spring roll wrapper", "garlic", "onion", "soy sauce"], calories: 150, protein: 7, carbs: 16, fats: 6, fiber: 1, recipe: "" },
-    { name: "Turon", ingredients: ["banana", "brown sugar", "spring roll wrapper", "cooking oil", "cinnamon"], calories: 170, protein: 1, carbs: 32, fats: 5, fiber: 2, recipe: "" },
-    { name: "Halo-Halo", ingredients: ["ice", "evaporated milk", "mango", "jackfruit", "palm seeds", "red beans", "vanilla ice cream"], calories: 220, protein: 3, carbs: 45, fats: 4, fiber: 3, recipe: "" },
-    { name: "Bibingka", ingredients: ["rice flour", "coconut", "brown sugar", "egg", "baking powder", "salt", "butter"], calories: 240, protein: 4, carbs: 38, fats: 8, fiber: 1, recipe: "" },
-    { name: "Puto", ingredients: ["rice flour", "sugar", "baking powder", "salt", "egg", "milk", "banana leaves"], calories: 180, protein: 3, carbs: 36, fats: 2, fiber: 1, recipe: "" },
-    { name: "Balut", ingredients: ["duck egg", "salt", "vinegar", "ginger"], calories: 190, protein: 14, carbs: 1, fats: 14, fiber: 0, recipe: "" },
-    { name: "Kwek-Kwek", ingredients: ["quail eggs", "flour", "turmeric", "salt", "baking powder", "oil"], calories: 130, protein: 7, carbs: 12, fats: 5, fiber: 0, recipe: "" },
-    { name: "Tokneneng", ingredients: ["quail eggs", "flour", "turmeric", "sweet chili sauce", "oil", "vinegar"], calories: 150, protein: 8, carbs: 14, fats: 6, fiber: 0, recipe: "" },
-    { name: "Empanada", ingredients: ["flour", "butter", "meat", "potatoes", "garlic", "onion", "egg"], calories: 240, protein: 8, carbs: 28, fats: 10, fiber: 2, recipe: "" },
-    { name: "Puto Bumbong", ingredients: ["rice flour", "coconut milk", "brown sugar", "salt", "banana leaves"], calories: 210, protein: 2, carbs: 40, fats: 5, fiber: 2, recipe: "" },
-    { name: "Tinutuan", ingredients: ["rice", "chicken", "ginger", "egg", "garlic", "onion", "fish sauce"], calories: 200, protein: 8, carbs: 28, fats: 4, fiber: 1, recipe: "" },
-    { name: "Lumpiang Togue", ingredients: ["bean sprouts", "pork", "spring roll wrapper", "garlic", "onion", "soy sauce"], calories: 140, protein: 7, carbs: 16, fats: 4, fiber: 2, recipe: "" },
-    { name: "Okoy", ingredients: ["shrimp", "potato", "flour", "egg", "onion", "oil", "vinegar"], calories: 180, protein: 8, carbs: 20, fats: 7, fiber: 2, recipe: "" },
-    { name: "Cassava Cake", ingredients: ["cassava", "coconut milk", "sugar", "egg", "butter", "salt"], calories: 250, protein: 2, carbs: 42, fats: 8, fiber: 2, recipe: "" },
-    { name: "Ube Cake", ingredients: ["ube", "flour", "sugar", "egg", "butter", "baking powder", "milk"], calories: 260, protein: 4, carbs: 44, fats: 8, fiber: 1, recipe: "" },
-    { name: "Choco Pie", ingredients: ["graham crackers", "chocolate", "condensed milk", "butter", "salt"], calories: 210, protein: 2, carbs: 32, fats: 9, fiber: 1, recipe: "" },
-    { name: "Dilis (Dried Anchovies)", ingredients: ["anchovies", "salt"], calories: 120, protein: 20, carbs: 0, fats: 4, fiber: 0, recipe: "" },
-    { name: "Bagnet Bits", ingredients: ["pork belly", "salt", "garlic"], calories: 280, protein: 16, carbs: 0, fats: 23, fiber: 0, recipe: "" },
-    { name: "Peanut Brittle", ingredients: ["peanuts", "brown sugar", "corn syrup", "butter", "salt"], calories: 220, protein: 8, carbs: 28, fats: 10, fiber: 2, recipe: "" },
-    { name: "Sweet Corn Ice Cream", ingredients: ["corn", "milk", "sugar", "cream", "vanilla"], calories: 180, protein: 4, carbs: 26, fats: 7, fiber: 1, recipe: "" },
-    { name: "Egg Pie", ingredients: ["egg yolks", "pie crust", "sugar", "condensed milk", "evaporated milk"], calories: 240, protein: 6, carbs: 32, fats: 10, fiber: 1, recipe: "" },
-    { name: "Fried Spring Roll", ingredients: ["cabbage", "carrots", "pork", "spring roll wrapper", "garlic", "soy sauce"], calories: 160, protein: 6, carbs: 18, fats: 7, fiber: 2, recipe: "" },
-    { name: "Garlic Bread Stick", ingredients: ["bread", "garlic", "butter", "parmesan cheese", "salt"], calories: 180, protein: 4, carbs: 24, fats: 8, fiber: 1, recipe: "" },
+    { name: "Banana Cue", ingredients: ["saba banana", "brown sugar", "cooking oil", "salt"], calories: 180, protein: 1, carbs: 35, fats: 5, fiber: 2, recipe: "1. Peel saba bananas and cut in half lengthwise\n2. Heat oil in a pan to medium heat\n3. Add brown sugar and stir until melted\n4. Coat each banana half in the caramelized sugar\n5. Serve hot on a stick with pinch of salt" },
+    { name: "Camote Cue", ingredients: ["sweet potato", "brown sugar", "cooking oil", "salt"], calories: 160, protein: 1, carbs: 32, fats: 4, fiber: 3, recipe: "1. Peel and cut sweet potato into thick lengthwise pieces\n2. Heat oil in a pan over medium heat\n3. Melt brown sugar in the oil until bubbly\n4. Dip each sweet potato piece in the caramelized sugar\n5. Skewer and serve immediately while warm" },
+    { name: "Fishball", ingredients: ["fish meat", "cornstarch", "salt", "pepper", "garlic", "vinegar"], calories: 120, protein: 10, carbs: 12, fats: 3, fiber: 0, recipe: "1. Grind fish meat finely with salt, pepper, and minced garlic\n2. Mix in cornstarch to bind the mixture\n3. Shape into small balls (about 1 inch diameter)\n4. Boil in water until balls float and rise to top\n5. Serve with vinegar-garlic dipping sauce" },
+    { name: "Siomai", ingredients: ["pork", "shrimp", "wonton wrapper", "soy sauce", "ginger", "garlic"], calories: 140, protein: 8, carbs: 14, fats: 5, fiber: 0, recipe: "1. Mince pork and shrimp together finely\n2. Mix with grated ginger, minced garlic, and soy sauce\n3. Place 1 teaspoon filling on wonton wrapper\n4. Gather corners at top and seal\n5. Steam for 10-12 minutes until wrapper is translucent" },
+    { name: "Lumpia Shanghai", ingredients: ["pork", "cabbage", "carrots", "spring roll wrapper", "garlic", "onion", "soy sauce"], calories: 150, protein: 7, carbs: 16, fats: 6, fiber: 1, recipe: "1. Sauté garlic and onion, add minced pork and cook until done\n2. Add shredded cabbage and carrots, cook until soft\n3. Season with soy sauce and cool mixture\n4. Fill each spring roll wrapper with 2 tablespoons filling\n5. Roll tightly and deep fry until golden brown" },
+    { name: "Turon", ingredients: ["banana", "brown sugar", "spring roll wrapper", "cooking oil", "cinnamon"], calories: 170, protein: 1, carbs: 32, fats: 5, fiber: 2, recipe: "1. Slice saba banana lengthwise into strips\n2. Place banana slice and brown sugar on spring roll wrapper\n3. Sprinkle cinnamon and roll tightly, sealing edges with water\n4. Deep fry in oil until wrapper is golden and crispy\n5. Drain on paper towel and serve hot" },
+    { name: "Halo-Halo", ingredients: ["ice", "evaporated milk", "mango", "jackfruit", "palm seeds", "red beans", "vanilla ice cream"], calories: 220, protein: 3, carbs: 45, fats: 4, fiber: 3, recipe: "1. Layer shaved ice in a tall glass\n2. Add cooked red beans and palm seeds\n3. Top with diced mango and jackfruit\n4. Pour evaporated milk over the mixture\n5. Top with a scoop of vanilla ice cream and serve immediately" },
+    { name: "Bibingka", ingredients: ["rice flour", "coconut", "brown sugar", "egg", "baking powder", "salt", "butter"], calories: 240, protein: 4, carbs: 38, fats: 8, fiber: 1, recipe: "1. Mix rice flour, brown sugar, baking powder, and salt\n2. Beat egg and combine with coconut milk and flour mixture\n3. Pour into buttered banana leaves on hot skillet\n4. Cook on medium heat with charcoal on top for 8-10 minutes\n5. Cool slightly, serve with grated coconut" },
+    { name: "Puto", ingredients: ["rice flour", "sugar", "baking powder", "salt", "egg", "milk", "banana leaves"], calories: 180, protein: 3, carbs: 36, fats: 2, fiber: 1, recipe: "1. Mix rice flour, sugar, baking powder, and salt together\n2. Beat egg and combine with milk, then mix with dry ingredients\n3. Fill small molds or cups lined with banana leaves\n4. Steam in a steamer basket for 8-10 minutes\n5. Cool and remove from molds to serve" },
+    { name: "Balut", ingredients: ["duck egg", "salt", "vinegar", "ginger"], calories: 190, protein: 14, carbs: 1, fats: 14, fiber: 0, recipe: "1. Boil duck eggs in salted water for 15-20 minutes\n2. Gently crack open the shell at the wider end\n3. Sip the broth from inside the egg\n4. Eat the cooked embryo and yolk inside\n5. Serve with salt, vinegar, and ginger sauce for dipping" },
+    { name: "Kwek-Kwek", ingredients: ["quail eggs", "flour", "turmeric", "salt", "baking powder", "oil"], calories: 130, protein: 7, carbs: 12, fats: 5, fiber: 0, recipe: "1. Hard boil quail eggs and peel carefully\n2. Make batter: mix flour, turmeric, salt, baking powder with water\n3. Heat oil for deep frying\n4. Coat each quail egg in batter and deep fry until golden\n5. Serve with sweet and spicy vinegar sauce" },
+    { name: "Tokneneng", ingredients: ["quail eggs", "flour", "turmeric", "sweet chili sauce", "oil", "vinegar"], calories: 150, protein: 8, carbs: 14, fats: 6, fiber: 0, recipe: "1. Hard boil quail eggs and peel completely\n2. Prepare turmeric batter (flour, turmeric, salt, water)\n3. Skewer 3-4 quail eggs on a stick\n4. Dip in batter and deep fry until golden\n5. Coat with sweet chili sauce and serve with vinegar" },
+    { name: "Empanada", ingredients: ["flour", "butter", "meat", "potatoes", "garlic", "onion", "egg"], calories: 240, protein: 8, carbs: 28, fats: 10, fiber: 2, recipe: "1. Cook minced meat with garlic, onion, and diced potatoes\n2. Season with salt and pepper, cool the filling\n3. Make dough: flour, butter, salt, and water kneaded together\n4. Roll dough thin, cut circles, fill, and fold\n5. Deep fry until golden brown on both sides" },
+    { name: "Puto Bumbong", ingredients: ["rice flour", "coconut milk", "brown sugar", "salt", "banana leaves"], calories: 210, protein: 2, carbs: 40, fats: 5, fiber: 2, recipe: "1. Mix rice flour, brown sugar, salt, and coconut milk\n2. Pour into bamboo tubes (bumbong) lined with banana leaves\n3. Steam in boiling water for 15 minutes\n4. Push puto out of tube onto banana leaf\n5. Serve hot topped with grated coconut and brown sugar" },
+    { name: "Tinutuan", ingredients: ["rice", "chicken", "ginger", "egg", "garlic", "onion", "fish sauce"], calories: 200, protein: 8, carbs: 28, fats: 4, fiber: 1, recipe: "1. Cook shredded chicken with garlic and onion\n2. Add broth and bring to boil, then add rice\n3. Add ginger slices and simmer until rice is very soft\n4. Stir in fish sauce and pour into bowl\n5. Top with fried egg and crispy garlic bits" },
+    { name: "Lumpiang Togue", ingredients: ["bean sprouts", "pork", "spring roll wrapper", "garlic", "onion", "soy sauce"], calories: 140, protein: 7, carbs: 16, fats: 4, fiber: 2, recipe: "1. Sauté garlic and onion, add minced pork and cook until done\n2. Add bean sprouts and soy sauce, cook for 2 minutes\n3. Let filling cool slightly\n4. Roll in spring roll wrapper tightly\n5. Deep fry until golden brown and crispy" },
+    { name: "Okoy", ingredients: ["shrimp", "potato", "flour", "egg", "onion", "oil", "vinegar"], calories: 180, protein: 8, carbs: 20, fats: 7, fiber: 2, recipe: "1. Shred potato and squeeze out excess moisture\n2. Mix with chopped shrimp, onion, flour, and beaten egg\n3. Season with salt and pepper\n4. Drop spoonfuls into hot oil for deep frying\n5. Fry until golden on both sides, serve with vinegar sauce" },
+    { name: "Cassava Cake", ingredients: ["cassava", "coconut milk", "sugar", "egg", "butter", "salt"], calories: 250, protein: 2, carbs: 42, fats: 8, fiber: 2, recipe: "1. Grate fresh cassava finely\n2. Mix cassava with coconut milk, sugar, egg, butter, and salt\n3. Pour into greased baking pan\n4. Bake at 350°F for 35-40 minutes until golden\n5. Cool before cutting into squares" },
+    { name: "Ube Cake", ingredients: ["ube", "flour", "sugar", "egg", "butter", "baking powder", "milk"], calories: 260, protein: 4, carbs: 44, fats: 8, fiber: 1, recipe: "1. Steam and mash ube yam until smooth\n2. Cream together butter and sugar\n3. Add egg, ube puree, and flour alternately with milk\n4. Add baking powder and mix until smooth\n5. Bake in greased pan at 350°F for 30-35 minutes" },
+    { name: "Choco Pie", ingredients: ["graham crackers", "chocolate", "condensed milk", "butter", "salt"], calories: 210, protein: 2, carbs: 32, fats: 9, fiber: 1, recipe: "1. Crush graham crackers into fine crumbs\n2. Melt butter and mix with crushed graham and salt\n3. Press into pie crust and refrigerate\n4. Melt chocolate with condensed milk for filling\n5. Pour into crust and refrigerate until set" },
+    { name: "Dilis (Dried Anchovies)", ingredients: ["anchovies", "salt"], calories: 120, protein: 20, carbs: 0, fats: 4, fiber: 0, recipe: "1. Clean fresh anchovies under running water\n2. Remove heads and gut if desired (optional)\n3. Layer on trays with sea salt between layers\n4. Dry under sun for 3-5 days until completely dried\n5. Store in airtight container for long-term use" },
+    { name: "Bagnet Bits", ingredients: ["pork belly", "salt", "garlic"], calories: 280, protein: 16, carbs: 0, fats: 23, fiber: 0, recipe: "1. Cut pork belly into small cubes about 1 inch\n2. Boil in water with salt and garlic for 10 minutes\n3. Drain well and dry completely\n4. Deep fry in oil over low heat until golden and crispy\n5. Drain on paper towel, serve as a crispy pork cracklings" },
+    { name: "Peanut Brittle", ingredients: ["peanuts", "brown sugar", "corn syrup", "butter", "salt"], calories: 220, protein: 8, carbs: 28, fats: 10, fiber: 2, recipe: "1. Heat brown sugar, corn syrup, and butter to 300°F\n2. Add roasted peanuts and stir to coat\n3. Quickly pour onto buttered baking sheet\n4. Cool completely then break into pieces\n5. Store in airtight container" },
+    { name: "Sweet Corn Ice Cream", ingredients: ["corn", "milk", "sugar", "cream", "vanilla"], calories: 180, protein: 4, carbs: 26, fats: 7, fiber: 1, recipe: "1. Blend cooked corn with milk until smooth\n2. Strain through fine mesh to get corn milk\n3. Heat corn milk with sugar until dissolved\n4. Cool completely, add cream and vanilla extract\n5. Churn in ice cream maker according to instructions" },
+    { name: "Egg Pie", ingredients: ["egg yolks", "pie crust", "sugar", "condensed milk", "evaporated milk"], calories: 240, protein: 6, carbs: 32, fats: 10, fiber: 1, recipe: "1. Beat egg yolks with sugar until pale\n2. Mix in condensed milk and evaporated milk\n3. Pour into unbaked pie crust\n4. Bake at 375°F for 30-35 minutes until set\n5. Cool before slicing and serving" },
+    { name: "Fried Spring Roll", ingredients: ["cabbage", "carrots", "pork", "spring roll wrapper", "garlic", "soy sauce"], calories: 160, protein: 6, carbs: 18, fats: 7, fiber: 2, recipe: "1. Sauté garlic, add minced pork and cook until done\n2. Add shredded cabbage and carrots, season with soy sauce\n3. Cook until vegetables soften, then cool\n4. Wrap in spring roll wrapper, seal edges with water\n5. Deep fry until golden brown and crispy" },
+    { name: "Garlic Bread Stick", ingredients: ["bread", "garlic", "butter", "parmesan cheese", "salt"], calories: 180, protein: 4, carbs: 24, fats: 8, fiber: 1, recipe: "1. Slice bread into sticks about 1 inch wide\n2. Mix softened butter with minced garlic, salt, and parmesan\n3. Brush garlic butter generously on bread sticks\n4. Arrange on baking sheet and bake at 375°F for 10-12 minutes\n5. Serve hot with additional parmesan cheese" },
 ];
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
@@ -182,6 +233,34 @@ const authenticateToken = (req, res, next) => {
     }
 };
 // ===== HELPER FUNCTIONS =====
+// Add rice/carb sides to lunch and dinner meals
+function addRiceSidesToMeals(weekPlan) {
+    const riceSideDishes = [
+        { name: 'Sinangag na Kanin (Garlic Fried Rice)', calories: 180, carbs: 35, protein: 4, fats: 2 },
+        { name: 'Plain Steamed Rice', calories: 130, carbs: 28, protein: 2.7, fats: 0.3 },
+        { name: 'Fried Rice', calories: 160, carbs: 30, protein: 3, fats: 3 }
+    ];
+    return weekPlan.map((day) => {
+        const updatedMeals = Object.assign({}, day.meals);
+        // Add rice to lunch if not already included
+        if (updatedMeals.lunch && !String(updatedMeals.lunch.name || '').toLowerCase().includes('rice')) {
+            const randomRice = riceSideDishes[Math.floor(Math.random() * riceSideDishes.length)];
+            updatedMeals.lunch = Object.assign(Object.assign({}, updatedMeals.lunch), { name: `${updatedMeals.lunch.name} with ${randomRice.name}`, calories: (updatedMeals.lunch.calories || 0) + randomRice.calories, carbs: (updatedMeals.lunch.carbs || 0) + randomRice.carbs, protein: (updatedMeals.lunch.protein || 0) + randomRice.protein, fats: (updatedMeals.lunch.fats || 0) + randomRice.fats, ingredients: Array.isArray(updatedMeals.lunch.ingredients)
+                    ? [...updatedMeals.lunch.ingredients, 'Garlic Fried Rice or Steamed Rice']
+                    : ['Garlic Fried Rice or Steamed Rice'] });
+        }
+        // Add rice to dinner if not already included
+        if (updatedMeals.dinner && !String(updatedMeals.dinner.name || '').toLowerCase().includes('rice')) {
+            const randomRice = riceSideDishes[Math.floor(Math.random() * riceSideDishes.length)];
+            updatedMeals.dinner = Object.assign(Object.assign({}, updatedMeals.dinner), { name: `${updatedMeals.dinner.name} with ${randomRice.name}`, calories: (updatedMeals.dinner.calories || 0) + randomRice.calories, carbs: (updatedMeals.dinner.carbs || 0) + randomRice.carbs, protein: (updatedMeals.dinner.protein || 0) + randomRice.protein, fats: (updatedMeals.dinner.fats || 0) + randomRice.fats, ingredients: Array.isArray(updatedMeals.dinner.ingredients)
+                    ? [...updatedMeals.dinner.ingredients, 'Garlic Fried Rice or Steamed Rice']
+                    : ['Garlic Fried Rice or Steamed Rice'] });
+        }
+        // Recalculate totals
+        const totals = sumMacros(Object.values(updatedMeals));
+        return Object.assign(Object.assign({}, day), { meals: updatedMeals, totalCalories: totals.calories, totalProtein: totals.protein, totalCarbs: totals.carbs, totalFats: totals.fats });
+    });
+}
 function enhanceAIWeekPlanWithDetails(parsedWeekPlan, dishes) {
     return __awaiter(this, void 0, void 0, function* () {
         if (!Array.isArray(parsedWeekPlan))
@@ -261,7 +340,7 @@ function createMealObject(meal) {
         carbs: Number((_f = (_e = meal.carbs) !== null && _e !== void 0 ? _e : meal.carb) !== null && _f !== void 0 ? _f : 0),
         fats: Number((_h = (_g = meal.fats) !== null && _g !== void 0 ? _g : meal.fat) !== null && _h !== void 0 ? _h : 0),
         fiber: Number((_j = meal.fiber) !== null && _j !== void 0 ? _j : 0),
-        recipe: meal.recipe || "No recipe provided",
+        recipe: meal.recipe || "1. Prepare all ingredients\n2. Cook according to traditional Filipino method\n3. Season to taste\n4. Serve hot",
     };
 }
 function generateShoppingList(weekPlan) {
@@ -495,6 +574,9 @@ function isoDateString(input) {
         return new Date().toISOString().split('T')[0];
     return d.toISOString().split('T')[0];
 }
+// ============================================
+// INPUT VALIDATION HELPERS
+// ============================================
 // Generate recipe instructions using OpenAI
 function generateRecipeInstructions(mealName, ingredients) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -588,22 +670,28 @@ app.get('/api/system/status', (req, res) => __awaiter(void 0, void 0, void 0, fu
             dbOk = false;
         }
         const openaiOk = !!process.env.OPENAI_API_KEY && typeof process.env.OPENAI_API_KEY === 'string' && process.env.OPENAI_API_KEY.trim().length > 0;
-        let paymongoOk = false;
+        let paypalOk = false;
         try {
-            yield axios_1.default.get(PAYMONGO_BASE_URL + '/v1/sources', {
+            yield axios_1.default.post(`${PAYPAL_API_URL}/oauth2/token`, 'grant_type=client_credentials', {
                 timeout: 1500,
-                auth: { username: (process.env.PAYMONGO_SECRET_KEY || ''), password: '' }
+                auth: {
+                    username: PAYPAL_CLIENT_ID,
+                    password: PAYPAL_CLIENT_SECRET
+                },
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
             });
-            paymongoOk = true;
+            paypalOk = true;
         }
         catch (e) {
-            paymongoOk = false;
+            paypalOk = false;
         }
         return res.json({
             ok: true,
             dbConnected: dbOk,
             openai: openaiOk,
-            paymongo: paymongoOk,
+            paypal: paypalOk,
             timestamp: new Date().toISOString()
         });
     }
@@ -612,17 +700,27 @@ app.get('/api/system/status', (req, res) => __awaiter(void 0, void 0, void 0, fu
     }
 }));
 // ===== AUTHENTICATION ROUTES =====
-app.post('/api/auth/login', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+app.post('/api/auth/login', authLimiter, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email, password } = req.body;
-        console.log('\n🔐 Login attempt for:', email);
+        // Validate inputs
+        if (!email || !password) {
+            return res.status(400).json({ message: 'Email and password are required' });
+        }
+        if (!isValidEmail(email)) {
+            return res.status(400).json({ message: 'Invalid email format' });
+        }
+        if (typeof password !== 'string' || password.length === 0) {
+            return res.status(400).json({ message: 'Invalid password' });
+        }
+        console.log('\n🔐 Login attempt received');
         const [users] = yield db_config_1.pool.query('SELECT * FROM users WHERE email = ?', [email]);
         if (!Array.isArray(users) || users.length === 0) {
             console.log('❌ User not found');
             return res.status(401).json({ message: 'Invalid credentials' });
         }
         const user = users[0];
-        console.log('✅ User found:', user.email);
+        console.log('✅ User found');
         const validPassword = yield bcryptjs_1.default.compare(password, user.password);
         if (!validPassword) {
             console.log('❌ Invalid password');
@@ -667,11 +765,12 @@ app.post('/api/auth/change-password', (req, res) => __awaiter(void 0, void 0, vo
         res.status(500).json({ message: 'Server error' });
     }
 }));
-app.post('/api/register', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+app.post('/api/register', registerLimiter, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
         const { firstName, lastName, email, password, phone, gender, dateOfBirth, membershipType, membershipPrice, emergencyContact, address, joinDate, } = req.body;
-        console.log('\n➕ Registering new member:', email);
+        console.log('\n➕ New member registration started');
+        // Validate required fields
         if (!firstName || !lastName || !email || !password || !phone) {
             console.log('❌ Missing required fields');
             return res.status(400).json({
@@ -679,9 +778,40 @@ app.post('/api/register', (req, res) => __awaiter(void 0, void 0, void 0, functi
                 message: 'Missing required fields'
             });
         }
+        // Validate email format
+        if (!isValidEmail(email)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid email format'
+            });
+        }
+        // Validate password strength
+        const passwordValidation = validatePassword(password);
+        if (!passwordValidation.isValid) {
+            return res.status(400).json({
+                success: false,
+                message: passwordValidation.message || 'Password does not meet requirements'
+            });
+        }
+        // Validate phone format
+        if (!isValidPhone(phone)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid phone number format'
+            });
+        }
+        // Sanitize string inputs
+        const sanitizedFirstName = sanitizeInput(firstName);
+        const sanitizedLastName = sanitizeInput(lastName);
+        if (!sanitizedFirstName || !sanitizedLastName) {
+            return res.status(400).json({
+                success: false,
+                message: 'First and last names are required'
+            });
+        }
         const [existingUsers] = yield db_config_1.pool.query('SELECT id FROM users WHERE email = ?', [email]);
         if (existingUsers.length > 0) {
-            console.log('❌ Email already registered');
+            console.log('❌ Registration failed: email already in use');
             return res.status(400).json({
                 success: false,
                 message: 'Email already registered'
@@ -798,13 +928,13 @@ app.get('/api/members', (req, res) => __awaiter(void 0, void 0, void 0, function
 app.post('/api/members', authenticateToken, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { firstName, lastName, email, password, phone, gender, dateOfBirth, membershipType, membershipPrice, joinDate, status, emergencyContact, address, } = req.body;
-        console.log('\n➕ Admin adding new member:', email);
+        console.log('\n➕ Admin adding new member');
         if (!firstName || !lastName || !email || !password) {
             return res.status(400).json({ message: 'Missing required fields' });
         }
         const [existing] = yield db_config_1.pool.query('SELECT id FROM users WHERE email = ?', [email]);
         if (existing.length > 0) {
-            console.log('❌ Email already exists:', email);
+            console.log('❌ Email already exists in system');
             return res.status(400).json({ message: 'Email already exists' });
         }
         const hashedPassword = yield bcryptjs_1.default.hash(password, 12);
@@ -967,13 +1097,17 @@ app.get('/api/member/subscription', authenticateToken, (req, res) => __awaiter(v
     }
 }));
 app.post('/api/member/payment/gcash', authenticateToken, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
-        const { userId, membershipType, amount, paymentMethod } = req.body;
-        console.log('\n💳 Processing GCash AUTO-APPROVAL payment:', { userId, membershipType, amount, paymentMethod });
+        const { userId: bodyUserId, membershipType, amount, paymentMethod } = req.body;
+        // Use userId from token if not provided in body (for renewal cases)
+        const userId = bodyUserId || ((_a = req.user) === null || _a === void 0 ? void 0 : _a.id);
+        console.log('\n💳 Processing GCash AUTO-APPROVAL payment:', { userId, membershipType, amount, paymentMethod, fromToken: !bodyUserId });
         if (!userId || !membershipType || !amount) {
+            console.log('❌ Missing required fields:', { userId: !!userId, membershipType: !!membershipType, amount: !!amount });
             return res.status(400).json({
                 success: false,
-                message: 'Missing required fields'
+                message: 'Missing required fields: userId=' + (userId ? 'OK' : 'MISSING') + ', membershipType=' + (membershipType ? 'OK' : 'MISSING') + ', amount=' + (amount ? 'OK' : 'MISSING')
             });
         }
         const transactionId = `GCASH-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
@@ -1183,7 +1317,7 @@ app.post('/api/meal-planner/generate', authenticateToken, (req, res) => __awaite
     console.log('🔄 /api/meal-planner/generate hit');
     try {
         const userId = req.user.id;
-        const { lifestyle, mealType, goal, dietaryRestrictions, targets, planName } = req.body;
+        const { lifestyle, mealType, goal, diet, dietaryRestrictions, targets, planName } = req.body;
         if (!dbConnected) {
             console.warn('Database not connected: returning local fallback week plan');
             const weekPlan = generateWeekPlan(null, targets, goal);
@@ -1213,11 +1347,44 @@ app.post('/api/meal-planner/generate', authenticateToken, (req, res) => __awaite
             });
         });
         const dishesJson = JSON.stringify(dishesForPrompt);
+        // Build diet constraint text with explicit filtering rules
+        let dietConstraint = '';
+        let dietRules = '';
+        if (diet && diet !== '') {
+            dietConstraint = `\n- Diet Type: ${diet}`;
+            // Add explicit filtering rules based on diet type
+            switch (diet.toLowerCase()) {
+                case 'vegan':
+                    dietRules = '\n- STRICTLY VEGAN: Exclude ALL meat, poultry, seafood, eggs, dairy, and animal products. Only plant-based dishes.';
+                    break;
+                case 'vegetarian':
+                    dietRules = '\n- VEGETARIAN: Exclude meat, poultry, and seafood. Eggs and dairy are allowed.';
+                    break;
+                case 'low carb':
+                    dietRules = '\n- LOW CARB: Prioritize dishes with low carbohydrate content. Minimize rice and starchy foods.';
+                    break;
+                case 'low fat':
+                    dietRules = '\n- LOW FAT: Prioritize lean proteins and minimize oil/fat in dishes.';
+                    break;
+                case 'keto':
+                    dietRules = '\n- KETO: Very low carbs (under 20g per meal), high fat and protein. Exclude rice, bread, sugary items.';
+                    break;
+                case 'paleo':
+                    dietRules = '\n- PALEO: Exclude grains, legumes, and dairy. Focus on meat, seafood, vegetables, and fruits.';
+                    break;
+                case 'low sodium':
+                    dietRules = '\n- LOW SODIUM: Minimize salt and salty condiments. Focus on fresh, unsalted preparations.';
+                    break;
+                case 'high protein':
+                    dietRules = '\n- HIGH PROTEIN: Prioritize high-protein dishes with lean meats, seafood, and legumes.';
+                    break;
+            }
+        }
         const prompt = `
 You are a professional Filipino nutritionist and meal planner. The user preferences:
 - Lifestyle: ${lifestyle}
 - Type: ${mealType}
-- Goal: ${goal}
+- Goal: ${goal}${dietConstraint}
 - Restrictions: ${dietaryRestrictions}
 - Targets: ${(_a = targets === null || targets === void 0 ? void 0 : targets.calories) !== null && _a !== void 0 ? _a : 2000} kcal, ${(_b = targets === null || targets === void 0 ? void 0 : targets.protein) !== null && _b !== void 0 ? _b : 150}g protein, ${(_c = targets === null || targets === void 0 ? void 0 : targets.carbs) !== null && _c !== void 0 ? _c : 250}g carbs, ${(_d = targets === null || targets === void 0 ? void 0 : targets.fats) !== null && _d !== void 0 ? _d : 70}g fats
 
@@ -1225,10 +1392,11 @@ Only use meals from the provided DB list (JSON) below:
 ${dishesJson}
 
 Rules:
-- Only use dishes that appear in the list (no new dishes).
+- Only use dishes that appear in the list (no new dishes).${dietRules}
+- IMPORTANT: For lunch and dinner, include a rice/carb side dish (like "Sinangag na Kanin" or "Fried Rice") to make it a complete Filipino meal.
 - Randomize meals across days and avoid repeating the same meal on consecutive days.
 - Return exactly JSON with "weekPlan": an array of 7 objects with structure:
-  { "day":"Monday", "meals": { "breakfast": "Tapsilog"|{name:..., calories:..., ingredients:[]...}, ... }, "totalCalories": number, "totalProtein": number, "totalCarbs": number, "totalFats": number }
+  { "day":"Monday", "meals": { "breakfast": "Tapsilog"|{name:..., calories:..., ingredients:[]...}, "lunch": {name: "main dish with rice side"}, ... }, "totalCalories": number, "totalProtein": number, "totalCarbs": number, "totalFats": number }
 `;
         let weekPlan = [];
         let preferenceId = null;
@@ -1270,19 +1438,23 @@ Rules:
                 }
                 if (parsed && Array.isArray(parsed.weekPlan) && parsed.weekPlan.length === 7) {
                     weekPlan = yield enhanceAIWeekPlanWithDetails(parsed.weekPlan, dbDishes);
+                    weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
                 }
                 else {
                     const aiDay = parsed && parsed.weekPlan && parsed.weekPlan[0] ? parsed.weekPlan[0] : null;
                     weekPlan = generateWeekPlan(aiDay, targets, goal);
+                    weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
                 }
             }
             catch (aiErr) {
                 console.warn('OpenAI generation failed — falling back to deterministic plan', getErrorMessage(aiErr)); // changed
                 weekPlan = generateWeekPlan(null, targets, goal);
+                weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
             }
         }
         else {
             weekPlan = generateWeekPlan(null, targets, goal);
+            weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
         }
         // Build today's shopping list
         let todayShoppingList = [];
@@ -1887,6 +2059,36 @@ app.use((err, req, res, next) => {
 process.on('uncaughtException', (err) => {
     console.error('UNCAUGHT EXCEPTION:', getErrorMessage(err), err);
 });
+// ============================================
+// ERROR HANDLING MIDDLEWARE
+// ============================================
+app.use((err, req, res, next) => {
+    // Log error internally (without sensitive data)
+    const errorId = (0, uuid_1.v4)().substring(0, 8);
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    console.error(`[ERROR-${errorId}] ${err.status || 500}: ${err.message}`);
+    // Don't expose stack traces in production
+    if (!isDevelopment) {
+        console.error(`Stack trace hidden in production (Error ID: ${errorId})`);
+    }
+    else {
+        console.error(err.stack);
+    }
+    // Determine HTTP status code
+    const statusCode = err.status || err.statusCode || 500;
+    // Safe error response
+    const errorResponse = Object.assign({ success: false, message: isDevelopment ? err.message : 'An error occurred processing your request' }, (isDevelopment && { errorId, stack: err.stack }));
+    res.status(statusCode).json(errorResponse);
+});
+// 404 handler - must be last
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        message: 'Endpoint not found',
+        path: req.path,
+        method: req.method
+    });
+});
 process.on('unhandledRejection', (reason) => {
     console.error('UNHANDLED REJECTION:', getErrorMessage(reason), reason);
 });
@@ -2032,6 +2234,53 @@ function sendEmail(to, subject, html) {
         }
     });
 }
+/**
+ * Validates password strength
+ * Requirements: 8+ chars, 1 uppercase, 1 lowercase, 1 number, 1 special char
+ */
+function validatePassword(password) {
+    if (!password || password.length < 8) {
+        return { isValid: false, message: 'Password must be at least 8 characters' };
+    }
+    if (!/[A-Z]/.test(password)) {
+        return { isValid: false, message: 'Password must contain at least one uppercase letter' };
+    }
+    if (!/[a-z]/.test(password)) {
+        return { isValid: false, message: 'Password must contain at least one lowercase letter' };
+    }
+    if (!/[0-9]/.test(password)) {
+        return { isValid: false, message: 'Password must contain at least one number' };
+    }
+    if (!/[!@#$%^&*]/.test(password)) {
+        return { isValid: false, message: 'Password must contain at least one special character (!@#$%^&*)' };
+    }
+    return { isValid: true };
+}
+/**
+ * Sanitizes string input to prevent injection attacks
+ */
+function sanitizeInput(input) {
+    if (typeof input !== 'string')
+        return '';
+    return input
+        .replace(/[<>\"']/g, '') // Remove HTML/script tags
+        .trim()
+        .substring(0, 255); // Max 255 chars
+}
+/**
+ * Validates phone number (basic format)
+ */
+function isValidPhone(phone) {
+    const phoneRegex = /^[\d\s\-\+\(\)]{7,}$/;
+    return phoneRegex.test(String(phone).replace(/\s/g, ''));
+}
+/**
+ * Validates monetary amount (0 < amount < 999999)
+ */
+function isValidAmount(amount) {
+    const num = parseFloat(amount);
+    return !isNaN(num) && num > 0 && num < 999999;
+}
 function isValidEmail(email) {
     if (!email || typeof email !== 'string')
         return false;
@@ -2146,132 +2395,240 @@ app.post('/api/admin/attendance/test-email', authenticateToken, (req, res) => __
         res.status(500).json({ success: false, message: 'Failed to send test email.' });
     }
 }));
-// Add PayMongo webhook secret + public key + app base url
-const PAYMONGO_WEBHOOK_SECRET = process.env.PAYMONGO_WEBHOOK_SECRET || '';
-const PAYMONGO_PUBLIC_KEY = process.env.PAYMONGO_PUBLIC_KEY || '';
+// PayPal Test Endpoint
+app.post('/api/test/paypal', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d;
+    try {
+        const tokenUrl = `${PAYPAL_API_URL}/oauth2/token`;
+        console.log('\n🧪 PAYPAL TEST ENDPOINT');
+        console.log('📍 Token URL:', tokenUrl);
+        console.log('💼 Client ID:', (PAYPAL_CLIENT_ID === null || PAYPAL_CLIENT_ID === void 0 ? void 0 : PAYPAL_CLIENT_ID.substring(0, 15)) + '...');
+        console.log('🔑 Secret (first 10 chars):', (PAYPAL_CLIENT_SECRET === null || PAYPAL_CLIENT_SECRET === void 0 ? void 0 : PAYPAL_CLIENT_SECRET.substring(0, 10)) + '...');
+        console.log('📋 Mode:', PAYPAL_MODE);
+        const axiosConfig = {
+            auth: {
+                username: PAYPAL_CLIENT_ID,
+                password: PAYPAL_CLIENT_SECRET
+            },
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            timeout: 5000
+        };
+        console.log('🔄 Sending request to PayPal...\n');
+        const response = yield axios_1.default.post(tokenUrl, 'grant_type=client_credentials', axiosConfig);
+        console.log('✅ SUCCESS! Got token');
+        res.json({
+            success: true,
+            message: 'PayPal connection works!',
+            tokenUrl,
+            mode: PAYPAL_MODE,
+            clientIdPrefix: (PAYPAL_CLIENT_ID === null || PAYPAL_CLIENT_ID === void 0 ? void 0 : PAYPAL_CLIENT_ID.substring(0, 15)) + '...'
+        });
+    }
+    catch (error) {
+        console.error('❌ TEST FAILED');
+        console.error('Status:', (_a = error.response) === null || _a === void 0 ? void 0 : _a.status);
+        console.error('Error:', ((_b = error.response) === null || _b === void 0 ? void 0 : _b.data) || error.message);
+        res.status(500).json({
+            success: false,
+            error: ((_c = error.response) === null || _c === void 0 ? void 0 : _c.data) || error.message,
+            status: (_d = error.response) === null || _d === void 0 ? void 0 : _d.status,
+            hint: 'Check that your PayPal credentials are correct'
+        });
+    }
+}));
+// App configuration
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
-// Basic auth header helper for PayMongo
-const paymongoAuthHeader = () => `Basic ${Buffer.from(`${PAYMONGO_SECRET_KEY}:`).toString('base64')}`;
-// Create a PayMongo 'gcash' source and return redirect URL
-app.post('/api/payments/paymongo/create-source', authenticateToken, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c;
+// Helper function to get PayPal access token
+function getPayPalAccessToken() {
+    return __awaiter(this, void 0, void 0, function* () {
+        var _a, _b, _c, _d, _e, _f, _g, _h;
+        try {
+            const tokenUrl = `${PAYPAL_API_URL}/oauth2/token`;
+            console.log('\n🔗 PayPal Token Request:');
+            console.log('   URL:', tokenUrl);
+            console.log('   Client ID:', (PAYPAL_CLIENT_ID === null || PAYPAL_CLIENT_ID === void 0 ? void 0 : PAYPAL_CLIENT_ID.substring(0, 15)) + '...');
+            console.log('   Mode:', PAYPAL_MODE);
+            // Use Base64 encoding for auth header instead of axios auth
+            const credentials = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64');
+            const response = yield axios_1.default.post(tokenUrl, 'grant_type=client_credentials', {
+                headers: {
+                    'Authorization': `Basic ${credentials}`,
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                timeout: 10000
+            });
+            const tokenData = response.data;
+            console.log('✅ Token obtained successfully\n');
+            return tokenData.access_token;
+        }
+        catch (error) {
+            console.error('\n❌ PayPal Token Error:');
+            console.error('   Status:', (_a = error.response) === null || _a === void 0 ? void 0 : _a.status);
+            console.error('   Error Code:', (_c = (_b = error.response) === null || _b === void 0 ? void 0 : _b.data) === null || _c === void 0 ? void 0 : _c.error);
+            console.error('   Error Description:', (_e = (_d = error.response) === null || _d === void 0 ? void 0 : _d.data) === null || _e === void 0 ? void 0 : _e.error_description);
+            console.error('   Full Response:', (_f = error.response) === null || _f === void 0 ? void 0 : _f.data);
+            console.error('   Message:', error.message);
+            throw new Error('PayPal authentication failed: ' + (((_h = (_g = error.response) === null || _g === void 0 ? void 0 : _g.data) === null || _h === void 0 ? void 0 : _h.error_description) || error.message));
+        }
+    });
+}
+// Create a PayPal order and return redirect URL
+app.post('/api/payments/paypal/create-order', authenticateToken, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e;
     try {
         const userId = req.user.id;
-        const { amount, plan, successRedirect, failedRedirect } = req.body;
+        const { amount, plan } = req.body;
+        // Validate input
         if (!amount || !plan) {
             return res.status(400).json({ success: false, message: 'Missing amount or plan' });
         }
+        if (!isValidAmount(amount)) {
+            return res.status(400).json({ success: false, message: 'Invalid payment amount' });
+        }
+        const accessToken = yield getPayPalAccessToken();
+        const planDescription = plan === 'monthly' ? 'Monthly Membership' :
+            plan === 'quarterly' ? 'Quarterly Membership' :
+                'Annual Membership';
         const payload = {
-            data: {
-                attributes: {
-                    amount: Math.round(Number(amount) * 100), // PayMongo uses centavos
-                    currency: 'PHP',
-                    type: 'gcash',
-                    redirect: {
-                        success: (successRedirect || `${APP_URL}/payment/success`) + '?sourceId={id}',
-                        failed: (failedRedirect || `${APP_URL}/payment/failed`) + '?sourceId={id}',
+            intent: 'CAPTURE',
+            payer: {
+                email_address: `user_${userId}@activecore.test`
+            },
+            purchase_units: [{
+                    amount: {
+                        currency_code: 'PHP',
+                        value: String(amount)
                     },
-                    metadata: { userId, plan }
-                }
+                    description: planDescription,
+                    custom_id: `${userId}|${plan}` // Store userId and plan in custom_id
+                }],
+            application_context: {
+                brand_name: 'ActiveCore Fitness',
+                landing_page: 'BILLING',
+                user_action: 'PAY_NOW',
+                return_url: `${APP_URL}/member/payment/success`,
+                cancel_url: `${APP_URL}/member/payment/cancel`
             }
         };
-        const response = yield axios_1.default.post(`${PAYMONGO_BASE_URL}/sources`, payload, {
+        const response = yield axios_1.default.post(`${PAYPAL_API_URL}/checkout/orders`, payload, {
             headers: {
-                Authorization: paymongoAuthHeader(),
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 10000 // 10 second timeout
+        });
+        const responseData = response.data;
+        const orderId = responseData.id;
+        const approvalLink = (_b = (_a = responseData.links) === null || _a === void 0 ? void 0 : _a.find((link) => link.rel === 'approve')) === null || _b === void 0 ? void 0 : _b.href;
+        if (!orderId || !approvalLink) {
+            console.error(`❌ PayPal order creation failed: Missing order ID or approval link`);
+            return res.status(500).json({ success: false, message: 'Failed to create payment order' });
+        }
+        // Insert payment record (pending)
+        yield db_config_1.pool.query(`INSERT INTO payments (user_id, amount, payment_method, membership_type, payment_status, transaction_id, created_at)
+         VALUES (?, ?, 'paypal', ?, 'pending', ?, NOW())`, [userId, Number(amount), plan, orderId]);
+        console.log(`💳 Payment order created for user ${userId}`);
+        res.json({ success: true, approvalLink, orderId });
+    }
+    catch (err) {
+        const isDevelopment = process.env.NODE_ENV === 'development';
+        const errorCode = ((_c = err.response) === null || _c === void 0 ? void 0 : _c.status) || 500;
+        // Log error without exposing sensitive details
+        if (isDevelopment) {
+            console.error('❌ create-order error:');
+            console.error('  Status:', (_d = err.response) === null || _d === void 0 ? void 0 : _d.status);
+            console.error('  Message:', err.message);
+        }
+        else {
+            console.error(`❌ PayPal create-order error (${errorCode}): ${err.message || 'Payment service error'}`);
+        }
+        // Safe error message for client
+        const clientMessage = errorCode === 401 || errorCode === 403
+            ? 'Payment service authentication failed. Please contact support.'
+            : errorCode >= 400 && errorCode < 500
+                ? 'Invalid payment request. Please check your details and try again.'
+                : 'Payment service temporarily unavailable. Please try again later.';
+        res.status(500).json(Object.assign({ success: false, message: clientMessage }, (isDevelopment && { debug: (_e = err.response) === null || _e === void 0 ? void 0 : _e.data })));
+    }
+}));
+// Capture PayPal order and update subscription
+app.post('/api/payments/paypal/capture-order', authenticateToken, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+    try {
+        const userId = req.user.id;
+        const { orderId } = req.body;
+        if (!orderId) {
+            return res.status(400).json({ success: false, message: 'Missing orderId' });
+        }
+        const accessToken = yield getPayPalAccessToken();
+        // Capture the payment
+        const captureResponse = yield axios_1.default.post(`${PAYPAL_API_URL}/checkout/orders/${orderId}/capture`, {}, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
             }
         });
-        // keep response typing simple to avoid axios type issues
-        const responseData = response.data;
-        const source = responseData === null || responseData === void 0 ? void 0 : responseData.data;
-        if (!source)
-            return res.status(500).json({ success: false, message: 'Could not create source' });
-        const checkoutUrl = (_b = (_a = source.attributes) === null || _a === void 0 ? void 0 : _a.redirect) === null || _b === void 0 ? void 0 : _b.checkout_url;
-        const sourceId = source.id;
-        // Insert payment record (pending)
-        yield db_config_1.pool.query(`INSERT INTO payments (user_id, amount, payment_method, membership_type, payment_status, transaction_id, created_at)
-         VALUES (?, ?, 'gcash', ?, 'pending', ?, NOW())`, [userId, Number(amount), plan, sourceId]);
-        res.json({ success: true, checkoutUrl, sourceId });
-    }
-    catch (err) {
-        console.error('❌ create-source error', ((_c = err.response) === null || _c === void 0 ? void 0 : _c.data) || err.message || err);
-        res.status(500).json({ success: false, message: 'Create source failed' });
-    }
-}));
-// PayMongo webhook - verify signature and update DB
-app.post('/api/payments/paymongo/webhook', express_1.default.raw({ type: 'application/json' }), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
-    try {
-        const rawBody = req.body; // Buffer
-        const signatureHeader = req.headers['paymongo-signature'] || req.headers['x-paymongo-signature'] || '';
-        // Verify signature if configured
-        if (PAYMONGO_WEBHOOK_SECRET) {
-            const computed = crypto_1.default.createHmac('sha256', PAYMONGO_WEBHOOK_SECRET).update(rawBody).digest('hex');
-            // PayMongo signature header often contains 'sha256=<hash>' or a CSV with various algorithms
-            const signatureValue = (_a = signatureHeader.split(/\s*,\s*/).find((s) => s.includes('sha256='))) === null || _a === void 0 ? void 0 : _a.split('=')[1];
-            if (!signatureValue || signatureValue !== computed) {
-                console.warn('⚠️ Invalid PayMongo webhook signature');
-                return res.status(400).send('Invalid signature');
+        const captureData = captureResponse.data;
+        const paymentStatus = captureData.status;
+        const captureId = (_e = (_d = (_c = (_b = (_a = captureData.purchase_units) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.payments) === null || _c === void 0 ? void 0 : _c.captures) === null || _d === void 0 ? void 0 : _d[0]) === null || _e === void 0 ? void 0 : _e.id;
+        const customId = (_g = (_f = captureData.purchase_units) === null || _f === void 0 ? void 0 : _f[0]) === null || _g === void 0 ? void 0 : _g.custom_id;
+        const [paymentUserId, plan] = (customId === null || customId === void 0 ? void 0 : customId.split('|')) || [null, null];
+        if (paymentStatus !== 'COMPLETED') {
+            return res.json({ success: false, status: paymentStatus, message: 'Payment not completed' });
+        }
+        // Update payment record
+        yield db_config_1.pool.query(`UPDATE payments SET payment_status = ?, payment_date = NOW() WHERE transaction_id = ? AND user_id = ?`, ['completed', orderId, userId]);
+        // Calculate subscription dates
+        let months = 1;
+        if (plan === 'annual')
+            months = 12;
+        else if (plan === 'quarterly')
+            months = 3;
+        const subscriptionStart = new Date();
+        const subscriptionEnd = new Date();
+        subscriptionEnd.setMonth(subscriptionEnd.getMonth() + months);
+        // Get payment amount
+        const [paymentRows] = yield db_config_1.pool.query(`SELECT amount FROM payments WHERE transaction_id = ? AND user_id = ? LIMIT 1`, [orderId, userId]);
+        const paymentAmount = ((_h = paymentRows === null || paymentRows === void 0 ? void 0 : paymentRows[0]) === null || _h === void 0 ? void 0 : _h.amount) || 0;
+        // Update user subscription
+        yield db_config_1.pool.query(`UPDATE users 
+       SET status = 'active',
+           payment_status = 'paid',
+           subscription_start = ?,
+           subscription_end = ?,
+           membership_type = ?,
+           membership_price = ?,
+           next_payment = ?
+       WHERE id = ?`, [
+            isoDateString(subscriptionStart),
+            isoDateString(subscriptionEnd),
+            plan,
+            paymentAmount,
+            isoDateString(subscriptionEnd),
+            userId
+        ]);
+        // Record payment history
+        yield db_config_1.pool.query(`INSERT INTO payments_history (user_id, payment_id, amount, payment_method, status, created_at)
+         VALUES (?, ?, ?, 'paypal', 'completed', NOW())`, [userId, orderId, paymentAmount]);
+        console.log(`✅ Payment for user ${userId} captured and completed (orderId=${orderId}), subscription updated to ${plan}`);
+        res.json({
+            success: true,
+            status: 'completed',
+            subscription: {
+                start: subscriptionStart.toISOString().split('T')[0],
+                end: subscriptionEnd.toISOString().split('T')[0],
+                type: plan
             }
-        }
-        const event = JSON.parse(rawBody.toString('utf8'));
-        const eventType = event.type;
-        console.log('🔔 PayMongo webhook received:', eventType);
-        const sourceId = ((_d = (_c = (_b = event.data) === null || _b === void 0 ? void 0 : _b.attributes) === null || _c === void 0 ? void 0 : _c.source) === null || _d === void 0 ? void 0 : _d.id) || ((_e = event.data) === null || _e === void 0 ? void 0 : _e.id) || ((_g = (_f = event.data) === null || _f === void 0 ? void 0 : _f.attributes) === null || _g === void 0 ? void 0 : _g.source);
-        const paymentId = ((_h = event.data) === null || _h === void 0 ? void 0 : _h.id) || ((_k = (_j = event.data) === null || _j === void 0 ? void 0 : _j.attributes) === null || _k === void 0 ? void 0 : _k.payment);
-        if (!sourceId && !paymentId) {
-            console.warn('⚠️ Webhook missing source/payment id');
-            return res.json({ success: true });
-        }
-        const [rows] = yield db_config_1.pool.query(`SELECT id, user_id, amount, membership_type FROM payments WHERE transaction_id IN (?, ?) LIMIT 1`, [sourceId, paymentId]);
-        if (!rows || rows.length === 0) {
-            console.warn('⚠️ No matching payment record found for source/payment', sourceId || paymentId);
-            return res.json({ success: true });
-        }
-        const record = rows[0];
-        let newStatus = 'pending';
-        if (eventType === 'payment.paid' || eventType === 'source.chargeable')
-            newStatus = 'completed';
-        if (eventType === 'payment.failed')
-            newStatus = 'failed';
-        yield db_config_1.pool.query(`UPDATE payments SET payment_status = ?, transaction_id = ?, payment_date = NOW() WHERE id = ?`, [newStatus, paymentId || sourceId, record.id]);
-        if (newStatus === 'completed') {
-            let months = 1;
-            const plan = record.membership_type || '';
-            if (/year/i.test(plan))
-                months = 12;
-            if (/quarter/i.test(plan))
-                months = 3;
-            yield db_config_1.pool.query(`UPDATE users SET next_payment = DATE_ADD(CURDATE(), INTERVAL ? MONTH) WHERE id = ?`, [months, record.user_id]);
-            yield db_config_1.pool.query(`INSERT INTO payments_history (user_id, payment_id, amount, payment_method, status, created_at)
-           VALUES (?, ?, ?, 'gcash', 'completed', NOW())`, [record.user_id, record.id, record.amount]);
-            console.log(`✅ Payment for user ${record.user_id} marked as completed (source/payment=${sourceId || paymentId})`);
-        }
-        else {
-            console.log(`ℹ️ Payment status updated to ${newStatus} for source/payment ${sourceId || paymentId}`);
-        }
-        res.json({ success: true });
+        });
     }
     catch (err) {
-        console.error('❌ PayMongo webhook error', err.message || err);
-        res.status(500).json({ success: false, message: 'Webhook processing failed' });
-    }
-}));
-// Verify endpoint — read DB payment status by source or payment id
-app.get('/api/payments/paymongo/verify', authenticateToken, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const sourceId = req.query.sourceId || req.query.paymentId;
-        if (!sourceId)
-            return res.status(400).json({ success: false, message: 'Missing sourceId or paymentId' });
-        const [rows] = yield db_config_1.pool.query(`SELECT * FROM payments WHERE transaction_id = ? LIMIT 1`, [sourceId]);
-        if (!rows || rows.length === 0) {
-            return res.json({ success: true, status: 'pending', message: 'No payment found yet.' });
+        console.error('❌ capture-order error:', ((_j = err.response) === null || _j === void 0 ? void 0 : _j.data) || err.message || err);
+        // If it's a 404, order may not exist
+        if (((_k = err.response) === null || _k === void 0 ? void 0 : _k.status) === 404) {
+            return res.status(400).json({ success: false, message: 'PayPal order not found' });
         }
-        const p = rows[0];
-        return res.json({ success: true, status: p.payment_status, payment: p });
-    }
-    catch (err) {
-        console.error('❌ verify payment error', err);
-        res.status(500).json({ success: false, message: 'Failed to verify payment' });
+        res.status(500).json({ success: false, message: 'Failed to capture PayPal payment' });
     }
 }));

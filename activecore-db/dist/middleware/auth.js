@@ -53,7 +53,7 @@ const verifyPassword = (password, hash) => __awaiter(void 0, void 0, void 0, fun
 });
 exports.verifyPassword = verifyPassword;
 const createToken = (userId, role) => {
-    return jsonwebtoken_1.default.sign({ userId, role }, process.env.JWT_SECRET || 'default_secret', { expiresIn: '24h' });
+    return jsonwebtoken_1.default.sign({ userId, role }, process.env.JWT_SECRET, { expiresIn: '24h' });
 };
 exports.createToken = createToken;
 exports.default = { authMiddleware: exports.authMiddleware, roleCheck: exports.roleCheck, hashPassword: exports.hashPassword, verifyPassword: exports.verifyPassword, createToken: exports.createToken };

@@ -92,26 +92,36 @@ if (process.env.NODE_ENV === 'development') {
   // Ensure pre-flight passes
   app.options('*', cors({ origin: true, credentials: true }));
 } else {
-  const allowedOrigins = (process.env.FRONTEND_URL?.split(',') || ['http://localhost:8100']).map((s) => s.trim().replace(/\/$/, ''));
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    const origin = (req.headers.origin as string | undefined) || undefined;
-    const originNormalized = origin ? origin.replace(/\/$/, '') : origin;
-    const allowedExplicit = originNormalized && allowedOrigins.includes(originNormalized);
-    const allowedLocal = originNormalized && (originNormalized.includes('localhost') || originNormalized.includes('127.0.0.1') || originNormalized.includes('ngrok.io'));
-    if (!origin || allowedExplicit || allowedLocal) {
-      const allowOrigin = origin || (allowedOrigins.length > 0 ? allowedOrigins[0] : '*');
-      res.header('Access-Control-Allow-Origin', allowOrigin);
-      res.header('Access-Control-Allow-Credentials', 'true');
-      res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-      if (req.method === 'OPTIONS') return res.sendStatus(204);
-      console.log(`CORS allowed origin: ${origin}`);
-      next();
-    } else {
-      console.warn(`CORS denied origin: ${origin}`);
-      res.status(403).json({ success: false, message: 'CORS origin denied', origin });
-    }
-  });
+  // Production: Use explicit allowlist
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS?.split(',') || process.env.FRONTEND_URL?.split(',') || ['http://localhost:8100'])
+    .map((s) => s.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+  
+  const corsOptions = {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      const originNormalized = origin.replace(/\/$/, '');
+      const isAllowed = 
+        allowedOrigins.includes(originNormalized) ||
+        originNormalized.includes('localhost') ||
+        originNormalized.includes('127.0.0.1') ||
+        (process.env.ALLOW_NGROK === 'true' && originNormalized.includes('ngrok.io'));
+      
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        callback(new Error('CORS not allowed'));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+  };
+  
+  app.use(cors(corsOptions));
+  app.options('*', cors(corsOptions));
 }
 
 // PayPal API configuration
@@ -2343,6 +2353,46 @@ process.on('uncaughtException', (err: any) => {
   console.error('UNCAUGHT EXCEPTION:', getErrorMessage(err), err);
 });
 
+// ============================================
+// ERROR HANDLING MIDDLEWARE
+// ============================================
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  // Log error internally (without sensitive data)
+  const errorId = uuidv4().substring(0, 8);
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
+  console.error(`[ERROR-${errorId}] ${err.status || 500}: ${err.message}`);
+  
+  // Don't expose stack traces in production
+  if (!isDevelopment) {
+    console.error(`Stack trace hidden in production (Error ID: ${errorId})`);
+  } else {
+    console.error(err.stack);
+  }
+  
+  // Determine HTTP status code
+  const statusCode = err.status || err.statusCode || 500;
+  
+  // Safe error response
+  const errorResponse = {
+    success: false,
+    message: isDevelopment ? err.message : 'An error occurred processing your request',
+    ...(isDevelopment && { errorId, stack: err.stack })
+  };
+  
+  res.status(statusCode).json(errorResponse);
+});
+
+// 404 handler - must be last
+app.use((req: Request, res: Response) => {
+  res.status(404).json({
+    success: false,
+    message: 'Endpoint not found',
+    path: req.path,
+    method: req.method
+  });
+});
+
 process.on('unhandledRejection', (reason: any) => {
   console.error('UNHANDLED REJECTION:', getErrorMessage(reason), reason);
 });
@@ -2534,6 +2584,14 @@ function sanitizeInput(input: any): string {
 function isValidPhone(phone: string): boolean {
   const phoneRegex = /^[\d\s\-\+\(\)]{7,}$/;
   return phoneRegex.test(String(phone).replace(/\s/g, ''));
+}
+
+/**
+ * Validates monetary amount (0 < amount < 999999)
+ */
+function isValidAmount(amount: any): boolean {
+  const num = parseFloat(amount);
+  return !isNaN(num) && num > 0 && num < 999999;
 }
 
 function isValidEmail(email?: string) {
@@ -2757,8 +2815,13 @@ app.post('/api/payments/paypal/create-order', authenticateToken, async (req: Aut
     const userId = req.user!.id;
     const { amount, plan } = req.body;
 
+    // Validate input
     if (!amount || !plan) {
       return res.status(400).json({ success: false, message: 'Missing amount or plan' });
+    }
+    
+    if (!isValidAmount(amount)) {
+      return res.status(400).json({ success: false, message: 'Invalid payment amount' });
     }
 
     const accessToken = await getPayPalAccessToken();
@@ -2793,7 +2856,8 @@ app.post('/api/payments/paypal/create-order', authenticateToken, async (req: Aut
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
-      }
+      },
+      timeout: 10000 // 10 second timeout
     });
 
     const responseData = response.data as any;
@@ -2801,7 +2865,8 @@ app.post('/api/payments/paypal/create-order', authenticateToken, async (req: Aut
     const approvalLink = responseData.links?.find((link: any) => link.rel === 'approve')?.href;
 
     if (!orderId || !approvalLink) {
-      return res.status(500).json({ success: false, message: 'Failed to create PayPal order' });
+      console.error(`❌ PayPal order creation failed: Missing order ID or approval link`);
+      return res.status(500).json({ success: false, message: 'Failed to create payment order' });
     }
 
     // Insert payment record (pending)
@@ -2811,16 +2876,33 @@ app.post('/api/payments/paypal/create-order', authenticateToken, async (req: Aut
       [userId, Number(amount), plan, orderId]
     );
 
-    console.log(`💳 PayPal order created for user ${userId}: ${orderId}`);
+    console.log(`💳 Payment order created for user ${userId}`);
     res.json({ success: true, approvalLink, orderId });
   } catch (err: any) {
-    console.error('❌ create-order error - Full details:');
-    console.error('  Status:', err.response?.status);
-    console.error('  Data:', JSON.stringify(err.response?.data, null, 2));
-    console.error('  Message:', err.message);
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const errorCode = err.response?.status || 500;
     
-    const errorMsg = err.response?.data?.error_description || err.response?.data?.message || err.message || 'Failed to create PayPal order';
-    res.status(500).json({ success: false, message: errorMsg, error: err.response?.data });
+    // Log error without exposing sensitive details
+    if (isDevelopment) {
+      console.error('❌ create-order error:');
+      console.error('  Status:', err.response?.status);
+      console.error('  Message:', err.message);
+    } else {
+      console.error(`❌ PayPal create-order error (${errorCode}): ${err.message || 'Payment service error'}`);
+    }
+    
+    // Safe error message for client
+    const clientMessage = errorCode === 401 || errorCode === 403
+      ? 'Payment service authentication failed. Please contact support.'
+      : errorCode >= 400 && errorCode < 500
+      ? 'Invalid payment request. Please check your details and try again.'
+      : 'Payment service temporarily unavailable. Please try again later.';
+    
+    res.status(500).json({ 
+      success: false, 
+      message: clientMessage,
+      ...(isDevelopment && { debug: err.response?.data })
+    });
   }
 });
 
