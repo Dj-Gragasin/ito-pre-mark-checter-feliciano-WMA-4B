@@ -37,17 +37,14 @@ const Payment: React.FC = () => {
     plan: '',
     card: '',
     expiry: '',
-    cvc: '',
-    paymentMethod: 'card',
-  });
+import { API_CONFIG } from '../config/api.config';
+
+// ... other imports and component code ...
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
-
-  // API base URL - adjust according to your backend
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
   const planPrices = {
     'Monthly - ₱500': 500,
@@ -135,7 +132,7 @@ const Payment: React.FC = () => {
         joinDate: new Date().toISOString(),
       };
 
-      const response = await fetch(`${API_BASE_URL}/members`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/members`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -177,7 +174,7 @@ const Payment: React.FC = () => {
     };
 
     try {
-      const response = await fetch(`${API_BASE_URL}/payments/process`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/payments/process`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -200,7 +197,7 @@ const Payment: React.FC = () => {
 
   async function payWithGcash(amount: number, plan: string) {
     const token = localStorage.getItem('token') || '';
-    const res = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002/api'}/payments/paymongo/create-source`, {
+    const res = await fetch(`${API_CONFIG.BASE_URL}/payments/paymongo/create-source`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({ amount, plan })
@@ -224,7 +221,7 @@ const Payment: React.FC = () => {
 
     try {
       // Check if email already exists
-      const checkResponse = await fetch(`${API_BASE_URL}/members/check-email`, {
+      const checkResponse = await fetch(`${API_CONFIG.BASE_URL}/members/check-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

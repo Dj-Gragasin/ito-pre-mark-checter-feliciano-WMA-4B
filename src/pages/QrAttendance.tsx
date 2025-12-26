@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { useHistory } from "react-router-dom";
+import { API_CONFIG } from "../config/api.config";
 import {
   IonPage,
   IonHeader,
@@ -28,8 +29,6 @@ import {
   warningOutline,
 } from "ionicons/icons";
 import "./QrAttendance.css";
-
-const API_URL = 'http://localhost:3002/api';
 
 const QrAttendance: React.FC = () => {
   const history = useHistory();
@@ -78,8 +77,7 @@ const QrAttendance: React.FC = () => {
       // Try API first
       const token = localStorage.getItem('token');
       if (token) {
-        console.log('🔍 Fetching user profile from API...');
-        const response = await fetch(`${API_URL}/user/profile`, {
+        const response = await fetch(`${API_CONFIG.BASE_URL}/user/profile`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -215,7 +213,7 @@ const QrAttendance: React.FC = () => {
     try {
       setLoading(true);
       
-      const response = await fetch(`${API_URL}/attendance/checkin`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/attendance/checkin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_CONFIG } from '../config/api.config';
 import {
   IonPage,
   IonHeader,
@@ -17,8 +18,6 @@ import {
 import { checkmarkCircle, arrowBack } from 'ionicons/icons';
 import './MemberPayment.css';
 
-const API_URL = 'http://localhost:3002/api';
-
 const PaymentSuccess: React.FC = () => {
   const router = useIonRouter();
   const [presentToast] = useIonToast();
@@ -35,8 +34,6 @@ const PaymentSuccess: React.FC = () => {
       const params = new URLSearchParams(window.location.search);
       const orderId = params.get('token');
 
-      console.log('🔍 Capturing PayPal payment, orderId:', orderId);
-
       if (!orderId) {
         setVerificationStatus('pending');
         setIsVerifying(false);
@@ -50,7 +47,7 @@ const PaymentSuccess: React.FC = () => {
       }
 
       // Call backend to capture payment
-      const response = await fetch(`${API_URL}/payments/paypal/capture-order`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/payments/paypal/capture-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

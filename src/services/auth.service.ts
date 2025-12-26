@@ -1,10 +1,9 @@
 import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3002/api';
+import { API_CONFIG } from '../config/api.config';
 
 export const loginUser = async (email: string, password: string) => {
   try {
-    const response = await fetch('http://localhost:3002/api/auth/login', {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -25,7 +24,6 @@ export const loginUser = async (email: string, password: string) => {
 
     return data;
   } catch (error: any) {
-    console.error('Login error:', error);
     throw new Error(error.message || 'Failed to login');
   }
 };
