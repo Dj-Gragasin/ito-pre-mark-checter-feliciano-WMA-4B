@@ -50,7 +50,7 @@ export const verifyPassword = async (password: string, hash: string): Promise<bo
 export const createToken = (userId: number, role: string): string => {
   return jwt.sign(
     { userId, role },
-    process.env.JWT_SECRET || 'default_secret',
+    process.env.JWT_SECRET!,
     { expiresIn: '24h' }
   );
 };

@@ -10,6 +10,7 @@ import axios from 'axios';
 import { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
+import rateLimit from 'express-rate-limit';
 // Avoid startup crash if OPENAI_API_KEY missing
 let openai: OpenAI | undefined;
 if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim() !== '') {
@@ -24,14 +25,60 @@ import crypto from 'crypto';
 
 const app = express();
 
+// ============================================
+// SECURITY: Validate JWT_SECRET at startup
+// ============================================
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  console.error('\n❌ ========================================');
+  console.error('❌ FATAL: JWT_SECRET CONFIGURATION ERROR');
+  console.error('❌ ========================================');
+  console.error('❌ JWT_SECRET must be:');
+  console.error('❌   1. Set in .env file');
+  console.error('❌   2. At least 32 characters long');
+  console.error('❌ ');
+  console.error('❌ Generate a secure secret:');
+  console.error('❌   openssl rand -base64 32');
+  console.error('❌ ========================================\n');
+  process.exit(1);
+}
+
 // Track OpenAI availability globally
 let openaiAvailable = true;
+
+// ============================================
+// RATE LIMITING: Protect against brute force
+// ============================================
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 login attempts per windowMs
+  message: 'Too many login attempts. Please try again later.',
+  standardHeaders: true, // Return rate limit info in RateLimit-* headers
+  legacyHeaders: false,
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // Limit each IP to 10 registration attempts per hour
+  message: 'Too many registration attempts. Please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const generalLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 30, // General API limit: 30 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Dev CORS: allow all in development for quick debugging
 app.use(cors({ origin: true, credentials: true }));
 app.options('*', cors({ origin: true, credentials: true }));
 
 app.use(express.json());
+
+// Apply general rate limiting to all requests
+app.use(generalLimiter);
 
 // Debug: log incoming requests and origin so we can diagnose CORS issues
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -572,6 +619,10 @@ function isoDateString(input?: Date | string | null): string {
   return d.toISOString().split('T')[0];
 }
 
+// ============================================
+// INPUT VALIDATION HELPERS
+// ============================================
+
 // Generate recipe instructions using OpenAI
 async function generateRecipeInstructions(mealName: string, ingredients: string[]): Promise<string> {
   if (!openai || !openaiAvailable) {
@@ -699,10 +750,24 @@ app.get('/api/system/status', async (req: Request, res: Response) => {
 });
 
 // ===== AUTHENTICATION ROUTES =====
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
-    console.log('\n🔐 Login attempt for:', email);
+    
+    // Validate inputs
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
+    
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+    
+    if (typeof password !== 'string' || password.length === 0) {
+      return res.status(400).json({ message: 'Invalid password' });
+    }
+
+    console.log('\n🔐 Login attempt received');
 
     const [users] = await pool.query<any[]>(
       'SELECT * FROM users WHERE email = ?',
@@ -715,7 +780,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const user = users[0];
-    console.log('✅ User found:', user.email);
+    console.log('✅ User found');
 
     const validPassword = await bcrypt.compare(password, user.password);
 
@@ -782,7 +847,7 @@ app.post('/api/auth/change-password', async (req, res) => {
   }
 });
 
-app.post('/api/register', async (req: Request, res: Response) => {
+app.post('/api/register', registerLimiter, async (req: Request, res: Response) => {
   try {
     const {
       firstName,
@@ -799,13 +864,49 @@ app.post('/api/register', async (req: Request, res: Response) => {
       joinDate,
     } = req.body;
 
-    console.log('\n➕ Registering new member:', email);
+    console.log('\n➕ New member registration started');
 
+    // Validate required fields
     if (!firstName || !lastName || !email || !password || !phone) {
       console.log('❌ Missing required fields');
       return res.status(400).json({ 
         success: false, 
         message: 'Missing required fields' 
+      });
+    }
+    
+    // Validate email format
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid email format' 
+      });
+    }
+    
+    // Validate password strength
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: passwordValidation.message || 'Password does not meet requirements'
+      });
+    }
+    
+    // Validate phone format
+    if (!isValidPhone(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid phone number format'
+      });
+    }
+    
+    // Sanitize string inputs
+    const sanitizedFirstName = sanitizeInput(firstName);
+    const sanitizedLastName = sanitizeInput(lastName);
+    if (!sanitizedFirstName || !sanitizedLastName) {
+      return res.status(400).json({
+        success: false,
+        message: 'First and last names are required'
       });
     }
 
@@ -815,7 +916,7 @@ app.post('/api/register', async (req: Request, res: Response) => {
     );
 
     if ((existingUsers as any[]).length > 0) {
-      console.log('❌ Email already registered');
+      console.log('❌ Registration failed: email already in use');
       return res.status(400).json({ 
         success: false, 
         message: 'Email already registered' 
@@ -965,7 +1066,7 @@ app.post('/api/members', authenticateToken, async (req: AuthRequest, res: Respon
       
     } = req.body;
 
-    console.log('\n➕ Admin adding new member:', email);
+    console.log('\n➕ Admin adding new member');
 
     if (!firstName || !lastName || !email || !password) {
       return res.status(400).json({ message: 'Missing required fields' });
@@ -977,7 +1078,7 @@ app.post('/api/members', authenticateToken, async (req: AuthRequest, res: Respon
     );
 
     if (existing.length > 0) {
-      console.log('❌ Email already exists:', email);
+      console.log('❌ Email already exists in system');
       return res.status(400).json({ message: 'Email already exists' });
     }
 
@@ -2391,6 +2492,48 @@ async function sendEmail(to: string, subject: string, html: string): Promise<boo
     console.error(`Failed to send email to ${to}:`, err.message || err);
     return false;
   }
+}
+
+/**
+ * Validates password strength
+ * Requirements: 8+ chars, 1 uppercase, 1 lowercase, 1 number, 1 special char
+ */
+function validatePassword(password: string): { isValid: boolean; message?: string } {
+  if (!password || password.length < 8) {
+    return { isValid: false, message: 'Password must be at least 8 characters' };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { isValid: false, message: 'Password must contain at least one uppercase letter' };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { isValid: false, message: 'Password must contain at least one lowercase letter' };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { isValid: false, message: 'Password must contain at least one number' };
+  }
+  if (!/[!@#$%^&*]/.test(password)) {
+    return { isValid: false, message: 'Password must contain at least one special character (!@#$%^&*)' };
+  }
+  return { isValid: true };
+}
+
+/**
+ * Sanitizes string input to prevent injection attacks
+ */
+function sanitizeInput(input: any): string {
+  if (typeof input !== 'string') return '';
+  return input
+    .replace(/[<>\"']/g, '') // Remove HTML/script tags
+    .trim()
+    .substring(0, 255); // Max 255 chars
+}
+
+/**
+ * Validates phone number (basic format)
+ */
+function isValidPhone(phone: string): boolean {
+  const phoneRegex = /^[\d\s\-\+\(\)]{7,}$/;
+  return phoneRegex.test(String(phone).replace(/\s/g, ''));
 }
 
 function isValidEmail(email?: string) {
