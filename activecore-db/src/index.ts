@@ -1,6 +1,10 @@
 ﻿import dotenv from 'dotenv';
 dotenv.config();
 
+// Initialize Sentry FIRST, before any other code
+import { initSentry, sentryRequestHandler, sentryErrorHandler } from './config/sentry.config';
+initSentry();
+
 import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
@@ -64,6 +68,9 @@ const generalLimiter = rateLimit({
 // Dev CORS: allow all in development for quick debugging
 app.use(cors({ origin: true, credentials: true }));
 app.options('*', cors({ origin: true, credentials: true }));
+
+// Sentry request handler - must be early in the middleware stack
+app.use(sentryRequestHandler);
 
 app.use(express.json());
 
@@ -2280,6 +2287,12 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 // Handle uncaught exceptions and unhandled rejections
 process.on('uncaughtException', (err: any) => {
 });
+
+// ============================================
+// SENTRY ERROR HANDLER
+// ============================================
+// Must be added AFTER route handlers and BEFORE the final error handler
+app.use(sentryErrorHandler);
 
 // ============================================
 // ERROR HANDLING MIDDLEWARE

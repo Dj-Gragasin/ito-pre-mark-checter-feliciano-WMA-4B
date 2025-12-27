@@ -15,6 +15,9 @@ var _a, _b;
 Object.defineProperty(exports, "__esModule", { value: true });
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
+// Initialize Sentry FIRST, before any other code
+const sentry_config_1 = require("./config/sentry.config");
+(0, sentry_config_1.initSentry)();
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
@@ -70,6 +73,8 @@ const generalLimiter = (0, express_rate_limit_1.default)({
 // Dev CORS: allow all in development for quick debugging
 app.use((0, cors_1.default)({ origin: true, credentials: true }));
 app.options('*', (0, cors_1.default)({ origin: true, credentials: true }));
+// Sentry request handler - must be early in the middleware stack
+app.use(sentry_config_1.sentryRequestHandler);
 app.use(express_1.default.json());
 // Apply security headers to all responses
 app.use(securityHeaders_1.securityHeaders);
@@ -1978,6 +1983,11 @@ app.use((err, req, res, next) => {
 // Handle uncaught exceptions and unhandled rejections
 process.on('uncaughtException', (err) => {
 });
+// ============================================
+// SENTRY ERROR HANDLER
+// ============================================
+// Must be added AFTER route handlers and BEFORE the final error handler
+app.use(sentry_config_1.sentryErrorHandler);
 // ============================================
 // ERROR HANDLING MIDDLEWARE
 // ============================================
