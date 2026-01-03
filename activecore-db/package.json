@@ -20,7 +20,7 @@
     "express": "^4.21.2",
     "express-rate-limit": "^8.2.1",
     "jsonwebtoken": "^9.0.2",
-    "mysql2": "^3.15.3",
+    "pg": "^8.11.3",
     "nodemailer": "^7.0.10",
     "openai": "^6.9.0",
     "winston": "^3.19.0"

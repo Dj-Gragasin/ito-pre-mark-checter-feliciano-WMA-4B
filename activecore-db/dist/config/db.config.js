@@ -14,34 +14,69 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.pool = void 0;
 exports.initializeDatabase = initializeDatabase;
-const promise_1 = __importDefault(require("mysql2/promise"));
+const pg_1 = require("pg");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 console.log('🔍 Database Configuration:');
 console.log('   Host:', process.env.DB_HOST || 'localhost');
-console.log('   Port:', process.env.DB_PORT || '3306');
-console.log('   User:', process.env.DB_USER || 'root');
+console.log('   Port:', process.env.DB_PORT || '5432');
+console.log('   User:', process.env.DB_USER || 'postgres');
 console.log('   Database:', process.env.DB_NAME || 'activecore');
-exports.pool = promise_1.default.createPool({
+const pgPool = new pg_1.Pool({
     host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '3306'),
-    user: process.env.DB_USER || 'root',
+    port: parseInt(process.env.DB_PORT || '5432'),
+    user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'activecore',
-    waitForConnections: true,
-    connectionLimit: 10,
-    maxIdle: 10,
-    idleTimeout: 60000,
-    queueLimit: 0
+    max: 10,
+    idleTimeoutMillis: 60000,
+    connectionTimeoutMillis: 2000,
 });
+// Create wrapper to provide MySQL-compatible interface
+class MySQLCompatiblePool {
+    constructor(pool) {
+        this.pgPool = pool;
+    }
+    query(sql, values) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                // Convert MySQL placeholders (?) to PostgreSQL placeholders ($1, $2, etc.)
+                let pgSql = sql;
+                let paramIndex = 1;
+                pgSql = pgSql.replace(/\?/g, () => `$${paramIndex++}`);
+                const result = yield this.pgPool.query(pgSql, values || []);
+                // Create a compatible result object that looks like MySQL results
+                const fields = {
+                    affectedRows: result.rowCount || 0,
+                };
+                // Return as a tuple that can be destructured
+                return [result.rows, fields];
+            }
+            catch (error) {
+                throw error;
+            }
+        });
+    }
+    getConnection() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return yield this.pgPool.connect();
+        });
+    }
+    end() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return yield this.pgPool.end();
+        });
+    }
+}
+exports.pool = new MySQLCompatiblePool(pgPool);
 function initializeDatabase() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             console.log('\n🔌 Connecting to database...');
             const connection = yield exports.pool.getConnection();
             console.log('✅ Database connected successfully!');
-            console.log('📊 Connection ID:', connection.threadId);
             console.log('🗄️  Database:', process.env.DB_NAME || 'activecore');
+            console.log('📊 Backend:', process.env.DB_HOST || 'localhost');
             console.log('');
             connection.release();
             return true;
@@ -54,19 +89,13 @@ function initializeDatabase() {
             console.error('Code:', error.code);
             console.error('');
             console.error('📝 Troubleshooting steps:');
-            console.error('1. Check if XAMPP MySQL is running');
+            console.error('1. Check if PostgreSQL is running on Render');
             console.error('2. Verify database "activecore" exists');
-            console.error('3. Confirm MySQL is on port 3306');
+            console.error('3. Confirm PostgreSQL is on port 5432');
             console.error('4. Check .env file configuration');
+            console.error('5. Verify DB_HOST matches Render connection string');
             console.error('========================================\n');
             return false;
         }
     });
 }
-// Test connection on startup
-exports.pool.on('connection', (connection) => {
-    console.log('🔗 New database connection established (ID:', connection.threadId, ')');
-});
-exports.pool.on('release', (connection) => {
-    console.log('📤 Database connection released (ID:', connection.threadId, ')');
-});

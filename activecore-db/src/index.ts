@@ -1,4 +1,4 @@
-﻿import dotenv from 'dotenv';
+import dotenv from 'dotenv';
 dotenv.config();
 
 // Initialize Sentry FIRST, before any other code
@@ -158,25 +158,25 @@ const trustedFilipinoMeals = [
 
 // Extended trustedFilipinoMealsDetailed with more meals and macros
 const trustedFilipinoMealsDetailed = [
-  { name: "Chicken Adobo", ingredients: ["chicken thighs","soy sauce","vinegar","garlic","bay leaves","black pepper","oil","water"], calories: 480, protein: 36, carbs: 50, fats: 14, fiber: 2, recipe: "1. Heat oil in a pan and sautÃ© garlic until fragrant\n2. Add chicken pieces and brown on all sides\n3. Pour in soy sauce and vinegar, add bay leaves\n4. Simmer covered for 30 minutes until chicken is tender\n5. Season with pepper and serve hot with rice" },
-  { name: "Pork Adobo", ingredients: ["pork belly","soy sauce","vinegar","garlic cloves","bay leaves","black pepper","cooking oil","water"], calories: 520, protein: 32, carbs: 52, fats: 22, fiber: 2, recipe: "1. Cut pork belly into bite-sized pieces\n2. Heat oil and sautÃ© minced garlic until fragrant\n3. Brown pork pieces on all sides for 5 minutes\n4. Add soy sauce, vinegar, and bay leaves\n5. Simmer for 40 minutes until pork is tender and sauce reduces" },
-  { name: "Tapsilog", ingredients: ["beef tapa","garlic","rice","egg","butter","salt","pepper"], calories: 520, protein: 36, carbs: 48, fats: 16, fiber: 2, recipe: "1. Fry garlic rice: heat butter and sautÃ© minced garlic, add cooked rice\n2. Cook beef tapa on a hot pan until crispy and caramelized\n3. Fry an egg sunny-side up in butter\n4. Plate the garlic rice, tapa, and fried egg together\n5. Season with salt and pepper to taste" },
+  { name: "Chicken Adobo", ingredients: ["chicken thighs","soy sauce","vinegar","garlic","bay leaves","black pepper","oil","water"], calories: 480, protein: 36, carbs: 50, fats: 14, fiber: 2, recipe: "1. Heat oil in a pan and sauté garlic until fragrant\n2. Add chicken pieces and brown on all sides\n3. Pour in soy sauce and vinegar, add bay leaves\n4. Simmer covered for 30 minutes until chicken is tender\n5. Season with pepper and serve hot with rice" },
+  { name: "Pork Adobo", ingredients: ["pork belly","soy sauce","vinegar","garlic cloves","bay leaves","black pepper","cooking oil","water"], calories: 520, protein: 32, carbs: 52, fats: 22, fiber: 2, recipe: "1. Cut pork belly into bite-sized pieces\n2. Heat oil and sauté minced garlic until fragrant\n3. Brown pork pieces on all sides for 5 minutes\n4. Add soy sauce, vinegar, and bay leaves\n5. Simmer for 40 minutes until pork is tender and sauce reduces" },
+  { name: "Tapsilog", ingredients: ["beef tapa","garlic","rice","egg","butter","salt","pepper"], calories: 520, protein: 36, carbs: 48, fats: 16, fiber: 2, recipe: "1. Fry garlic rice: heat butter and sauté minced garlic, add cooked rice\n2. Cook beef tapa on a hot pan until crispy and caramelized\n3. Fry an egg sunny-side up in butter\n4. Plate the garlic rice, tapa, and fried egg together\n5. Season with salt and pepper to taste" },
   { name: "Bangus Sinigang", ingredients: ["milkfish","tamarind paste","radish","spinach","string beans","ginger","garlic","onion","salt","pepper"], calories: 410, protein: 32, carbs: 46, fats: 10, fiber: 3, recipe: "1. Boil water with tamarind paste and ginger slices for 5 minutes\n2. Add radish and onion, simmer for 5 minutes\n3. Add milkfish and string beans, simmer for 8 minutes\n4. Add spinach and cook until wilted (2 minutes)\n5. Season with salt and pepper, serve hot" },
-  { name: "Tinolang Manok", ingredients: ["chicken","ginger","malunggay leaves","papaya","garlic","onion","fish sauce","broth","oil"], calories: 390, protein: 34, carbs: 44, fats: 8, fiber: 3, recipe: "1. Heat oil and sautÃ© ginger, garlic, and onion\n2. Add chicken and cook until no longer pink\n3. Pour in broth and simmer for 15 minutes\n4. Add papaya cubes and simmer for 5 minutes\n5. Add malunggay leaves, fish sauce, and cook for 2 minutes" },
-  { name: "Laing", ingredients: ["taro leaves","coconut milk","garlic","onion","ginger","chili","shrimp paste","salt"], calories: 350, protein: 12, carbs: 38, fats: 16, fiber: 5, recipe: "1. Blanch taro leaves in boiling salted water for 5 minutes, drain well\n2. SautÃ© garlic, onion, and ginger in oil\n3. Add shrimp paste and cook for 1 minute\n4. Add taro leaves and coconut milk, simmer for 10 minutes\n5. Add chili and salt to taste, cook for 2 more minutes" },
-  { name: "Pinakbet", ingredients: ["eggplant","ampalaya","string beans","okra","squash","shrimp paste","garlic","onion","tomato","anchovy"], calories: 300, protein: 12, carbs: 30, fats: 10, fiber: 6, recipe: "1. Heat oil and sautÃ© garlic, onion, and shrimp paste\n2. Add ampalaya and cook for 2 minutes\n3. Add squash and tomato, simmer for 5 minutes\n4. Add eggplant, string beans, and okra\n5. Simmer until vegetables are tender (8 minutes), season to taste" },
-  { name: "Pancit Bihon", ingredients: ["bihon noodles","chicken","carrots","cabbage","garlic","onion","soy sauce","cooking oil","broth"], calories: 420, protein: 18, carbs: 62, fats: 8, fiber: 4, recipe: "1. Soak bihon noodles in hot water for 5 minutes, drain\n2. Heat oil and sautÃ© garlic and onion\n3. Add chicken and cook until done\n4. Add broth, carrots, and cabbage\n5. Add noodles and soy sauce, toss well and cook until noodles absorb liquid" },
-  { name: "Arroz Caldo", ingredients: ["rice","chicken","ginger","egg","garlic","onion","turmeric","broth","fish sauce","oil"], calories: 390, protein: 20, carbs: 54, fats: 8, fiber: 2, recipe: "1. Heat oil and sautÃ© garlic, onion, and ginger\n2. Add chicken and cook until done, shred finely\n3. Return chicken to pot, add rice and broth\n4. Add turmeric and fish sauce, simmer until rice is tender\n5. Beat egg and drizzle into the pot while stirring gently" },
-  { name: "Kare-Kare", ingredients: ["oxtail","peanut butter","vegetables","garlic","onion","vinegar","salt","pepper","oil","annatto"], calories: 540, protein: 28, carbs: 52, fats: 22, fiber: 5, recipe: "1. Boil oxtail in water with salt and pepper until tender\n2. In a separate pot, sautÃ© garlic, onion, and annatto in oil\n3. Add peanut butter and reserved broth to make sauce\n4. Add vegetables (eggplant, squash, long beans, bok choy)\n5. Simmer until vegetables are cooked, add vinegar to taste" },
+  { name: "Tinolang Manok", ingredients: ["chicken","ginger","malunggay leaves","papaya","garlic","onion","fish sauce","broth","oil"], calories: 390, protein: 34, carbs: 44, fats: 8, fiber: 3, recipe: "1. Heat oil and sauté ginger, garlic, and onion\n2. Add chicken and cook until no longer pink\n3. Pour in broth and simmer for 15 minutes\n4. Add papaya cubes and simmer for 5 minutes\n5. Add malunggay leaves, fish sauce, and cook for 2 minutes" },
+  { name: "Laing", ingredients: ["taro leaves","coconut milk","garlic","onion","ginger","chili","shrimp paste","salt"], calories: 350, protein: 12, carbs: 38, fats: 16, fiber: 5, recipe: "1. Blanch taro leaves in boiling salted water for 5 minutes, drain well\n2. Sauté garlic, onion, and ginger in oil\n3. Add shrimp paste and cook for 1 minute\n4. Add taro leaves and coconut milk, simmer for 10 minutes\n5. Add chili and salt to taste, cook for 2 more minutes" },
+  { name: "Pinakbet", ingredients: ["eggplant","ampalaya","string beans","okra","squash","shrimp paste","garlic","onion","tomato","anchovy"], calories: 300, protein: 12, carbs: 30, fats: 10, fiber: 6, recipe: "1. Heat oil and sauté garlic, onion, and shrimp paste\n2. Add ampalaya and cook for 2 minutes\n3. Add squash and tomato, simmer for 5 minutes\n4. Add eggplant, string beans, and okra\n5. Simmer until vegetables are tender (8 minutes), season to taste" },
+  { name: "Pancit Bihon", ingredients: ["bihon noodles","chicken","carrots","cabbage","garlic","onion","soy sauce","cooking oil","broth"], calories: 420, protein: 18, carbs: 62, fats: 8, fiber: 4, recipe: "1. Soak bihon noodles in hot water for 5 minutes, drain\n2. Heat oil and sauté garlic and onion\n3. Add chicken and cook until done\n4. Add broth, carrots, and cabbage\n5. Add noodles and soy sauce, toss well and cook until noodles absorb liquid" },
+  { name: "Arroz Caldo", ingredients: ["rice","chicken","ginger","egg","garlic","onion","turmeric","broth","fish sauce","oil"], calories: 390, protein: 20, carbs: 54, fats: 8, fiber: 2, recipe: "1. Heat oil and sauté garlic, onion, and ginger\n2. Add chicken and cook until done, shred finely\n3. Return chicken to pot, add rice and broth\n4. Add turmeric and fish sauce, simmer until rice is tender\n5. Beat egg and drizzle into the pot while stirring gently" },
+  { name: "Kare-Kare", ingredients: ["oxtail","peanut butter","vegetables","garlic","onion","vinegar","salt","pepper","oil","annatto"], calories: 540, protein: 28, carbs: 52, fats: 22, fiber: 5, recipe: "1. Boil oxtail in water with salt and pepper until tender\n2. In a separate pot, sauté garlic, onion, and annatto in oil\n3. Add peanut butter and reserved broth to make sauce\n4. Add vegetables (eggplant, squash, long beans, bok choy)\n5. Simmer until vegetables are cooked, add vinegar to taste" },
   { name: "Lumpiang Sariwa", ingredients: ["spring roll wrapper","vegetables","peanut sauce","garlic","shrimp","pork","egg","vinegar"], calories: 260, protein: 8, carbs: 38, fats: 8, fiber: 4, recipe: "1. Blanch vegetables (cabbage, carrots, green beans) until crisp-tender\n2. Cook pork and shrimp, chop finely\n3. Mix cooked vegetables with pork and shrimp\n4. Place filling on spring roll wrapper, roll tightly and seal\n5. Serve with peanut sauce (peanut butter + vinegar + garlic)" },
   { name: "Daing na Bangus", ingredients: ["milkfish","vinegar","garlic","salt","pepper","bay leaves","cooking oil"], calories: 410, protein: 32, carbs: 44, fats: 10, fiber: 2, recipe: "1. Mix vinegar, salt, pepper, bay leaves, and garlic in a bowl\n2. Place milkfish in a glass dish and pour vinegar mixture over it\n3. Refrigerate for at least 2 hours (preferably overnight)\n4. Heat oil in a pan and fry the marinated milkfish until golden\n5. Serve with the remaining marinade as sauce" },
   { name: "Chicken Inasal", ingredients: ["chicken leg","annatto oil","vinegar","garlic","ginger","brown sugar","salt","pepper"], calories: 420, protein: 34, carbs: 44, fats: 10, fiber: 2, recipe: "1. Mix annatto oil, vinegar, garlic, ginger, brown sugar, salt, and pepper\n2. Marinate chicken legs in this mixture for 1 hour\n3. Grill chicken over charcoal or pan-fry on medium heat\n4. Baste with marinade while grilling until cooked through\n5. Serve with sliced calamansi or lime" },
-  { name: "Ginisang Monggo", ingredients: ["mung beans","garlic","pork bits","spinach","onion","ginger","tomato","oil","salt"], calories: 340, protein: 18, carbs: 44, fats: 8, fiber: 6, recipe: "1. Boil mung beans until soft, drain\n2. Heat oil and sautÃ© garlic, onion, and ginger\n3. Add pork bits and cook until done\n4. Add cooked mung beans and simmer for 5 minutes\n5. Add spinach and tomato, cook until spinach wilts, season with salt" },
-  { name: "La Paz Batchoy", ingredients: ["egg noodles","pork","chicken liver","egg","garlic","onion","carrots","broth","lard"], calories: 480, protein: 22, carbs: 60, fats: 14, fiber: 2, recipe: "1. Cook egg noodles and set aside\n2. Heat lard and sautÃ© garlic, onion, and carrots\n3. Add pork and chicken liver, simmer until cooked\n4. Pour in broth and bring to a boil\n5. Place noodles in bowl, pour broth and toppings, top with raw egg" },
-  { name: "Bicol Express", ingredients: ["pork","coconut milk","long chili","shrimp paste","garlic","onion","salt","oil"], calories: 520, protein: 24, carbs: 52, fats: 22, fiber: 3, recipe: "1. Heat oil and sautÃ© garlic and onion\n2. Add shrimp paste and cook for 1 minute\n3. Add pork cubes and brown on all sides\n4. Pour in coconut milk and add long chili\n5. Simmer for 20 minutes until pork is tender, season with salt" },
+  { name: "Ginisang Monggo", ingredients: ["mung beans","garlic","pork bits","spinach","onion","ginger","tomato","oil","salt"], calories: 340, protein: 18, carbs: 44, fats: 8, fiber: 6, recipe: "1. Boil mung beans until soft, drain\n2. Heat oil and sauté garlic, onion, and ginger\n3. Add pork bits and cook until done\n4. Add cooked mung beans and simmer for 5 minutes\n5. Add spinach and tomato, cook until spinach wilts, season with salt" },
+  { name: "La Paz Batchoy", ingredients: ["egg noodles","pork","chicken liver","egg","garlic","onion","carrots","broth","lard"], calories: 480, protein: 22, carbs: 60, fats: 14, fiber: 2, recipe: "1. Cook egg noodles and set aside\n2. Heat lard and sauté garlic, onion, and carrots\n3. Add pork and chicken liver, simmer until cooked\n4. Pour in broth and bring to a boil\n5. Place noodles in bowl, pour broth and toppings, top with raw egg" },
+  { name: "Bicol Express", ingredients: ["pork","coconut milk","long chili","shrimp paste","garlic","onion","salt","oil"], calories: 520, protein: 24, carbs: 52, fats: 22, fiber: 3, recipe: "1. Heat oil and sauté garlic and onion\n2. Add shrimp paste and cook for 1 minute\n3. Add pork cubes and brown on all sides\n4. Pour in coconut milk and add long chili\n5. Simmer for 20 minutes until pork is tender, season with salt" },
   { name: "Paksiw na Bangus", ingredients: ["milkfish","vinegar","eggplant","salt","garlic","ginger","bay leaves","oil"], calories: 380, protein: 28, carbs: 40, fats: 10, fiber: 4, recipe: "1. Layer eggplant slices in a pan with milkfish on top\n2. Mix vinegar, salt, garlic, ginger, and bay leaves, pour over fish\n3. Add oil and bring to a simmer\n4. Cover and cook for 10 minutes until fish is cooked\n5. Serve in a shallow dish with the broth" },
   { name: "Bulalo", ingredients: ["beef shank","corn","radish","spinach","cabbage","garlic","onion","fish sauce","broth"], calories: 520, protein: 32, carbs: 50, fats: 18, fiber: 3, recipe: "1. Boil beef shank with garlic and onion for 45 minutes until tender\n2. Add radish cubes and simmer for 10 minutes\n3. Add corn and cabbage, simmer for 5 minutes\n4. Add spinach and fish sauce\n5. Cook until spinach wilts (2 minutes), season and serve hot" },
-  { name: "Tinolang Isda", ingredients: ["fish","ginger","papaya","malunggay leaves","garlic","onion","fish sauce","broth","oil"], calories: 350, protein: 28, carbs: 38, fats: 8, fiber: 3, recipe: "1. Heat oil and sautÃ© ginger, garlic, and onion\n2. Add fish and cook briefly on both sides\n3. Pour in broth and add papaya cubes\n4. Simmer for 8 minutes until papaya is tender\n5. Add malunggay leaves and fish sauce, cook for 2 minutes" },
+  { name: "Tinolang Isda", ingredients: ["fish","ginger","papaya","malunggay leaves","garlic","onion","fish sauce","broth","oil"], calories: 350, protein: 28, carbs: 38, fats: 8, fiber: 3, recipe: "1. Heat oil and sauté ginger, garlic, and onion\n2. Add fish and cook briefly on both sides\n3. Pour in broth and add papaya cubes\n4. Simmer for 8 minutes until papaya is tender\n5. Add malunggay leaves and fish sauce, cook for 2 minutes" },
   { name: "Pochero", ingredients: ["pork","plantains","chickpeas","carrots","potatoes","cabbage","garlic","onion","broth"], calories: 500, protein: 28, carbs: 54, fats: 16, fiber: 5, recipe: "1. Boil pork with garlic and onion until partially cooked\n2. Add potatoes, carrots, and plantains\n3. Simmer for 10 minutes\n4. Add cabbage and chickpeas\n5. Continue cooking until all vegetables are tender (10 minutes)" },
 ];
 
@@ -186,7 +186,7 @@ const filipinoSnacks = [
   { name: "Camote Cue", ingredients: ["sweet potato","brown sugar","cooking oil","salt"], calories: 160, protein: 1, carbs: 32, fats: 4, fiber: 3, recipe: "1. Peel and cut sweet potato into thick lengthwise pieces\n2. Heat oil in a pan over medium heat\n3. Melt brown sugar in the oil until bubbly\n4. Dip each sweet potato piece in the caramelized sugar\n5. Skewer and serve immediately while warm" },
   { name: "Fishball", ingredients: ["fish meat","cornstarch","salt","pepper","garlic","vinegar"], calories: 120, protein: 10, carbs: 12, fats: 3, fiber: 0, recipe: "1. Grind fish meat finely with salt, pepper, and minced garlic\n2. Mix in cornstarch to bind the mixture\n3. Shape into small balls (about 1 inch diameter)\n4. Boil in water until balls float and rise to top\n5. Serve with vinegar-garlic dipping sauce" },
   { name: "Siomai", ingredients: ["pork","shrimp","wonton wrapper","soy sauce","ginger","garlic"], calories: 140, protein: 8, carbs: 14, fats: 5, fiber: 0, recipe: "1. Mince pork and shrimp together finely\n2. Mix with grated ginger, minced garlic, and soy sauce\n3. Place 1 teaspoon filling on wonton wrapper\n4. Gather corners at top and seal\n5. Steam for 10-12 minutes until wrapper is translucent" },
-  { name: "Lumpia Shanghai", ingredients: ["pork","cabbage","carrots","spring roll wrapper","garlic","onion","soy sauce"], calories: 150, protein: 7, carbs: 16, fats: 6, fiber: 1, recipe: "1. SautÃ© garlic and onion, add minced pork and cook until done\n2. Add shredded cabbage and carrots, cook until soft\n3. Season with soy sauce and cool mixture\n4. Fill each spring roll wrapper with 2 tablespoons filling\n5. Roll tightly and deep fry until golden brown" },
+  { name: "Lumpia Shanghai", ingredients: ["pork","cabbage","carrots","spring roll wrapper","garlic","onion","soy sauce"], calories: 150, protein: 7, carbs: 16, fats: 6, fiber: 1, recipe: "1. Sauté garlic and onion, add minced pork and cook until done\n2. Add shredded cabbage and carrots, cook until soft\n3. Season with soy sauce and cool mixture\n4. Fill each spring roll wrapper with 2 tablespoons filling\n5. Roll tightly and deep fry until golden brown" },
   { name: "Turon", ingredients: ["banana","brown sugar","spring roll wrapper","cooking oil","cinnamon"], calories: 170, protein: 1, carbs: 32, fats: 5, fiber: 2, recipe: "1. Slice saba banana lengthwise into strips\n2. Place banana slice and brown sugar on spring roll wrapper\n3. Sprinkle cinnamon and roll tightly, sealing edges with water\n4. Deep fry in oil until wrapper is golden and crispy\n5. Drain on paper towel and serve hot" },
   { name: "Halo-Halo", ingredients: ["ice","evaporated milk","mango","jackfruit","palm seeds","red beans","vanilla ice cream"], calories: 220, protein: 3, carbs: 45, fats: 4, fiber: 3, recipe: "1. Layer shaved ice in a tall glass\n2. Add cooked red beans and palm seeds\n3. Top with diced mango and jackfruit\n4. Pour evaporated milk over the mixture\n5. Top with a scoop of vanilla ice cream and serve immediately" },
   { name: "Bibingka", ingredients: ["rice flour","coconut","brown sugar","egg","baking powder","salt","butter"], calories: 240, protein: 4, carbs: 38, fats: 8, fiber: 1, recipe: "1. Mix rice flour, brown sugar, baking powder, and salt\n2. Beat egg and combine with coconut milk and flour mixture\n3. Pour into buttered banana leaves on hot skillet\n4. Cook on medium heat with charcoal on top for 8-10 minutes\n5. Cool slightly, serve with grated coconut" },
@@ -197,18 +197,18 @@ const filipinoSnacks = [
   { name: "Empanada", ingredients: ["flour","butter","meat","potatoes","garlic","onion","egg"], calories: 240, protein: 8, carbs: 28, fats: 10, fiber: 2, recipe: "1. Cook minced meat with garlic, onion, and diced potatoes\n2. Season with salt and pepper, cool the filling\n3. Make dough: flour, butter, salt, and water kneaded together\n4. Roll dough thin, cut circles, fill, and fold\n5. Deep fry until golden brown on both sides" },
   { name: "Puto Bumbong", ingredients: ["rice flour","coconut milk","brown sugar","salt","banana leaves"], calories: 210, protein: 2, carbs: 40, fats: 5, fiber: 2, recipe: "1. Mix rice flour, brown sugar, salt, and coconut milk\n2. Pour into bamboo tubes (bumbong) lined with banana leaves\n3. Steam in boiling water for 15 minutes\n4. Push puto out of tube onto banana leaf\n5. Serve hot topped with grated coconut and brown sugar" },
   { name: "Tinutuan", ingredients: ["rice","chicken","ginger","egg","garlic","onion","fish sauce"], calories: 200, protein: 8, carbs: 28, fats: 4, fiber: 1, recipe: "1. Cook shredded chicken with garlic and onion\n2. Add broth and bring to boil, then add rice\n3. Add ginger slices and simmer until rice is very soft\n4. Stir in fish sauce and pour into bowl\n5. Top with fried egg and crispy garlic bits" },
-  { name: "Lumpiang Togue", ingredients: ["bean sprouts","pork","spring roll wrapper","garlic","onion","soy sauce"], calories: 140, protein: 7, carbs: 16, fats: 4, fiber: 2, recipe: "1. SautÃ© garlic and onion, add minced pork and cook until done\n2. Add bean sprouts and soy sauce, cook for 2 minutes\n3. Let filling cool slightly\n4. Roll in spring roll wrapper tightly\n5. Deep fry until golden brown and crispy" },
+  { name: "Lumpiang Togue", ingredients: ["bean sprouts","pork","spring roll wrapper","garlic","onion","soy sauce"], calories: 140, protein: 7, carbs: 16, fats: 4, fiber: 2, recipe: "1. Sauté garlic and onion, add minced pork and cook until done\n2. Add bean sprouts and soy sauce, cook for 2 minutes\n3. Let filling cool slightly\n4. Roll in spring roll wrapper tightly\n5. Deep fry until golden brown and crispy" },
   { name: "Okoy", ingredients: ["shrimp","potato","flour","egg","onion","oil","vinegar"], calories: 180, protein: 8, carbs: 20, fats: 7, fiber: 2, recipe: "1. Shred potato and squeeze out excess moisture\n2. Mix with chopped shrimp, onion, flour, and beaten egg\n3. Season with salt and pepper\n4. Drop spoonfuls into hot oil for deep frying\n5. Fry until golden on both sides, serve with vinegar sauce" },
-  { name: "Cassava Cake", ingredients: ["cassava","coconut milk","sugar","egg","butter","salt"], calories: 250, protein: 2, carbs: 42, fats: 8, fiber: 2, recipe: "1. Grate fresh cassava finely\n2. Mix cassava with coconut milk, sugar, egg, butter, and salt\n3. Pour into greased baking pan\n4. Bake at 350Â°F for 35-40 minutes until golden\n5. Cool before cutting into squares" },
-  { name: "Ube Cake", ingredients: ["ube","flour","sugar","egg","butter","baking powder","milk"], calories: 260, protein: 4, carbs: 44, fats: 8, fiber: 1, recipe: "1. Steam and mash ube yam until smooth\n2. Cream together butter and sugar\n3. Add egg, ube puree, and flour alternately with milk\n4. Add baking powder and mix until smooth\n5. Bake in greased pan at 350Â°F for 30-35 minutes" },
+  { name: "Cassava Cake", ingredients: ["cassava","coconut milk","sugar","egg","butter","salt"], calories: 250, protein: 2, carbs: 42, fats: 8, fiber: 2, recipe: "1. Grate fresh cassava finely\n2. Mix cassava with coconut milk, sugar, egg, butter, and salt\n3. Pour into greased baking pan\n4. Bake at 350°F for 35-40 minutes until golden\n5. Cool before cutting into squares" },
+  { name: "Ube Cake", ingredients: ["ube","flour","sugar","egg","butter","baking powder","milk"], calories: 260, protein: 4, carbs: 44, fats: 8, fiber: 1, recipe: "1. Steam and mash ube yam until smooth\n2. Cream together butter and sugar\n3. Add egg, ube puree, and flour alternately with milk\n4. Add baking powder and mix until smooth\n5. Bake in greased pan at 350°F for 30-35 minutes" },
   { name: "Choco Pie", ingredients: ["graham crackers","chocolate","condensed milk","butter","salt"], calories: 210, protein: 2, carbs: 32, fats: 9, fiber: 1, recipe: "1. Crush graham crackers into fine crumbs\n2. Melt butter and mix with crushed graham and salt\n3. Press into pie crust and refrigerate\n4. Melt chocolate with condensed milk for filling\n5. Pour into crust and refrigerate until set" },
   { name: "Dilis (Dried Anchovies)", ingredients: ["anchovies","salt"], calories: 120, protein: 20, carbs: 0, fats: 4, fiber: 0, recipe: "1. Clean fresh anchovies under running water\n2. Remove heads and gut if desired (optional)\n3. Layer on trays with sea salt between layers\n4. Dry under sun for 3-5 days until completely dried\n5. Store in airtight container for long-term use" },
   { name: "Bagnet Bits", ingredients: ["pork belly","salt","garlic"], calories: 280, protein: 16, carbs: 0, fats: 23, fiber: 0, recipe: "1. Cut pork belly into small cubes about 1 inch\n2. Boil in water with salt and garlic for 10 minutes\n3. Drain well and dry completely\n4. Deep fry in oil over low heat until golden and crispy\n5. Drain on paper towel, serve as a crispy pork cracklings" },
-  { name: "Peanut Brittle", ingredients: ["peanuts","brown sugar","corn syrup","butter","salt"], calories: 220, protein: 8, carbs: 28, fats: 10, fiber: 2, recipe: "1. Heat brown sugar, corn syrup, and butter to 300Â°F\n2. Add roasted peanuts and stir to coat\n3. Quickly pour onto buttered baking sheet\n4. Cool completely then break into pieces\n5. Store in airtight container" },
+  { name: "Peanut Brittle", ingredients: ["peanuts","brown sugar","corn syrup","butter","salt"], calories: 220, protein: 8, carbs: 28, fats: 10, fiber: 2, recipe: "1. Heat brown sugar, corn syrup, and butter to 300°F\n2. Add roasted peanuts and stir to coat\n3. Quickly pour onto buttered baking sheet\n4. Cool completely then break into pieces\n5. Store in airtight container" },
   { name: "Sweet Corn Ice Cream", ingredients: ["corn","milk","sugar","cream","vanilla"], calories: 180, protein: 4, carbs: 26, fats: 7, fiber: 1, recipe: "1. Blend cooked corn with milk until smooth\n2. Strain through fine mesh to get corn milk\n3. Heat corn milk with sugar until dissolved\n4. Cool completely, add cream and vanilla extract\n5. Churn in ice cream maker according to instructions" },
-  { name: "Egg Pie", ingredients: ["egg yolks","pie crust","sugar","condensed milk","evaporated milk"], calories: 240, protein: 6, carbs: 32, fats: 10, fiber: 1, recipe: "1. Beat egg yolks with sugar until pale\n2. Mix in condensed milk and evaporated milk\n3. Pour into unbaked pie crust\n4. Bake at 375Â°F for 30-35 minutes until set\n5. Cool before slicing and serving" },
-  { name: "Fried Spring Roll", ingredients: ["cabbage","carrots","pork","spring roll wrapper","garlic","soy sauce"], calories: 160, protein: 6, carbs: 18, fats: 7, fiber: 2, recipe: "1. SautÃ© garlic, add minced pork and cook until done\n2. Add shredded cabbage and carrots, season with soy sauce\n3. Cook until vegetables soften, then cool\n4. Wrap in spring roll wrapper, seal edges with water\n5. Deep fry until golden brown and crispy" },
-  { name: "Garlic Bread Stick", ingredients: ["bread","garlic","butter","parmesan cheese","salt"], calories: 180, protein: 4, carbs: 24, fats: 8, fiber: 1, recipe: "1. Slice bread into sticks about 1 inch wide\n2. Mix softened butter with minced garlic, salt, and parmesan\n3. Brush garlic butter generously on bread sticks\n4. Arrange on baking sheet and bake at 375Â°F for 10-12 minutes\n5. Serve hot with additional parmesan cheese" },
+  { name: "Egg Pie", ingredients: ["egg yolks","pie crust","sugar","condensed milk","evaporated milk"], calories: 240, protein: 6, carbs: 32, fats: 10, fiber: 1, recipe: "1. Beat egg yolks with sugar until pale\n2. Mix in condensed milk and evaporated milk\n3. Pour into unbaked pie crust\n4. Bake at 375°F for 30-35 minutes until set\n5. Cool before slicing and serving" },
+  { name: "Fried Spring Roll", ingredients: ["cabbage","carrots","pork","spring roll wrapper","garlic","soy sauce"], calories: 160, protein: 6, carbs: 18, fats: 7, fiber: 2, recipe: "1. Sauté garlic, add minced pork and cook until done\n2. Add shredded cabbage and carrots, season with soy sauce\n3. Cook until vegetables soften, then cool\n4. Wrap in spring roll wrapper, seal edges with water\n5. Deep fry until golden brown and crispy" },
+  { name: "Garlic Bread Stick", ingredients: ["bread","garlic","butter","parmesan cheese","salt"], calories: 180, protein: 4, carbs: 24, fats: 8, fiber: 1, recipe: "1. Slice bread into sticks about 1 inch wide\n2. Mix softened butter with minced garlic, salt, and parmesan\n3. Brush garlic butter generously on bread sticks\n4. Arrange on baking sheet and bake at 375°F for 10-12 minutes\n5. Serve hot with additional parmesan cheese" },
 ];
 
 
@@ -434,7 +434,7 @@ function getNutritionTips(goal: string) {
     case "muscle gain":
     case "gain":
       return [
-        "Increase protein intake at every meal (aim for 20â€“40g per meal).",
+        "Increase protein intake at every meal (aim for 20–40g per meal).",
         "Include a mix of fast-digesting carbs and protein post-workout (e.g., rice + chicken).",
         "Use healthy fats (avocado, coconut, nuts) to increase calorie density."
       ];
@@ -580,12 +580,12 @@ async function safeOpenAICompletionsCreate(params: any, timeoutMs = 12000): Prom
 // Utility: ensure a user preference row exists; return its id or null
 async function ensureUserPreferenceExists(userId: number): Promise<number | null> {
   try {
-    const [rows] = await pool.query<any[]>('SELECT id FROM user_meal_preferences WHERE user_id = ?', [userId]);
+    const [rows] = await pool.query<any>('SELECT id FROM user_meal_preferences WHERE user_id = ?', [userId]);
     if (Array.isArray(rows) && rows.length > 0) {
       return Number(rows[0].id);
     }
 
-    const [insertResult] = await pool.query<any>(
+    const [, insertResult] = await pool.query<any>(
       `INSERT INTO user_meal_preferences (user_id, preferences, created_at)
        VALUES (?, ?, NOW())`,
       [ userId, JSON.stringify({}) ]
@@ -769,7 +769,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     }
 
 
-    const [users] = await pool.query<any[]>(
+    const [users] = await pool.query<any>(
       'SELECT * FROM users WHERE email = ?',
       [email]
     );
@@ -812,7 +812,7 @@ app.post('/api/auth/change-password', async (req, res) => {
   try {
     const { userId, currentPassword, newPassword } = req.body;
 
-    const [users] = await pool.query<any[]>(
+    const [users] = await pool.query<any>(
       'SELECT * FROM users WHERE id = ?',
       [userId]
     );
@@ -952,7 +952,7 @@ app.post('/api/register', registerLimiter, async (req: Request, res: Response) =
         dateOfBirth || null,
         membershipType || 'monthly',
         membershipPrice || 1500,
-        isoDateString(req.body?.joinDate || joinDate), // safe access â€” prefer req.body.joinDate if present
+        isoDateString(req.body?.joinDate || joinDate), // safe access — prefer req.body.joinDate if present
         isoDateString(subscriptionStart), // was subscriptionStart.toISOString().split('T')[0]
         isoDateString(subscriptionEnd), // was subscriptionEnd.toISOString().split('T')[0]
         emergencyContact || null,
@@ -981,7 +981,7 @@ app.post('/api/register', registerLimiter, async (req: Request, res: Response) =
 app.get('/api/members', async (req, res) => {
   try {
     
-    const [members] = await pool.query<any[]>(
+    const [members] = await pool.query<any>(
       `SELECT 
         u.id, 
         u.email, 
@@ -1057,7 +1057,7 @@ app.post('/api/members', authenticateToken, async (req: AuthRequest, res: Respon
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    const [existing] = await pool.query<any[]>(
+    const [existing] = await pool.query<any>(
       'SELECT id FROM users WHERE email = ?',
       [email]
     );
@@ -1242,7 +1242,7 @@ app.get('/api/member/subscription', authenticateToken, async (req: AuthRequest, 
   try {
     const userId = req.user!.id;
 
-    const [member] = await pool.query<any[]>(
+    const [member] = await pool.query<any>(
       `SELECT 
         id, email, first_name as firstName, last_name as lastName,
         membership_type as membershipType, membership_price as membershipPrice,
@@ -1334,7 +1334,7 @@ app.post('/api/member/payment/gcash', authenticateToken, async (req: AuthRequest
 
     res.status(201).json({
       success: true,
-      message: 'âœ… Payment successful! Your subscription is now active.',
+      message: '✅ Payment successful! Your subscription is now active.',
       paymentId: (result as any).insertId,
       transactionId,
       paymentStatus: 'paid',
@@ -1420,7 +1420,7 @@ app.post('/api/admin/payments/record-cash', authenticateToken, async (req: AuthR
 
     res.status(201).json({
       success: true,
-      message: 'âœ… Payment recorded! Member subscription is now active.',
+      message: '✅ Payment recorded! Member subscription is now active.',
       paymentId: (result as any).insertId,
       transactionId,
       paymentStatus: 'paid',
@@ -1440,7 +1440,7 @@ app.post('/api/admin/payments/record-cash', authenticateToken, async (req: AuthR
 // GET ALL PAYMENTS FOR ADMIN DASHBOARD (ADMIN)
 app.get('/api/admin/payments/all', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const [payments] = await pool.query<any[]>(`
+    const [payments] = await pool.query<any>(`
       SELECT 
         p.id,
         p.user_id,
@@ -1471,21 +1471,21 @@ app.get('/api/admin/payments/all', authenticateToken, async (req: AuthRequest, r
 app.get('/api/admin/payments/summary', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     // Total revenue (sum of all paid payments)
-    const [revenueRows] = await pool.query<any[]>(`
+    const [revenueRows] = await pool.query<any>(`
       SELECT SUM(amount) as totalRevenue
       FROM payments
       WHERE payment_status = 'paid'
     `);
 
     // Count of pending payments
-    const [pendingRows] = await pool.query<any[]>(`
+    const [pendingRows] = await pool.query<any>(`
       SELECT COUNT(*) as pendingPayments
       FROM payments
       WHERE payment_status = 'pending'
     `);
 
     // Count of paid payments
-    const [paidRows] = await pool.query<any[]>(`
+    const [paidRows] = await pool.query<any>(`
       SELECT COUNT(*) as paidPayments
       FROM payments
       WHERE payment_status = 'paid'
@@ -1514,7 +1514,7 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
       const weekPlan = generateWeekPlan(null, targets, goal);
       return res.status(503).json({
         success: false,
-        message: 'Database not connected â€” returning fallback plan',
+        message: 'Database not connected — returning fallback plan',
         mealPlan: {
           weekPlan,
           shoppingList: generateShoppingList(weekPlan),
@@ -1525,7 +1525,7 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
       });
     }
 
-    const [dbDishes] = await pool.query<any[]>('SELECT * FROM filipino_dishes ORDER BY name ASC');
+    const [dbDishes] = await pool.query<any>('SELECT * FROM filipino_dishes ORDER BY name ASC');
 
     const dishesForPrompt = dbDishes.map(d => ({
       name: d.name,
@@ -1598,7 +1598,7 @@ Rules:
 
     // Try to get user's preference id early
     try {
-      const [prefRows] = await pool.query<any[]>('SELECT id FROM user_meal_preferences WHERE user_id = ?', [userId]);
+      const [prefRows] = await pool.query<any>('SELECT id FROM user_meal_preferences WHERE user_id = ?', [userId]);
       if (Array.isArray(prefRows) && prefRows.length > 0) {
         preferenceId = Number(prefRows[0].id);
       } else {
@@ -1717,7 +1717,7 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
     if (isSnack) {
       dishes = filipinoSnacks;
     } else if (category) {
-      const [rows] = await pool.query<any[]>('SELECT * FROM filipino_dishes WHERE category = ?', [category]);
+      const [rows] = await pool.query<any>('SELECT * FROM filipino_dishes WHERE category = ?', [category]);
       dishes = rows || [];
     }
     
@@ -1725,7 +1725,7 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
       if (isSnack) {
         dishes = filipinoSnacks;
       } else {
-        const [rows] = await pool.query<any[]>('SELECT * FROM filipino_dishes ORDER BY name');
+        const [rows] = await pool.query<any>('SELECT * FROM filipino_dishes ORDER BY name');
         dishes = rows || [];
       }
     }
@@ -1787,7 +1787,7 @@ Return JSON: { "newMeal": { "name":"...", "ingredients":[...], "calories":..., "
         try { 
           parsed = JSON.parse(aiResponse); 
         } catch (parseErr) {
-          // AI response was not valid JSON — will use fallback
+          // AI response was not valid JSON � will use fallback
           parsed = null;
         }
 
@@ -1830,7 +1830,7 @@ Return JSON: { "newMeal": { "name":"...", "ingredients":[...], "calories":..., "
 async function dbColumnExists(table: string, column: string): Promise<boolean> {
   try {
     const dbName = process.env.DB_NAME || 'activecore';
-    const [rows] = await pool.query<any[]>(
+    const [rows] = await pool.query<any>(
       `SELECT COUNT(*) as cnt 
        FROM information_schema.COLUMNS 
        WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
@@ -1855,7 +1855,7 @@ app.post('/api/meal-planner/save', authenticateToken, async (req: AuthRequest, r
     // ensure preference exists if needed (unchanged)
     let preferenceId: number | null = null;
     try {
-      const [prefRows] = await pool.query<any[]>('SELECT id FROM user_meal_preferences WHERE user_id = ?', [userId]);
+      const [prefRows] = await pool.query<any>('SELECT id FROM user_meal_preferences WHERE user_id = ?', [userId]);
       if (Array.isArray(prefRows) && prefRows.length > 0) {
         preferenceId = Number(prefRows[0].id);
       } else {
@@ -1923,7 +1923,7 @@ app.get('/api/meal-planner/plans', authenticateToken, async (req: AuthRequest, r
     if (hasUpdatedAt) cols.push('updated_at');
 
     const orderBy = hasGeneratedAt ? 'generated_at' : 'id';
-    const [rows] = await pool.query<any[]>(`SELECT ${cols.join(', ')} FROM meal_plans WHERE user_id = ? ORDER BY ${orderBy} DESC`, [userId]);
+    const [rows] = await pool.query<any>(`SELECT ${cols.join(', ')} FROM meal_plans WHERE user_id = ? ORDER BY ${orderBy} DESC`, [userId]);
 
     const plans = rows.map((r: any) => ({
       id: Number(r.id),
@@ -1952,7 +1952,7 @@ app.get('/api/meal-planner/plans/:id', authenticateToken, async (req: AuthReques
     if (hasGeneratedAt) cols.push('generated_at');
     if (hasUpdatedAt) cols.push('updated_at');
 
-    const [rows] = await pool.query<any[]>(`SELECT ${cols.join(', ')} FROM meal_plans WHERE id = ?`, [planId]);
+    const [rows] = await pool.query<any>(`SELECT ${cols.join(', ')} FROM meal_plans WHERE id = ?`, [planId]);
     if (!rows || rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Plan not found' });
     }
@@ -1967,7 +1967,7 @@ app.get('/api/meal-planner/plans/:id', authenticateToken, async (req: AuthReques
       try { 
         parsed = JSON.parse(plan.plan_data); 
       } catch (parseErr) {
-        // plan.plan_data was not valid JSON — treating as fallback
+        // plan.plan_data was not valid JSON � treating as fallback
         parsed = plan.plan_data;
       }
     } else {
@@ -2028,7 +2028,7 @@ app.post('/api/attendance/checkin', authenticateToken, async (req: AuthRequest, 
     // Prevent duplicate check-in for today
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
-    const [existing] = await pool.query<any[]>(
+    const [existing] = await pool.query<any>(
      
       `SELECT id FROM attendance WHERE user_id = ? AND DATE(check_in_time) = ?`,
       [userId, todayStr]
@@ -2056,7 +2056,7 @@ app.post('/api/attendance/checkin', authenticateToken, async (req: AuthRequest, 
 app.get('/api/attendance/history', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const [rows] = await pool.query<any[]>(
+    const [rows] = await pool.query<any>(
       `SELECT id, check_in_time, location, status FROM attendance WHERE user_id = ? ORDER BY check_in_time DESC`,
       [userId]
     );
@@ -2120,7 +2120,7 @@ app.get('/api/attendance/history', authenticateToken, async (req: AuthRequest, r
 app.get('/api/admin/attendance/today', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const today = new Date().toISOString().split('T')[0];
-    const [rows] = await pool.query<any[]>(
+    const [rows] = await pool.query<any>(
       `SELECT a.id, a.user_id, a.check_in_time, a.location, u.first_name, u.last_name, u.email
        FROM attendance a
        INNER JOIN users u ON a.user_id = u.id
@@ -2137,7 +2137,7 @@ app.get('/api/admin/attendance/today', authenticateToken, async (req: AuthReques
 app.get('/api/admin/attendance', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const date = req.query.date as string || new Date().toISOString().split('T')[0];
-    const [rows] = await pool.query<any[]>(
+    const [rows] = await pool.query<any>(
       `SELECT a.id, a.user_id, a.check_in_time, a.location, u.first_name, u.last_name, u.email
        FROM attendance a
        INNER JOIN users u ON a.user_id = u.id
@@ -2169,14 +2169,14 @@ app.get('/api/rewards/available', authenticateToken, async (req: AuthRequest, re
     const userId = req.user!.id;
     // Example rewards (customize as needed)
     const rewards = [
-      { id: 1, title: "Bronze Streak", description: "Attend 3 days", requiredAttendance: 3, points: 10, category: "streak", icon: "ðŸ¥‰" },
-      { id: 2, title: "Silver Streak", description: "Attend 7 days", requiredAttendance: 7, points: 25, category: "streak", icon: "ðŸ¥ˆ" },
-      { id: 3, title: "Gold Streak", description: "Attend 14 days", requiredAttendance: 14, points: 50, category: "streak", icon: "ðŸ¥‡" },
-      { id: 4, title: "Attendance Pro", description: "Attend 30 days", requiredAttendance: 30, points: 100, category: "streak", icon: "ðŸ†" },
+      { id: 1, title: "Bronze Streak", description: "Attend 3 days", requiredAttendance: 3, points: 10, category: "streak", icon: "🥉" },
+      { id: 2, title: "Silver Streak", description: "Attend 7 days", requiredAttendance: 7, points: 25, category: "streak", icon: "🥈" },
+      { id: 3, title: "Gold Streak", description: "Attend 14 days", requiredAttendance: 14, points: 50, category: "streak", icon: "🥇" },
+      { id: 4, title: "Attendance Pro", description: "Attend 30 days", requiredAttendance: 30, points: 100, category: "streak", icon: "🏆" },
     ];
 
     // Fetch claimed rewards
-    const [claimedRows] = await pool.query<any[]>(
+    const [claimedRows] = await pool.query<any>(
       `SELECT reward_id, claimed_at FROM rewards_claimed WHERE user_id = ?`,
       [userId]
     );
@@ -2184,7 +2184,7 @@ app.get('/api/rewards/available', authenticateToken, async (req: AuthRequest, re
     claimedRows.forEach(r => claimedMap.set(r.reward_id, r.claimed_at));
 
     // Fetch attendance count
-    const [attendanceRows] = await pool.query<any[]>(
+    const [attendanceRows] = await pool.query<any>(
       `SELECT COUNT(*) as total FROM attendance WHERE user_id = ?`,
       [userId]
     );
@@ -2222,7 +2222,7 @@ app.post('/api/rewards/claim', authenticateToken, async (req: AuthRequest, res: 
     if (!reward) return res.status(404).json({ success: false, message: "Reward not found" });
 
     // Check attendance
-    const [attendanceRows] = await pool.query<any[]>(
+    const [attendanceRows] = await pool.query<any>(
       `SELECT COUNT(*) as total FROM attendance WHERE user_id = ?`,
       [userId]
     );
@@ -2232,7 +2232,7 @@ app.post('/api/rewards/claim', authenticateToken, async (req: AuthRequest, res: 
     }
 
     // Check if already claimed
-    const [claimedRows] = await pool.query<any[]>(
+    const [claimedRows] = await pool.query<any>(
       `SELECT id FROM rewards_claimed WHERE user_id = ? AND reward_id = ?`,
       [userId, rewardId]
     );
@@ -2256,7 +2256,7 @@ app.post('/api/rewards/claim', authenticateToken, async (req: AuthRequest, res: 
 app.get('/api/user/profile', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const [users] = await pool.query<any[]>(
+    const [users] = await pool.query<any>(
       'SELECT id, email, first_name, last_name, role FROM users WHERE id = ?',
       [userId]
     );
@@ -2504,7 +2504,7 @@ function isValidAmount(amount: any): boolean {
 
 function isValidEmail(email?: string) {
   if (!email || typeof email !== 'string') return false;
-  // simple regex â€” avoids outbound errors caused by malformed addresses
+  // simple regex — avoids outbound errors caused by malformed addresses
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
@@ -2515,7 +2515,7 @@ async function notifyInactiveMembers(thresholdDays = 3) {
     }
 
     // Select members who haven't checked in within thresholdDays
-    const [rows] = await pool.query<any[]>(
+    const [rows] = await pool.query<any>(
       `
       SELECT u.id, u.email, u.first_name, u.last_name, MAX(a.check_in_time) AS lastCheckIn
       FROM users u
@@ -2539,7 +2539,7 @@ async function notifyInactiveMembers(thresholdDays = 3) {
       }
 
       // Avoid resending within last thresholdDays
-      const [alreadySent] = await pool.query<any[]>(
+      const [alreadySent] = await pool.query<any>(
         `SELECT id FROM notification_logs WHERE user_id = ? AND type = 'absent_reminder' AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY) LIMIT 1`,
         [u.id, thresholdDays]
       );
@@ -2548,20 +2548,20 @@ async function notifyInactiveMembers(thresholdDays = 3) {
         continue;
       }
 
-      const lastCheckInText = u.lastCheckIn ? `Your last visit was on ${new Date(u.lastCheckIn).toLocaleDateString()}.` : `We haven't seen you yet â€” start your journey with us!`;
+      const lastCheckInText = u.lastCheckIn ? `Your last visit was on ${new Date(u.lastCheckIn).toLocaleDateString()}.` : `We haven't seen you yet — start your journey with us!`;
 
-      const subject = `We've missed you at ActiveCore â€” come back!`;
+      const subject = `We've missed you at ActiveCore — come back!`;
       const html = `
         <p>Hi ${u.first_name || 'Member'},</p>
         <p>${lastCheckInText}</p>
-        <p>We noticed you haven't visited the gym in a while. Your fitness matters â€” we'd love to see you back! Here are a few ways to make it easier:</p>
+        <p>We noticed you haven't visited the gym in a while. Your fitness matters — we'd love to see you back! Here are a few ways to make it easier:</p>
         <ul>
           <li>Book a quick orientation with our trainer</li>
           <li>Try a refreshed workout plan</li>
           <li>Bring a friend and get motivated together</li>
         </ul>
         <p>If there's anything we can help with, just reply to this email.</p>
-        <p>â€” ActiveCore</p>
+        <p>— ActiveCore</p>
       `;
 
       const sent = await sendEmail(u.email, subject, html);
@@ -2595,13 +2595,13 @@ const DAILY_MS = 24 * 60 * 60 * 1000;
 // Run once at startup
 setTimeout(() => {
   notifyInactiveMembers(NOTIFY_THRESHOLD_DAYS).catch(() => {
-    // Silently fail scheduled task — email service may not be configured
+    // Silently fail scheduled task � email service may not be configured
   });
 }, 5 * 1000); // small delay on start
 // Run every 24 hours
 setInterval(() => {
   notifyInactiveMembers(NOTIFY_THRESHOLD_DAYS).catch(() => {
-    // Silently fail scheduled task — email service may not be configured
+    // Silently fail scheduled task � email service may not be configured
   });
 }, DAILY_MS);
 
@@ -2831,7 +2831,7 @@ app.post('/api/payments/paypal/capture-order', authenticateToken, async (req: Au
     subscriptionEnd.setMonth(subscriptionEnd.getMonth() + months);
 
     // Get payment amount
-    const [paymentRows] = await pool.query<any[]>(
+    const [paymentRows] = await pool.query<any>(
       `SELECT amount FROM payments WHERE transaction_id = ? AND user_id = ? LIMIT 1`,
       [orderId, userId]
     );
