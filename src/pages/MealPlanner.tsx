@@ -895,8 +895,7 @@ const MealPlanner: React.FC = () => {
           setMealPlan(prev => {
             if (!prev) return prev;
             const next = { ...prev };
-            // eslint-disable-next-line no-loop-func
-            next.weekPlan = next.weekPlan.map((d, idx) => {
+            next.weekPlan = next.weekPlan.map((d, idx) => { // eslint-disable-line no-loop-func
               if (idx !== dayIndex) return d;
               const updatedMeals = { ...d.meals, [mealKey]: normalizedNewMeal };
               return recomputeDayTotals({ ...d, meals: updatedMeals });

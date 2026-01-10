@@ -57,13 +57,11 @@ const EquipmentManagement: React.FC = () => {
     notes: "",
   });
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
+  useEffect(() => { // eslint-disable-line react-hooks/exhaustive-deps
     loadEquipments();
   }, []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
+  useEffect(() => { // eslint-disable-line react-hooks/exhaustive-deps
     filterEquipments();
   }, [searchText, equipments]);
 

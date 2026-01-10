@@ -95,13 +95,11 @@ const MembersManagement: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false); // ✅ Add this line
   const [presentToast] = useIonToast();
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
+  useEffect(() => { // eslint-disable-line react-hooks/exhaustive-deps
     loadMembers();
   }, []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
+  useEffect(() => { // eslint-disable-line react-hooks/exhaustive-deps
     filterMembers();
   }, [searchText, members]);
 

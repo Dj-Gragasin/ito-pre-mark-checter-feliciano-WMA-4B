@@ -54,8 +54,7 @@ const AdminPayments: React.FC = () => {
   const [paymentToDelete, setPaymentToDelete] = useState<number | null>(null);
   const [presentToast] = useIonToast();
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
+  useEffect(() => { // eslint-disable-line react-hooks/exhaustive-deps
     loadPayments();
     
     const interval = setInterval(() => {
@@ -65,8 +64,7 @@ const AdminPayments: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
+  useEffect(() => { // eslint-disable-line react-hooks/exhaustive-deps
     filterPayments();
   }, [searchText, payments]);
 
