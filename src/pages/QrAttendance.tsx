@@ -9,7 +9,6 @@ import {
   IonTitle,
   IonContent,
   IonButton,
-  IonText,
   IonAlert,
   IonCard,
   IonCardHeader,
@@ -34,6 +33,7 @@ const QrAttendance: React.FC = () => {
   const history = useHistory();
   const [today, setToday] = useState<string>("");
   const [isScanning, setIsScanning] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [userName, setUserName] = useState("Member");
   const [firstName, setFirstName] = useState("Member");
   const [showSuccessToast, setShowSuccessToast] = useState(false);

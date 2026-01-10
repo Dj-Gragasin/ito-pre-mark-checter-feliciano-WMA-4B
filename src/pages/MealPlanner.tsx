@@ -14,7 +14,6 @@ import {
   IonLabel,
   IonInput,
   IonSpinner,
-  IonText,
   IonIcon,
   IonModal,
   IonButtons,
@@ -27,7 +26,6 @@ import {
   useIonToast,
   IonCardHeader,
   IonCardTitle,
-  IonChip,
   IonSegment,
   IonSegmentButton,
 } from "@ionic/react";
@@ -43,14 +41,11 @@ import {
   trash,
   documents,
   flame,
-  chevronForward,
   cart,
   bulb,
   warning,
   checkmarkCircle,
   listCircle,
-  arrowForward,
-  star,
   time,
   chevronDown,
   chevronForward as chevronRight,
@@ -634,6 +629,7 @@ const MealPlanner: React.FC = () => {
 
   const todayPlan = mealPlan?.weekPlan?.find(d => d.day === selectedDayName) || mealPlan?.weekPlan?.find(d => d.day === getTodayDayName());
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const MacroProgress = ({ label, value, target, icon }: { label: string; value: number; target: number; icon: string }) => {
     const percentage = Math.min((value / target) * 100, 100);
     return (

@@ -22,10 +22,8 @@ import "./theme/variables.css";
 import Home from "./pages/Home";
 import AdminDashboard from "./pages/AdminDashboard";
 import MemberDashboard from "./pages/MemberDashboard";
-import Payment from "./pages/Payment";
 import MyAttendance from "./pages/MyAttendance";
 import Calorie from "./pages/Calorie";
-import RegisterMember from "./pages/RegisterMember";
 import QrAttendance from "./pages/QrAttendance";
 import ProgressTracker from "./pages/ProgressTracker";
 import MuscleGainTracker from "./pages/MuscleGainTracker";
@@ -42,7 +40,7 @@ import PaymentFailed from "./pages/PaymentFailed";
 
 /* Import role-based route */
 import PrivateRoute from "./components/PrivateRoute";
-import { ensureToken } from "./services/auth.service"; // add this import
+import { ensureToken } from "./services/auth.service";
 
 setupIonicReact();
 

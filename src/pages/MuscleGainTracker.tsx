@@ -18,7 +18,6 @@ import {
 import {
   barbell,
   analytics,
-  calendar,
 } from 'ionicons/icons';
 import {
   Chart as ChartJS,

@@ -23,7 +23,6 @@ import {
   calendar,
   warning,
   wallet,
-  card,
   cash,
   location,
   arrowBack,
