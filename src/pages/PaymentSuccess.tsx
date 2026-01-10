@@ -24,7 +24,8 @@ const PaymentSuccess: React.FC = () => {
   const [isVerifying, setIsVerifying] = useState(true);
   const [verificationStatus, setVerificationStatus] = useState<'checking' | 'success' | 'pending'>('checking');
 
-  useEffect(() => { // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
     capturePayment();
   }, []);
 
