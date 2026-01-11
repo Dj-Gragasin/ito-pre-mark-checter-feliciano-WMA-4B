@@ -8,7 +8,9 @@ import {
 import { statsChart, calendar, people, cash, trendingUp, refreshOutline } from "ionicons/icons";
 import "./AdminReports.css";
 
-const API_URL = "http://localhost:3002/api";
+import { API_CONFIG } from "../config/api.config";
+
+const API_URL = API_CONFIG.BASE_URL;
 
 type TodayReport = {
   date: string;

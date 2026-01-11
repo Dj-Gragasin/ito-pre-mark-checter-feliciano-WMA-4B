@@ -23,6 +23,8 @@ import {
 } from 'ionicons/icons';
 import './MemberPayment.css';
 
+import { API_CONFIG } from '../config/api.config';
+
 interface Subscription {
   membershipType: string;
   membershipPrice: number;
@@ -37,7 +39,7 @@ const MEMBERSHIP_PRICES: { [key: string]: number } = {
   annual: 15000,
 };
 
-const API_URL = 'http://localhost:3002/api';
+const API_URL = API_CONFIG.BASE_URL;
 
 const MemberPayment: React.FC = () => {
   const router = useIonRouter();

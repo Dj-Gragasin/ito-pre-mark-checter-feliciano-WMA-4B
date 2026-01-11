@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useHistory } from 'react-router-dom';
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3002/api';
+import { API_CONFIG } from '../config/api.config';
+
+const API = API_CONFIG.BASE_URL;
 
 const PaymentReturn: React.FC = () => {
   const location = useLocation();

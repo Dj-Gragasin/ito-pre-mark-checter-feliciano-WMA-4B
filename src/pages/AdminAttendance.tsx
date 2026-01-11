@@ -34,6 +34,8 @@ import {
 import { QRCodeSVG } from "qrcode.react";
 import "./AdminAttendance.css";
 
+import { API_CONFIG } from "../config/api.config";
+
 interface AttendanceRecord {
   id: number;
   userId: number;
@@ -46,7 +48,7 @@ interface AttendanceRecord {
   status: "present" | "late";
 }
 
-const API_URL = "http://localhost:3002/api";
+const API_URL = API_CONFIG.BASE_URL;
 
 const AdminAttendance: React.FC = () => {
   const [qrToken, setQrToken] = useState<string>("");

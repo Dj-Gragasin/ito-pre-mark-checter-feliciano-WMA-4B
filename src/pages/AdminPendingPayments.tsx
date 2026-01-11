@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -25,6 +25,8 @@ import {
 } from 'ionicons/icons';
 import './AdminPendingPayments.css';
 
+import { API_CONFIG } from '../config/api.config';
+
 interface PendingPayment {
   id: number;
   user_id: number;
@@ -46,15 +48,9 @@ const AdminPendingPayments: React.FC = () => {
   const [selectedPayment, setSelectedPayment] = useState<PendingPayment | null>(null);
   const [presentToast] = useIonToast();
 
-  const API_URL = 'http://localhost:3002/api';
+  const API_URL = API_CONFIG.BASE_URL;
 
-  useEffect(() => {
-    loadPendingPayments();
-    const interval = setInterval(loadPendingPayments, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadPendingPayments = async () => {
+  const loadPendingPayments = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/admin/payments/pending`, {
         headers: {
@@ -69,7 +65,13 @@ const AdminPendingPayments: React.FC = () => {
     } catch (error) {
       console.error('Error loading pending payments:', error);
     }
-  };
+  }, [API_URL]);
+
+  useEffect(() => {
+    loadPendingPayments();
+    const interval = setInterval(loadPendingPayments, 30000);
+    return () => clearInterval(interval);
+  }, [loadPendingPayments]);
 
   const handleApprove = async (payment: PendingPayment) => {
     try {

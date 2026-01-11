@@ -50,7 +50,9 @@ import {
 } from "ionicons/icons";
 import "./MealPlanner.css";
 
-const API_URL = "http://localhost:3002/api";
+import { API_CONFIG } from "../config/api.config";
+
+const API_URL = API_CONFIG.BASE_URL;
 
 // ============ MODERN UI COMPONENTS ============
 // Summary Bar - persistent top summary

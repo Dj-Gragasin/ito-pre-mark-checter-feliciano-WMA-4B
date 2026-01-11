@@ -982,11 +982,13 @@ app.post('/api/register', registerLimiter, async (req: Request, res: Response) =
 app.get('/api/members', async (req, res) => {
   try {
     
+    // PostgreSQL-safe: avoid GROUP BY across many selected columns.
+    // Use a correlated subquery for payment count instead.
     const [members] = await pool.query<any>(
-      `SELECT 
-        u.id, 
-        u.email, 
-        u.first_name as firstName, 
+      `SELECT
+        u.id,
+        u.email,
+        u.first_name as firstName,
         u.last_name as lastName,
         u.phone,
         u.gender,
@@ -1000,11 +1002,9 @@ app.get('/api/members', async (req, res) => {
         u.subscription_end as subscriptionEnd,
         u.emergency_contact as emergencyContact,
         u.address,
-        COUNT(p.id) as totalPayments
+        (SELECT COUNT(*) FROM payments p WHERE p.user_id = u.id) as totalPayments
       FROM users u
-      LEFT JOIN payments p ON u.id = p.user_id
-      WHERE u.role = 'member'
-      GROUP BY u.id`
+      WHERE u.role = 'member'`
     );
 
     
@@ -1084,7 +1084,7 @@ app.post('/api/members', authenticateToken, async (req: AuthRequest, res: Respon
         break;
     }
     
-    const [result] = await pool.query(
+    const [rows] = await pool.query<any>(
       `INSERT INTO users (
         first_name, last_name, email, password, phone, 
         gender, date_of_birth, role, status,
@@ -1092,7 +1092,8 @@ app.post('/api/members', authenticateToken, async (req: AuthRequest, res: Respon
         subscription_start, subscription_end,
         payment_status, emergency_contact, address,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'member', ?, ?, ?, ?, ?, ?, 'pending', ?, ?, NOW())`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'member', ?, ?, ?, ?, ?, ?, 'pending', ?, ?, NOW())
+      RETURNING id`,
       [
         firstName,
         lastName,
@@ -1112,7 +1113,7 @@ app.post('/api/members', authenticateToken, async (req: AuthRequest, res: Respon
       ]
     );
 
-    const insertId = (result as any).insertId;
+    const insertId = rows?.[0]?.id;
 
 
     res.status(201).json({ 
