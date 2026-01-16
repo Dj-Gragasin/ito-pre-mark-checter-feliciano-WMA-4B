@@ -8,13 +8,6 @@
   padding: 1rem;
 }
 
-.stats-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
-
 .stat-card {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -65,15 +58,10 @@
   margin-top: 1rem;
 }
 
-.payments-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 1.5rem;
-}
-
 .payment-card {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
   border: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 0;
 }
 
 .payment-header {
@@ -169,7 +157,6 @@ ion-button[color="danger"]:hover {
 }
 
 .empty-state {
-  grid-column: 1 / -1;
   text-align: center;
   padding: 3rem;
   color: #999;
@@ -193,10 +180,6 @@ ion-button[color="danger"]:hover {
 }
 
 @media (max-width: 768px) {
-  .payments-grid {
-    grid-template-columns: 1fr;
-  }
-
   .stat-card h3 {
     font-size: 1.5rem;
   }

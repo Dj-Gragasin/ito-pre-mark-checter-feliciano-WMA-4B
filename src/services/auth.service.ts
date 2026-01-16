@@ -1,4 +1,5 @@
 import { API_CONFIG } from '../config/api.config';
+import { Capacitor } from '@capacitor/core';
 
 export const loginUser = async (email: string, password: string) => {
   try {
@@ -10,7 +11,14 @@ export const loginUser = async (email: string, password: string) => {
       body: JSON.stringify({ email, password }),
     });
 
-    const data = await response.json();
+    let data: any = null;
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      data = await response.json();
+    } else {
+      const text = await response.text();
+      data = { message: text };
+    }
 
     if (!response.ok) {
       throw new Error(data.message || 'Login failed');
@@ -23,7 +31,31 @@ export const loginUser = async (email: string, password: string) => {
 
     return data;
   } catch (error: any) {
-    throw new Error(error.message || 'Failed to login');
+    const isNative = Capacitor.isNativePlatform();
+    const isLikelyFetchFailure =
+      error?.name === 'TypeError' &&
+      typeof error?.message === 'string' &&
+      error.message.toLowerCase().includes('fetch');
+
+    if (isLikelyFetchFailure) {
+      const base = API_CONFIG.BASE_URL;
+      const localhostHint = base.includes('localhost') || base.includes('127.0.0.1');
+
+      const nativeHint = isNative
+        ? (localhostHint
+            ?
+              "You're using a localhost API URL, but inside the APK 'localhost' means your PHONE (not your PC/server).\n\n" +
+              "Fix: rebuild the APK with REACT_APP_API_URL set to your server's reachable IP/domain, e.g. http://192.168.1.10:3002/api or https://YOUR-SERVICE/api."
+            :
+              "If this is a local/LAN server, make sure your phone and server are on the same Wi‑Fi and the port is reachable.")
+        : "If you're in a browser, ensure the API URL is reachable and (if using camera) served from https/localhost.";
+
+      throw new Error(
+        `Network error: Failed to reach API.\n\nAPI: ${base}\n\n${nativeHint}`
+      );
+    }
+
+    throw new Error(error?.message || 'Failed to login');
   }
 };
 

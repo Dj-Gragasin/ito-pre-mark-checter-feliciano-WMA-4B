@@ -13,6 +13,11 @@ import {
   IonLabel,
   IonInput,
   IonButtons,
+  IonGrid,
+  IonRow,
+  IonCol,
+  IonCard,
+  IonCardContent,
   useIonRouter
 } from '@ionic/react';
 import { logIn, informationCircle } from 'ionicons/icons';
@@ -53,74 +58,126 @@ const Home: React.FC = () => {
 
       <IonContent fullscreen>
         <div className="hero-section">
-          <h1>Welcome to ActiveCore</h1>
-          <p>
-            <strong>ActiveCore</strong> is your all-in-one fitness companion. Track your progress, manage your gym attendance, access personalized meal plans, and unlock rewards as you achieve your goals. Join our community and transform your fitness journey today!
-          </p>
-          <div className="cta-buttons">
-            <IonButton 
-              className="secondary-button"
-              fill="outline" 
-              size="large"
-              onClick={() => setShowLearnMore(true)}
-            >
-              <IonIcon icon={informationCircle} slot="start" />
-              Learn More
-            </IonButton>
-            <IonButton 
-              className="login-button"
-              fill="clear"
-              onClick={() => setShowLogin(true)}
-            >
-              <IonIcon icon={logIn} slot="start" />
-              Log In
-            </IonButton>
-          </div>
+          <IonGrid fixed>
+            <IonRow>
+              <IonCol size="12">
+                <h1>Welcome to ActiveCore</h1>
+                <p>
+                  <strong>ActiveCore</strong> is your all-in-one fitness companion. Track your progress, manage your gym attendance, access personalized meal plans, and unlock rewards as you achieve your goals. Join our community and transform your fitness journey today!
+                </p>
+              </IonCol>
+            </IonRow>
+
+            <IonRow className="ion-justify-content-center ion-align-items-center">
+              <IonCol size="12" sizeMd="6" sizeLg="3">
+                <IonButton
+                  className="secondary-button"
+                  fill="outline"
+                  size="large"
+                  expand="block"
+                  onClick={() => setShowLearnMore(true)}
+                >
+                  <IonIcon icon={informationCircle} slot="start" />
+                  Learn More
+                </IonButton>
+              </IonCol>
+              <IonCol size="12" sizeMd="6" sizeLg="3">
+                <IonButton
+                  className="login-button"
+                  fill="clear"
+                  expand="block"
+                  onClick={() => setShowLogin(true)}
+                >
+                  <IonIcon icon={logIn} slot="start" />
+                  Log In
+                </IonButton>
+              </IonCol>
+            </IonRow>
+          </IonGrid>
         </div>
 
-        <div className="stats-section">
-          <div className="stat-card">
-            <h2>5,000+</h2>
-            <p>Active Members</p>
-            <span>Growing daily</span>
-          </div>
-          <div className="stat-card">
-            <h2>500+</h2>
-            <p>Classes Weekly</p>
-            <span>Various disciplines</span>
-          </div>
-          <div className="stat-card">
-            <h2>50+</h2>
-            <p>Expert Trainers</p>
-            <span>Certified professionals</span>
-          </div>
-          <div className="stat-card">
-            <h2>95%</h2>
-            <p>Success Rate</p>
-            <span>Member satisfaction</span>
-          </div>
-        </div>
+        <section className="stats-section">
+          <IonGrid fixed>
+            <IonRow>
+              <IonCol size="12" sizeMd="6" sizeLg="3">
+                <IonCard className="stat-card">
+                  <IonCardContent>
+                    <h2>5,000+</h2>
+                    <p>Active Members</p>
+                    <span>Growing daily</span>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+              <IonCol size="12" sizeMd="6" sizeLg="3">
+                <IonCard className="stat-card">
+                  <IonCardContent>
+                    <h2>500+</h2>
+                    <p>Classes Weekly</p>
+                    <span>Various disciplines</span>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+              <IonCol size="12" sizeMd="6" sizeLg="3">
+                <IonCard className="stat-card">
+                  <IonCardContent>
+                    <h2>50+</h2>
+                    <p>Expert Trainers</p>
+                    <span>Certified professionals</span>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+              <IonCol size="12" sizeMd="6" sizeLg="3">
+                <IonCard className="stat-card">
+                  <IonCardContent>
+                    <h2>95%</h2>
+                    <p>Success Rate</p>
+                    <span>Member satisfaction</span>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+            </IonRow>
+          </IonGrid>
+        </section>
 
-        <div className="features-section">
-          <h2>Why Choose ActiveCore?</h2>
-          <div className="features-grid">
-            <div className="feature-card">
-              <img src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&auto=format" alt="Gym Equipment" />
-              <h3>State-of-the-art Equipment</h3>
-              <p>Access to premium fitness equipment</p>
-            </div>
-            <div className="feature-card">
-              <img src="https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=500&auto=format" alt="Personal Training" />
-              <h3>Expert Training</h3>
-              <p>Work with certified trainers</p>
-            </div>
-            <div className="feature-card">
-              <img src="https://images.unsplash.com/photo-1540497077202-7c8a3999166f?w=500&auto=format" alt="Gym Facilities" />
-              <h3>Modern Facilities</h3>
-              <p>Clean and spacious environment</p>
-            </div>
-          </div>
-        </div>
+        <section className="features-section">
+          <IonGrid fixed>
+            <IonRow>
+              <IonCol size="12">
+                <h2>Why Choose ActiveCore?</h2>
+              </IonCol>
+            </IonRow>
+
+            <IonRow>
+              <IonCol size="12" sizeMd="6" sizeLg="4">
+                <IonCard className="feature-card">
+                  <IonCardContent>
+                    <img src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&auto=format" alt="Gym Equipment" />
+                    <h3>State-of-the-art Equipment</h3>
+                    <p>Access to premium fitness equipment</p>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+              <IonCol size="12" sizeMd="6" sizeLg="4">
+                <IonCard className="feature-card">
+                  <IonCardContent>
+                    <img src="https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=500&auto=format" alt="Personal Training" />
+                    <h3>Expert Training</h3>
+                    <p>Work with certified trainers</p>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+              <IonCol size="12" sizeMd="6" sizeLg="4">
+                <IonCard className="feature-card">
+                  <IonCardContent>
+                    <img src="https://images.unsplash.com/photo-1540497077202-7c8a3999166f?w=500&auto=format" alt="Gym Facilities" />
+                    <h3>Modern Facilities</h3>
+                    <p>Clean and spacious environment</p>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+            </IonRow>
+          </IonGrid>
+        </section>
 
         {/* Learn More Modal */}
         <IonModal isOpen={showLearnMore} onDidDismiss={() => setShowLearnMore(false)}>

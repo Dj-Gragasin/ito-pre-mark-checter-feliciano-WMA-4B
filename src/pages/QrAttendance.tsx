@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
+import { Capacitor } from "@capacitor/core";
 import { useHistory } from "react-router-dom";
 import { API_CONFIG } from "../config/api.config";
 import {
@@ -16,7 +17,7 @@ import {
   IonCardContent,
   IonIcon,
   IonButtons,
-  IonBackButton,
+  IonMenuButton,
   IonLoading,
   IonToast,
 } from "@ionic/react";
@@ -31,6 +32,7 @@ import "./QrAttendance.css";
 
 const QrAttendance: React.FC = () => {
   const history = useHistory();
+  const isNativeApp = Capacitor.isNativePlatform();
   const [today, setToday] = useState<string>("");
   const [isScanning, setIsScanning] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -112,6 +114,18 @@ const QrAttendance: React.FC = () => {
 
   const requestCameraPermission = async () => {
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setErrorMessage(
+          "This device/browser does not support camera access (getUserMedia).\n\n" +
+          (isNativeApp
+            ? "If you're using the APK, rebuild/reinstall after adding camera permission."
+            : "Try a modern browser (Chrome/Safari) and ensure you're on https or localhost.")
+        );
+        setShowErrorAlert(true);
+        setCameraPermission("denied");
+        return false;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       stream.getTracks().forEach(track => track.stop());
       setCameraPermission("granted");
@@ -122,10 +136,18 @@ const QrAttendance: React.FC = () => {
       if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
         setErrorMessage(
           "❌ Camera access denied.\n\n" +
-          "To enable:\n" +
-          "1. Click the 🔒 or ⓘ icon in your browser's address bar\n" +
-          "2. Allow camera permissions for this site\n" +
-          "3. Refresh the page and try again"
+          (isNativeApp
+            ? "To enable on Android:\n" +
+              "1. Open Settings > Apps > ActiveCore (this app)\n" +
+              "2. Permissions > Camera\n" +
+              "3. Set to Allow\n" +
+              "4. Return to the app and try again\n\n" +
+              "If you still don't see a Camera permission there, the APK was built without declaring it — reinstall the updated APK."
+            : "To enable in a browser:\n" +
+              "1. Click the 🔒 or ⓘ icon in your browser's address bar\n" +
+              "2. Find 'Camera' in permissions\n" +
+              "3. Change to 'Allow'\n" +
+              "4. Refresh this page and try again")
         );
       } else if (error.name === 'NotFoundError') {
         setErrorMessage("No camera found on this device.");
@@ -264,7 +286,7 @@ const QrAttendance: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/member" />
+            <IonMenuButton />
           </IonButtons>
           <IonTitle>QR Attendance</IonTitle>
         </IonToolbar>
@@ -301,12 +323,21 @@ const QrAttendance: React.FC = () => {
                   <p className="warning-text">
                     To scan QR codes, please enable camera access:
                   </p>
-                  <ol className="warning-steps">
-                    <li>Click the 🔒 icon in your browser's address bar</li>
-                    <li>Find "Camera" in permissions</li>
-                    <li>Change to "Allow"</li>
-                    <li>Refresh this page</li>
-                  </ol>
+                  {isNativeApp ? (
+                    <ol className="warning-steps">
+                      <li>Open Settings &gt; Apps &gt; ActiveCore</li>
+                      <li>Tap Permissions</li>
+                      <li>Set Camera to Allow</li>
+                      <li>Return here and tap Start Camera</li>
+                    </ol>
+                  ) : (
+                    <ol className="warning-steps">
+                      <li>Click the 🔒 icon in your browser's address bar</li>
+                      <li>Find "Camera" in permissions</li>
+                      <li>Change to "Allow"</li>
+                      <li>Refresh this page</li>
+                    </ol>
+                  )}
                   <IonButton 
                     size="small" 
                     color="warning"

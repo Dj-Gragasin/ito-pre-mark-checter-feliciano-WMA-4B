@@ -1,5 +1,10 @@
-import React, { useEffect } from "react";
-import { IonApp, IonRouterOutlet, setupIonicReact } from "@ionic/react";
+import React, { useEffect, useState } from "react";
+import {
+  IonApp,
+  IonRouterOutlet,
+  IonSplitPane,
+  setupIonicReact,
+} from "@ionic/react";
 import { IonReactRouter } from "@ionic/react-router";
 import { Route, Redirect } from "react-router-dom";
 
@@ -38,16 +43,48 @@ import PaymentReturn from "./pages/PaymentReturn";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentFailed from "./pages/PaymentFailed";
 
+import AppMenu from "./components/AppMenu";
+
 /* Import role-based route */
 import PrivateRoute from "./components/PrivateRoute";
 import { ensureToken } from "./services/auth.service";
 
 setupIonicReact();
 
+function readAuthState() {
+  const token = localStorage.getItem('token');
+  let role: string | undefined = undefined;
+  try {
+    const raw = localStorage.getItem('user') || localStorage.getItem('currentUser');
+    if (raw) {
+      const user = JSON.parse(raw);
+      role = (user?.role ?? user?.user?.role ?? user?.data?.role) as string | undefined;
+    }
+  } catch {
+    // ignore
+  }
+  const roleNorm = String(role || '').trim().toLowerCase();
+  const isAuthed = !!token && (roleNorm === 'admin' || roleNorm === 'member');
+  return { isAuthed, role: roleNorm };
+}
+
 const App: React.FC = () => {
+  const [authState, setAuthState] = useState(readAuthState());
+
   useEffect(() => {
-    // Auto ensure token only in development for convenience during local testing
-    if (process.env.NODE_ENV === "development") {
+    const onStorage = () => setAuthState(readAuthState());
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  useEffect(() => {
+    // Also update on initial mount in case localStorage changed before React booted
+    setAuthState(readAuthState());
+  }, []);
+
+  useEffect(() => {
+    // Optional dev autologin. Disabled by default to avoid showing the menu on /home.
+    if (process.env.NODE_ENV === "development" && process.env.REACT_APP_DEV_AUTOLOGIN === 'true') {
       (async () => {
         try {
           await ensureToken(); // uses default dev email
@@ -61,8 +98,10 @@ const App: React.FC = () => {
   return (
     <IonApp>
       <IonReactRouter>
-        <IonRouterOutlet>
-          <Route exact path="/home" component={Home} />
+        <IonSplitPane contentId="main" when={authState.isAuthed}>
+          <AppMenu />
+          <IonRouterOutlet id="main">
+            <Route exact path="/home" component={Home} />
 
           {/* Protected Admin Routes */}
           <PrivateRoute
@@ -156,9 +195,10 @@ const App: React.FC = () => {
             role="member"
           />
 
-          {/* Default redirect */}
-          <Route exact path="/" render={() => <Redirect to="/home" />} />
-        </IonRouterOutlet>
+            {/* Default redirect */}
+            <Route exact path="/" render={() => <Redirect to="/home" />} />
+          </IonRouterOutlet>
+        </IonSplitPane>
       </IonReactRouter>
     </IonApp>
   );

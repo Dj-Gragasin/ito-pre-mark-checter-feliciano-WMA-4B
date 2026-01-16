@@ -3,7 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@capacitor/android": "^7.4.4",
+    "@capacitor/app": "^7.1.1",
     "@capacitor/core": "7.4.3",
+    "@capacitor/haptics": "^7.0.3",
+    "@capacitor/keyboard": "^7.0.4",
+    "@capacitor/status-bar": "^7.0.4",
     "@ionic/react": "^7.8.6",
     "@ionic/react-router": "^7.8.6",
     "@types/axios": "^0.9.36",
@@ -35,6 +40,11 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "cap:add:android": "npx cap add android",
+    "cap:sync": "npx cap sync",
+    "cap:sync:android": "npx cap sync android",
+    "cap:open:android": "npx cap open android",
+    "android:apk:debug": "npm run build && npx cap sync android && cd android && gradlew.bat assembleDebug",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -56,6 +66,7 @@
     ]
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.4.4",
     "@types/node": "^24.10.1",
     "@types/qrcode.react": "^1.0.5",
     "@types/react-chartjs-2": "^2.0.2",

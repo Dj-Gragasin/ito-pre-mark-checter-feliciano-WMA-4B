@@ -30,6 +30,17 @@ import qrTokenRouter from './routes/qrToken';
 
 const app = express();
 
+const parsePositiveInt = (value: string | undefined, fallback: number): number => {
+  const n = Number.parseInt((value ?? '').trim(), 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+
+// If behind a reverse proxy (Vercel/Nginx/Cloudflare), enable this so req.ip reflects the real client.
+// Set TRUST_PROXY=1 (or any truthy value) in production.
+if (process.env.TRUST_PROXY && process.env.TRUST_PROXY !== '0' && process.env.TRUST_PROXY.toLowerCase() !== 'false') {
+  app.set('trust proxy', 1);
+}
+
 // ============================================
 // SECURITY: Validate JWT_SECRET at startup
 // ============================================
@@ -45,15 +56,16 @@ let openaiAvailable = true;
 // ============================================
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 login attempts per windowMs
+  max: parsePositiveInt(process.env.AUTH_RATE_LIMIT_MAX, 20), // Limit each IP to N login attempts per windowMs
   message: 'Too many login attempts. Please try again later.',
+  skipSuccessfulRequests: true,
   standardHeaders: true, // Return rate limit info in RateLimit-* headers
   legacyHeaders: false,
 });
 
 const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // Limit each IP to 10 registration attempts per hour
+  max: parsePositiveInt(process.env.REGISTER_RATE_LIMIT_MAX, 10), // Limit each IP to N registration attempts per hour
   message: 'Too many registration attempts. Please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -61,7 +73,7 @@ const registerLimiter = rateLimit({
 
 const generalLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 100, // General API limit: 100 requests per minute per IP (increased from 30)
+  max: parsePositiveInt(process.env.GENERAL_RATE_LIMIT_MAX, 300), // General API limit: requests per minute per IP
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -2177,10 +2189,21 @@ app.get('/api/rewards/available', authenticateToken, async (req: AuthRequest, re
     ];
 
     // Fetch claimed rewards
-    const [claimedRows] = await pool.query<any>(
-      `SELECT reward_id, claimed_at FROM rewards_claimed WHERE user_id = ?`,
-      [userId]
-    );
+    let claimedRows: any[] = [];
+    try {
+      const [rows] = await pool.query<any>(
+        `SELECT reward_id, claimed_at FROM user_rewards WHERE user_id = ?`,
+        [userId]
+      );
+      claimedRows = rows;
+    } catch (e) {
+      // Backward compat: some deployments used `rewards_claimed`
+      const [rows] = await pool.query<any>(
+        `SELECT reward_id, claimed_at FROM rewards_claimed WHERE user_id = ?`,
+        [userId]
+      );
+      claimedRows = rows;
+    }
     const claimedMap = new Map<number, string>();
     claimedRows.forEach(r => claimedMap.set(r.reward_id, r.claimed_at));
 
@@ -2201,6 +2224,7 @@ app.get('/api/rewards/available', authenticateToken, async (req: AuthRequest, re
 
     res.json({ success: true, rewards: rewardsWithStatus });
   } catch (err: any) {
+    console.error('Failed to fetch rewards:', err);
     res.status(500).json({ success: false, message: "Failed to fetch rewards." });
   }
 });
@@ -2233,22 +2257,40 @@ app.post('/api/rewards/claim', authenticateToken, async (req: AuthRequest, res: 
     }
 
     // Check if already claimed
-    const [claimedRows] = await pool.query<any>(
-      `SELECT id FROM rewards_claimed WHERE user_id = ? AND reward_id = ?`,
-      [userId, rewardId]
-    );
+    let claimedRows: any[] = [];
+    try {
+      const [rows] = await pool.query<any>(
+        `SELECT id FROM user_rewards WHERE user_id = ? AND reward_id = ?`,
+        [userId, rewardId]
+      );
+      claimedRows = rows;
+    } catch (e) {
+      const [rows] = await pool.query<any>(
+        `SELECT id FROM rewards_claimed WHERE user_id = ? AND reward_id = ?`,
+        [userId, rewardId]
+      );
+      claimedRows = rows;
+    }
     if (claimedRows.length > 0) {
       return res.status(400).json({ success: false, message: "Reward already claimed." });
     }
 
     // Insert claim
-    await pool.query(
-      `INSERT INTO rewards_claimed (user_id, reward_id, claimed_at) VALUES (?, ?, NOW())`,
-      [userId, rewardId]
-    );
+    try {
+      await pool.query(
+        `INSERT INTO user_rewards (user_id, reward_id, claimed_at) VALUES (?, ?, NOW())`,
+        [userId, rewardId]
+      );
+    } catch (e) {
+      await pool.query(
+        `INSERT INTO rewards_claimed (user_id, reward_id, claimed_at) VALUES (?, ?, NOW())`,
+        [userId, rewardId]
+      );
+    }
 
     res.json({ success: true, message: "Reward claimed!" });
   } catch (err: any) {
+    console.error('Failed to claim reward:', err);
     res.status(500).json({ success: false, message: "Failed to claim reward." });
   }
 });

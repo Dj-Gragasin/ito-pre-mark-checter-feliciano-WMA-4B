@@ -396,6 +396,39 @@
   }
 }
 
+@media (max-width: 480px) {
+  .info-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .expiry-info {
+    align-items: flex-start;
+  }
+
+  .summary-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  .summary-row .amount {
+    font-size: 1.35rem;
+  }
+
+  .cash-info,
+  .gym-location {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .cash-info ion-icon,
+  .gym-location ion-icon {
+    font-size: 1.75rem;
+  }
+}
+
 /* Ionic Dark Mode Override */
 ion-card-content {
   color: #888 !important;

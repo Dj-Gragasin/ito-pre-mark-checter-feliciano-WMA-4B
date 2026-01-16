@@ -1,5 +1,5 @@
 /* Base Styles */
-ion-content {
+.muscle-gain-content {
   --background: #121212;
 }
 
@@ -13,9 +13,6 @@ ion-content {
   margin: 20px 0;
   position: relative;
   overflow: hidden;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
 }
 
 /* Form Section */
@@ -87,35 +84,44 @@ ion-label {
   overflow-x: auto;
 }
 
-table {
+.muscle-gain-content table {
   width: 100%;
   border-collapse: collapse;
   color: #ffffff;
 }
 
-th, td {
+.muscle-gain-content th,
+.muscle-gain-content td {
   padding: 12px;
   text-align: left;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-th {
+.muscle-gain-content th {
   background: rgba(13, 148, 136, 0.1);
   color: var(--ion-color-primary);
 }
 
+.records-list-wrap {
+  display: none;
+}
+
 /* Button Container */
 .button-container {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
   margin: 20px 0;
 }
 
 /* Responsive Design */
 @media (max-width: 768px) {
+  .records-table-wrap {
+    display: none;
+  }
+
+  .records-list-wrap {
+    display: block;
+  }
   .form-container {
-    grid-template-columns: 1fr;
+    padding: 20px;
   }
 
   .chart-container {

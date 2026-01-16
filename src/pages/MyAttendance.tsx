@@ -6,18 +6,20 @@ import {
   IonTitle,
   IonContent,
   IonButtons,
-  IonBackButton,
+  IonMenuButton,
   IonCard,
   IonCardHeader,
   IonCardTitle,
   IonCardContent,
   IonBadge,
+  IonButton,
   IonIcon,
   IonRefresher,
   IonRefresherContent,
   IonGrid,
   IonRow,
   IonCol,
+  IonProgressBar,
   IonList, // ✅ Add this
 } from "@ionic/react";
 import {
@@ -221,7 +223,7 @@ const MyAttendance: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/member" />
+            <IonMenuButton />
           </IonButtons>
           <IonTitle>My Attendance</IonTitle>
         </IonToolbar>
@@ -335,54 +337,59 @@ const MyAttendance: React.FC = () => {
                   <p>Keep attending to unlock rewards!</p>
                 </div>
               ) : (
-                <div className="rewards-grid">
-                  {rewards.map((reward) => {
-                    const canClaim = stats.totalAttendance >= reward.requiredAttendance && !reward.claimed;
-                    const isLocked = stats.totalAttendance < reward.requiredAttendance;
+                <IonGrid className="rewards-grid">
+                  <IonRow>
+                    {rewards.map((reward) => {
+                      const canClaim = stats.totalAttendance >= reward.requiredAttendance && !reward.claimed;
+                      const isLocked = stats.totalAttendance < reward.requiredAttendance;
+                      const progress = reward.requiredAttendance
+                        ? Math.min(stats.totalAttendance / reward.requiredAttendance, 1)
+                        : 0;
 
-                    return (
-                      <div
-                        key={reward.id}
-                        className={`reward-item ${
-                          reward.claimed ? 'claimed' : canClaim ? 'unlocked' : 'locked'
-                        }`}
-                      >
-                        <div className="reward-icon">{reward.icon}</div>
-                        <div className="reward-info">
-                          <h3>{reward.title}</h3>
-                          <p>{reward.description}</p>
-                          <div className="reward-requirement">
-                            <IonBadge color={canClaim ? 'success' : 'medium'}>
-                              {stats.totalAttendance}/{reward.requiredAttendance} check-ins
-                            </IonBadge>
-                          </div>
-                        </div>
-                        {canClaim && !reward.claimed && (
-                          <button
-                            className="claim-button"
-                            onClick={() => handleClaimReward(reward.id)}
+                      return (
+                        <IonCol key={reward.id} size="12" sizeMd="6" sizeLg="4">
+                          <div
+                            className={`reward-item ${
+                              reward.claimed ? 'claimed' : canClaim ? 'unlocked' : 'locked'
+                            }`}
                           >
-                            <IonIcon icon={gift} />
-                            Claim Reward
-                          </button>
-                        )}
-                        {reward.claimed && (
-                          <IonBadge color="success">Claimed</IonBadge>
-                        )}
-                        {isLocked && (
-                          <div className="reward-progress">
-                            <div
-                              className="progress-bar"
-                              style={{
-                                width: `${(stats.totalAttendance / reward.requiredAttendance) * 100}%`,
-                              }}
-                            ></div>
+                            <div className="reward-icon">{reward.icon}</div>
+                            <div className="reward-info">
+                              <h3>{reward.title}</h3>
+                              <p>{reward.description}</p>
+                              <div className="reward-requirement">
+                                <IonBadge color={canClaim ? 'success' : 'medium'}>
+                                  {stats.totalAttendance}/{reward.requiredAttendance} check-ins
+                                </IonBadge>
+                              </div>
+                            </div>
+
+                            {canClaim && !reward.claimed && (
+                              <IonButton
+                                expand="block"
+                                className="claim-button"
+                                onClick={() => handleClaimReward(reward.id)}
+                              >
+                                <IonIcon icon={gift} slot="start" />
+                                Claim Reward
+                              </IonButton>
+                            )}
+
+                            {reward.claimed && (
+                              <IonBadge color="success">Claimed</IonBadge>
+                            )}
+
+                            {isLocked && (
+                              <div className="reward-progress">
+                                <IonProgressBar value={progress} />
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                        </IonCol>
+                      );
+                    })}
+                  </IonRow>
+                </IonGrid>
               )}
             </IonCardContent>
           </IonCard>

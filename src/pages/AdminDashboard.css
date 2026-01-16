@@ -23,7 +23,13 @@ body {
 .dashboard-container {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background: radial-gradient(circle at top, #181818, #0d0d0d);
+}
+
+.dashboard-content-wrapper {
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 /* ===== SIDEBAR WITH TITLE ===== */
@@ -33,6 +39,7 @@ body {
   left: 0;
   width: var(--sidebar-width);
   height: 100vh;
+  height: 100dvh;
   background: linear-gradient(180deg, #1e1e1e 0%, #1a1a1a 100%);
   padding: 0;
   box-shadow: 4px 0 20px rgba(0,0,0,0.4);
@@ -41,6 +48,30 @@ body {
   overflow-y: auto;
   z-index: 999;
   border-right: 1px solid rgba(0, 230, 118, 0.1);
+}
+
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 998;
+}
+
+.mobile-menu-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(30, 30, 30, 0.8);
+  color: var(--text-primary);
+  border-radius: 12px;
+  flex: 0 0 auto;
+}
+
+.mobile-menu-btn ion-icon {
+  font-size: 24px;
 }
 
 .sidebar::-webkit-scrollbar {
@@ -283,6 +314,7 @@ body {
   box-shadow: 0 4px 15px rgba(0,0,0,0.2);
   position: relative;
   overflow: hidden;
+  margin: 0;
 }
 
 .dashboard-card::before {
@@ -444,6 +476,10 @@ body {
 }
 
 @media (max-width: 768px) {
+  .mobile-menu-btn {
+    display: inline-flex;
+  }
+
   .sidebar {
     left: -280px;
     transition: left 0.3s ease;

@@ -6,7 +6,7 @@ import {
   IonTitle,
   IonContent,
   IonButtons,
-  IonBackButton,
+  IonMenuButton,
   IonCard,
   IonCardContent,
   IonBadge,
@@ -17,6 +17,9 @@ import {
   IonRefresherContent,
   IonButton,
   IonAlert,
+  IonGrid,
+  IonRow,
+  IonCol,
 } from "@ionic/react";
 import {
   cash,
@@ -208,7 +211,7 @@ const AdminPayments: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/admin" />
+            <IonMenuButton />
           </IonButtons>
           <IonTitle>Payment History</IonTitle>
         </IonToolbar>
@@ -220,143 +223,165 @@ const AdminPayments: React.FC = () => {
         </IonRefresher>
 
         <div className="payments-container">
-          {/* Info Banner */}
-          <IonCard style={{ background: 'rgba(0, 230, 118, 0.1)', border: '1px solid #00e676' }}>
-            <IonCardContent>
-              <p style={{ margin: 0, color: '#00e676', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <IonIcon icon={informationCircle} />
-                All payments are shown here. GCash payments are auto-approved. 
-                Cash payments are recorded by admin. You can delete old records for cleanup.
-              </p>
-            </IonCardContent>
-          </IonCard>
-
-          {/* Statistics - Only All Transactions */}
-          <div className="stats-row" style={{ justifyContent: 'center' }}>
-            <div className="stat-card" style={{ maxWidth: '400px' }}>
-              <IonIcon icon={person} style={{ fontSize: '3rem' }} />
-              <h3 style={{ fontSize: '3rem', margin: '1rem 0' }}>{payments.length}</h3>
-              <p style={{ fontSize: '1.2rem' }}>All Transactions</p>
-            </div>
-          </div>
-
-          {/* Search Only - No Filter Tabs */}
-          <div className="filters-section">
-            <IonSearchbar
-              value={searchText}
-              onIonInput={(e) => setSearchText(e.detail.value!)}
-              placeholder="Search payments..."
-            />
-          </div>
-
-          {/* Payments List */}
-          <div className="payments-grid">
-            {loading ? (
-              <div className="empty-state">
-                <p>Loading payments...</p>
-              </div>
-            ) : filteredPayments.length === 0 ? (
-              <div className="empty-state">
-                <IonIcon icon={cash} />
-                <h3>No Payments Found</h3>
-                <p>There are no payment records yet</p>
-              </div>
-            ) : (
-              filteredPayments.map((payment) => (
-                <IonCard key={payment.id} className="payment-card">
+          <IonGrid fixed>
+            <IonRow>
+              <IonCol size="12">
+                {/* Info Banner */}
+                <IonCard style={{ background: 'rgba(0, 230, 118, 0.1)', border: '1px solid #00e676' }}>
                   <IonCardContent>
-                    <div className="payment-header">
-                      <div>
-                        <h3 className="payment-name">
-                          <IonIcon icon={person} /> {payment.firstName} {payment.lastName}
-                        </h3>
-                        <p className="payment-email">{payment.email}</p>
-                      </div>
-                      <IonBadge color={getStatusColor(payment.payment_status)}>
-                        {payment.payment_status ? payment.payment_status.toUpperCase() : 'PAID'}
-                      </IonBadge>
-                    </div>
-
-                    <div className="payment-details">
-                      <div className="payment-row">
-                        <span>Amount:</span>
-                        <strong>₱{Number(payment.amount || 0).toLocaleString()}</strong>
-                      </div>
-                      <div className="payment-row">
-                        <span>Plan:</span>
-                        <strong>{payment.membership_type || 'N/A'}</strong>
-                      </div>
-                      <div className="payment-row">
-                        <span>Method:</span>
-                        <strong style={{ 
-                          color: payment.payment_method?.toLowerCase().includes('gcash') ? '#00e676' : '#fff' 
-                        }}>
-                          {payment.payment_method?.toUpperCase() || 'CASH'}
-                        </strong>
-                      </div>
-                      <div className="payment-row">
-                        <span>Date:</span>
-                        <strong>
-                          {payment.payment_date ? new Date(payment.payment_date).toLocaleDateString() : 'N/A'}
-                        </strong>
-                      </div>
-                      <div className="payment-row">
-                        <span>Transaction ID:</span>
-                        <strong className="transaction-id">{payment.transaction_id || 'N/A'}</strong>
-                      </div>
-                      
-                      {payment.subscription_start && payment.subscription_end && (
-                        <div className="payment-row highlight">
-                          <span>Subscription:</span>
-                          <strong>
-                            {new Date(payment.subscription_start).toLocaleDateString()} - {new Date(payment.subscription_end).toLocaleDateString()}
-                          </strong>
-                        </div>
-                      )}
-                      
-                      {payment.notes && (
-                        <div className="payment-row">
-                          <span>Notes:</span>
-                          <strong>{payment.notes}</strong>
-                        </div>
-                      )}
-                    </div>
-
-                    {payment.payment_method?.toLowerCase().includes('gcash') && (
-                      <div style={{ 
-                        marginTop: '1rem', 
-                        padding: '0.5rem', 
-                        background: 'rgba(0, 230, 118, 0.1)', 
-                        borderRadius: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.85rem',
-                        color: '#00e676'
-                      }}>
-                        <IonIcon icon={person} />
-                        Auto-approved - Instant access granted
-                      </div>
-                    )}
-
-                    {/* Delete Button */}
-                    <div className="payment-actions" style={{ marginTop: '1rem' }}>
-                      <IonButton
-                        expand="block"
-                        fill="outline"
-                        color="danger"
-                        size="small"
-                        onClick={() => handleDeletePayment(payment.id)}
-                      >
-                        <IonIcon icon={trash} slot="start" />
-                        Delete Record
-                      </IonButton>
-                    </div>
+                    <p style={{ margin: 0, color: '#00e676', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <IonIcon icon={informationCircle} />
+                      All payments are shown here. GCash payments are auto-approved.
+                      Cash payments are recorded by admin. You can delete old records for cleanup.
+                    </p>
                   </IonCardContent>
                 </IonCard>
-              ))
-            )}
-          </div>
+              </IonCol>
+            </IonRow>
+
+            <IonRow className="ion-justify-content-center">
+              <IonCol size="12" sizeMd="8" sizeLg="4">
+                {/* Statistics - Only All Transactions */}
+                <div className="stat-card">
+                  <IonIcon icon={person} style={{ fontSize: '3rem' }} />
+                  <h3 style={{ fontSize: '3rem', margin: '1rem 0' }}>{payments.length}</h3>
+                  <p style={{ fontSize: '1.2rem' }}>All Transactions</p>
+                </div>
+              </IonCol>
+            </IonRow>
+
+            <IonRow>
+              <IonCol size="12">
+                {/* Search */}
+                <div className="filters-section">
+                  <IonSearchbar
+                    value={searchText}
+                    onIonInput={(e) => setSearchText(e.detail.value!)}
+                    placeholder="Search payments..."
+                  />
+                </div>
+              </IonCol>
+            </IonRow>
+
+            <IonRow>
+              {loading ? (
+                <IonCol size="12">
+                  <div className="empty-state">
+                    <p>Loading payments...</p>
+                  </div>
+                </IonCol>
+              ) : filteredPayments.length === 0 ? (
+                <IonCol size="12">
+                  <div className="empty-state">
+                    <IonIcon icon={cash} />
+                    <h3>No Payments Found</h3>
+                    <p>There are no payment records yet</p>
+                  </div>
+                </IonCol>
+              ) : (
+                filteredPayments.map((payment) => (
+                  <IonCol key={payment.id} size="12" sizeMd="6" sizeLg="4">
+                    <IonCard className="payment-card">
+                      <IonCardContent>
+                        <div className="payment-header">
+                          <div>
+                            <h3 className="payment-name">
+                              <IonIcon icon={person} /> {payment.firstName} {payment.lastName}
+                            </h3>
+                            <p className="payment-email">{payment.email}</p>
+                          </div>
+                          <IonBadge color={getStatusColor(payment.payment_status)}>
+                            {payment.payment_status ? payment.payment_status.toUpperCase() : 'PAID'}
+                          </IonBadge>
+                        </div>
+
+                        <div className="payment-details">
+                          <div className="payment-row">
+                            <span>Amount:</span>
+                            <strong>₱{Number(payment.amount || 0).toLocaleString()}</strong>
+                          </div>
+                          <div className="payment-row">
+                            <span>Plan:</span>
+                            <strong>{payment.membership_type || 'N/A'}</strong>
+                          </div>
+                          <div className="payment-row">
+                            <span>Method:</span>
+                            <strong
+                              style={{
+                                color: payment.payment_method?.toLowerCase().includes('gcash') ? '#00e676' : '#fff',
+                              }}
+                            >
+                              {payment.payment_method?.toUpperCase() || 'CASH'}
+                            </strong>
+                          </div>
+                          <div className="payment-row">
+                            <span>Date:</span>
+                            <strong>
+                              {payment.payment_date ? new Date(payment.payment_date).toLocaleDateString() : 'N/A'}
+                            </strong>
+                          </div>
+                          <div className="payment-row">
+                            <span>Transaction ID:</span>
+                            <strong className="transaction-id">{payment.transaction_id || 'N/A'}</strong>
+                          </div>
+
+                          {payment.subscription_start && payment.subscription_end && (
+                            <div className="payment-row highlight">
+                              <span>Subscription:</span>
+                              <strong>
+                                {new Date(payment.subscription_start).toLocaleDateString()} -{' '}
+                                {new Date(payment.subscription_end).toLocaleDateString()}
+                              </strong>
+                            </div>
+                          )}
+
+                          {payment.notes && (
+                            <div className="payment-row">
+                              <span>Notes:</span>
+                              <strong>{payment.notes}</strong>
+                            </div>
+                          )}
+                        </div>
+
+                        {payment.payment_method?.toLowerCase().includes('gcash') && (
+                          <div
+                            style={{
+                              marginTop: '1rem',
+                              padding: '0.5rem',
+                              background: 'rgba(0, 230, 118, 0.1)',
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              fontSize: '0.85rem',
+                              color: '#00e676',
+                            }}
+                          >
+                            <IonIcon icon={person} />
+                            Auto-approved - Instant access granted
+                          </div>
+                        )}
+
+                        {/* Delete Button */}
+                        <div className="payment-actions" style={{ marginTop: '1rem' }}>
+                          <IonButton
+                            expand="block"
+                            fill="outline"
+                            color="danger"
+                            size="small"
+                            onClick={() => handleDeletePayment(payment.id)}
+                          >
+                            <IonIcon icon={trash} slot="start" />
+                            Delete Record
+                          </IonButton>
+                        </div>
+                      </IonCardContent>
+                    </IonCard>
+                  </IonCol>
+                ))
+              )}
+            </IonRow>
+          </IonGrid>
         </div>
 
         {/* Delete Confirmation Alert */}

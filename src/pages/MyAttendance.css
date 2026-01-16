@@ -73,8 +73,11 @@
 
 /* Rewards Grid */
 .rewards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  --ion-grid-padding: 0;
+  --ion-grid-column-padding: 0;
+}
+
+.rewards-grid ion-row {
   gap: 1.5rem;
 }
 
@@ -131,21 +134,10 @@
 }
 
 .claim-button {
-  background: linear-gradient(135deg, #00e676 0%, #00c853 100%);
-  color: #000;
-  border: none;
-  padding: 0.7rem 1.3rem;
-  border-radius: 999px;
-  font-weight: 700;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  width: 100%;
-}
-
-.claim-button:hover {
-  transform: scale(1.05);
-  box-shadow: 0 8px 24px rgba(0, 230, 118, 0.4);
+  --background: linear-gradient(135deg, #00e676 0%, #00c853 100%);
+  --color: #000;
+  --border-radius: 999px;
+  font-weight: 800;
 }
 
 .reward-progress {
@@ -158,10 +150,10 @@
   overflow: hidden;
 }
 
-.progress-bar {
-  height: 100%;
-  background: linear-gradient(90deg, #00e676 0%, #00c853 100%);
-  transition: width 0.5s ease;
+.reward-progress ion-progress-bar {
+  --background: rgba(255, 255, 255, 0.05);
+  --progress-background: linear-gradient(90deg, #00e676 0%, #00c853 100%);
+  height: 4px;
 }
 
 /* My Attendance Content */
@@ -399,8 +391,11 @@
 
 /* Rewards Grid */
 .rewards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  --ion-grid-padding: 0;
+  --ion-grid-column-padding: 0;
+}
+
+.rewards-grid ion-row {
   gap: 1.5rem;
 }
 
@@ -457,21 +452,10 @@
 }
 
 .claim-button {
-  background: linear-gradient(135deg, #00e676 0%, #00c853 100%);
-  color: #000;
-  border: none;
-  padding: 0.7rem 1.3rem;
-  border-radius: 999px;
-  font-weight: 700;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  width: 100%;
-}
-
-.claim-button:hover {
-  transform: scale(1.05);
-  box-shadow: 0 8px 24px rgba(0, 230, 118, 0.4);
+  --background: linear-gradient(135deg, #00e676 0%, #00c853 100%);
+  --color: #000;
+  --border-radius: 999px;
+  font-weight: 800;
 }
 
 .reward-progress {
@@ -484,10 +468,10 @@
   overflow: hidden;
 }
 
-.progress-bar {
-  height: 100%;
-  background: linear-gradient(90deg, #00e676 0%, #00c853 100%);
-  transition: width 0.5s ease;
+.reward-progress ion-progress-bar {
+  --background: rgba(255, 255, 255, 0.05);
+  --progress-background: linear-gradient(90deg, #00e676 0%, #00c853 100%);
+  height: 4px;
 }
 
 /* Responsive Design */
@@ -544,8 +528,8 @@
     align-self: flex-start;
   }
 
-  .rewards-grid {
-    grid-template-columns: 1fr;
+  .rewards-grid ion-row {
+    gap: 1rem;
   }
 }
 

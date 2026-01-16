@@ -21,7 +21,7 @@ import {
   IonGrid,
   IonRow,
   IonCol,
-  IonBackButton,
+  IonMenuButton,
   IonAlert,
   useIonToast,
   IonCardHeader,
@@ -83,20 +83,20 @@ const DaySelector: React.FC<{
   value: string;
   onChange: (day: string) => void;
   scrollRef?: React.RefObject<HTMLDivElement>;
-}> = ({ days, value, onChange, scrollRef }) => (
+}> = ({ days, value, onChange }) => (
   <div className="mp-day-selector-wrapper">
-    <div className="mp-day-selector" ref={scrollRef} role="tablist" aria-label="Days">
-      {days.map((day, idx) => (
-        <button
-          key={idx}
-          role="tab"
-          className={`mp-day-tab ${day === value ? "active" : ""}`}
-          onClick={() => onChange(day)}
-        >
-          {day.slice(0, 3)}
-        </button>
+    <IonSegment
+      scrollable
+      value={value}
+      onIonChange={(e) => onChange(e.detail.value as string)}
+      aria-label="Days"
+    >
+      {days.map((day) => (
+        <IonSegmentButton key={day} value={day}>
+          <IonLabel>{day.slice(0, 3)}</IonLabel>
+        </IonSegmentButton>
       ))}
-    </div>
+    </IonSegment>
   </div>
 );
 
@@ -186,6 +186,7 @@ interface MealPlan {
     vegetables: string[];
     carbs: string[];
     others: string[];
+    flat?: any[];
   };
   mealPrepTips: string[];
   nutritionTips: string[];
@@ -742,15 +743,37 @@ const MealPlanner: React.FC = () => {
       return recomputeDayTotals(updatedDay);
     });
 
-    // Normalize shopping list if necessary
-    const shoppingList = plan.shoppingList || { proteins: [], vegetables: [], carbs: [], others: [] };
+    // Normalize shopping list if necessary (backend variants supported)
+    const rawShoppingList =
+      plan.shoppingList ?? plan.shopping_list ?? plan.shoppingItems ?? plan.shopping_items ?? null;
+    const shoppingList = normalizeShoppingList(rawShoppingList);
+
+    const rawMealPrepTips = plan.mealPrepTips ?? plan.meal_prep_tips ?? plan.prepTips ?? null;
+    const mealPrepTips = Array.isArray(rawMealPrepTips)
+      ? rawMealPrepTips
+      : typeof rawMealPrepTips === 'string'
+        ? rawMealPrepTips
+            .split(/\r?\n/)
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
+
+    const rawNutritionTips = plan.nutritionTips ?? plan.nutrition_tips ?? null;
+    const nutritionTips = Array.isArray(rawNutritionTips)
+      ? rawNutritionTips
+      : typeof rawNutritionTips === 'string'
+        ? rawNutritionTips
+            .split(/\r?\n/)
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
 
     return {
       ...plan,
       weekPlan: normalizedWeek,
       shoppingList,
-      mealPrepTips: plan.mealPrepTips || [],
-      nutritionTips: plan.nutritionTips || [],
+      mealPrepTips,
+      nutritionTips,
     } as MealPlan;
   }
 
@@ -948,7 +971,7 @@ const MealPlanner: React.FC = () => {
       <IonHeader className="meal-planner-header">
         <IonToolbar className="meal-toolbar">
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/member-dashboard" />
+            <IonMenuButton />
           </IonButtons>
 
           <IonTitle>
@@ -971,7 +994,7 @@ const MealPlanner: React.FC = () => {
         </IonToolbar>
       </IonHeader>
 
-      <IonContent>
+      <IonContent className="meal-planner-content">
         {/* Header Banner */}
         {!mealPlan && (
           <div className="meal-planner-hero">
@@ -1189,31 +1212,37 @@ const MealPlanner: React.FC = () => {
                 {planStats.avgProtein}g protein (avg)
               </p>
 
-              <div className="action-buttons">
-                {/* Always show Save button; show 'Update' if already saved */}
-                <IonButton
-                  className="primary-btn"
-                  onClick={() => setShowSaveModal(true)}
-                  disabled={loading || !mealPlan}
-                  style={{ marginRight: 8 }}
-                >
-                  <IonIcon icon={save} slot="start" />
-                  {currentPlanId ? "Update Plan" : "Save Plan"}
-                </IonButton>
+              <IonGrid className="action-buttons">
+                <IonRow>
+                  <IonCol size="12" sizeMd="6">
+                    <IonButton
+                      expand="block"
+                      className="primary-btn"
+                      onClick={() => setShowSaveModal(true)}
+                      disabled={loading || !mealPlan}
+                    >
+                      <IonIcon icon={save} slot="start" />
+                      {currentPlanId ? "Update Plan" : "Save Plan"}
+                    </IonButton>
+                  </IonCol>
 
-                <IonButton
-                  className="secondary-btn"
-                  onClick={() => {
-                    setShowPreferencesForm(true);
-                    setMealPlan(null);
-                    setActiveTab("today");
-                    setCurrentPlanId(null);
-                  }}
-                >
-                  <IonIcon icon={refresh} slot="start" />
-                  New Plan
-                </IonButton>
-              </div>
+                  <IonCol size="12" sizeMd="6">
+                    <IonButton
+                      expand="block"
+                      className="secondary-btn"
+                      onClick={() => {
+                        setShowPreferencesForm(true);
+                        setMealPlan(null);
+                        setActiveTab("today");
+                        setCurrentPlanId(null);
+                      }}
+                    >
+                      <IonIcon icon={refresh} slot="start" />
+                      New Plan
+                    </IonButton>
+                  </IonCol>
+                </IonRow>
+              </IonGrid>
             </div>
 
             {/* MODERN UI: Summary Bar + Day Selector - DISABLED */}
@@ -1292,15 +1321,19 @@ const MealPlanner: React.FC = () => {
 
                 {/* Meal Category Tabs */}
                 <div className="daily-tabs-container">
-                  {mealCategories.map(cat => (
-                    <button
-                      key={cat}
-                      className={`daily-tab ${selectedMealCategory === cat ? 'active' : ''}`}
-                      onClick={() => setSelectedMealCategory(cat)}
-                    >
-                      {mealIcons[cat]} {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                    </button>
-                  ))}
+                  <IonSegment
+                    scrollable
+                    value={selectedMealCategory}
+                    onIonChange={(e) => setSelectedMealCategory(e.detail.value as typeof selectedMealCategory)}
+                  >
+                    {mealCategories.map((cat) => (
+                      <IonSegmentButton key={cat} value={cat}>
+                        <IonLabel>
+                          {mealIcons[cat]} {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                        </IonLabel>
+                      </IonSegmentButton>
+                    ))}
+                  </IonSegment>
                 </div>
 
                 {/* Meal Content for Selected Category */}
@@ -1326,52 +1359,109 @@ const MealPlanner: React.FC = () => {
 
             {/* Weekly Grid View - Calendar Style */}
             {activeTab === "week" && mealPlan?.weekPlan && (
-              <div className="weekly-grid-view">
-                {/* Grid Header */}
-                <div className="week-grid-header">
-                  <div className="grid-cell grid-header-cell"></div>
-                  {daysOfWeek.map(day => (
-                    <div key={day} className="grid-cell grid-header-cell">
-                      <div className="day-header">{day.substring(0, 3)}</div>
+              <>
+                {/* Desktop grid view */}
+                <div className="weekly-grid-view">
+                  <div className="week-grid-header">
+                    <div className="grid-cell grid-header-cell"></div>
+                    {daysOfWeek.map(day => (
+                      <div key={day} className="grid-cell grid-header-cell">
+                        <div className="day-header">{day.substring(0, 3)}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {['breakfast', 'lunch', 'dinner', 'snacks'].map(mealType => (
+                    <div key={mealType} className="week-grid-row">
+                      <div className="grid-cell grid-meal-label">
+                        <span className="meal-type-icon">{mealIcons[mealType]}</span>
+                        <span className="meal-type-name">{mealType.charAt(0).toUpperCase() + mealType.slice(1)}</span>
+                      </div>
+                      {mealPlan.weekPlan.map(dayPlan => {
+                        const meal =
+                          mealType === 'breakfast'
+                            ? dayPlan.meals.breakfast
+                            : mealType === 'lunch'
+                              ? dayPlan.meals.lunch
+                              : mealType === 'dinner'
+                                ? dayPlan.meals.dinner
+                                : (dayPlan.meals.snack1 || dayPlan.meals.snack2);
+
+                        return (
+                          <div
+                            key={`${dayPlan.day}-${mealType}`}
+                            className="grid-cell grid-meal-cell"
+                            onClick={() => {
+                              setSelectedDayName(dayPlan.day);
+                              setActiveTab("today");
+                              if (mealType === 'breakfast') setSelectedMealCategory('breakfast');
+                              else if (mealType === 'lunch') setSelectedMealCategory('lunch');
+                              else if (mealType === 'dinner') setSelectedMealCategory('dinner');
+                              else setSelectedMealCategory('snacks');
+                            }}
+                          >
+                            {meal ? (
+                              <div className="meal-grid-item">
+                                <div className="meal-grid-name">{meal.name}</div>
+                                <div className="meal-grid-calories">{meal.calories ?? 0} cal</div>
+                              </div>
+                            ) : (
+                              <div className="meal-grid-empty">-</div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   ))}
                 </div>
 
-                {/* Grid Rows for Each Meal Type */}
-                {['breakfast', 'lunch', 'dinner', 'snacks'].map(mealType => (
-                  <div key={mealType} className="week-grid-row">
-                    <div className="grid-cell grid-meal-label">
-                      <span className="meal-type-icon">{mealIcons[mealType]}</span>
-                      <span className="meal-type-name">{mealType.charAt(0).toUpperCase() + mealType.slice(1)}</span>
-                    </div>
-                    {mealPlan.weekPlan.map(dayPlan => {
-                      const meal = mealType === 'breakfast' ? dayPlan.meals.breakfast :
-                                   mealType === 'lunch' ? dayPlan.meals.lunch :
-                                   mealType === 'dinner' ? dayPlan.meals.dinner :
-                                   (dayPlan.meals.snack1 || dayPlan.meals.snack2);
-                      return (
-                        <div key={`${dayPlan.day}-${mealType}`} className="grid-cell grid-meal-cell" onClick={() => {
-                          setSelectedDayName(dayPlan.day);
-                          setActiveTab("today");
-                          if (mealType === 'breakfast') setSelectedMealCategory('breakfast');
-                          else if (mealType === 'lunch') setSelectedMealCategory('lunch');
-                          else if (mealType === 'dinner') setSelectedMealCategory('dinner');
-                          else setSelectedMealCategory('snacks');
-                        }}>
-                          {meal ? (
-                            <div className="meal-grid-item">
-                              <div className="meal-grid-name">{meal.name}</div>
-                              <div className="meal-grid-calories">{meal.calories ?? 0} cal</div>
-                            </div>
-                          ) : (
-                            <div className="meal-grid-empty">-</div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
+                {/* Mobile list view (no horizontal scroll) */}
+                <div className="weekly-list-view">
+                  <IonGrid fixed>
+                    <IonRow>
+                      {mealPlan.weekPlan.map((dayPlan) => (
+                        <IonCol key={dayPlan.day} size="12" sizeMd="6">
+                          <IonCard
+                            className="week-day-card"
+                            onClick={() => {
+                              setSelectedDayName(dayPlan.day);
+                              setActiveTab('today');
+                            }}
+                          >
+                            <IonCardHeader>
+                              <IonCardTitle>{dayPlan.day}</IonCardTitle>
+                            </IonCardHeader>
+                            <IonCardContent>
+                              <div className="week-day-row">
+                                <div className="week-day-label">Breakfast</div>
+                                <div className="week-day-value">{dayPlan.meals.breakfast?.name ?? '-'}</div>
+                              </div>
+                              <div className="week-day-row">
+                                <div className="week-day-label">Lunch</div>
+                                <div className="week-day-value">{dayPlan.meals.lunch?.name ?? '-'}</div>
+                              </div>
+                              <div className="week-day-row">
+                                <div className="week-day-label">Dinner</div>
+                                <div className="week-day-value">{dayPlan.meals.dinner?.name ?? '-'}</div>
+                              </div>
+                              <div className="week-day-row">
+                                <div className="week-day-label">Snacks</div>
+                                <div className="week-day-value">
+                                  {[dayPlan.meals.snack1?.name, dayPlan.meals.snack2?.name].filter(Boolean).join(' / ') || '-'}
+                                </div>
+                              </div>
+                              <div className="week-day-totals">
+                                <span>{dayPlan.totalCalories} cal</span>
+                                <span>{dayPlan.totalProtein}g protein</span>
+                              </div>
+                            </IonCardContent>
+                          </IonCard>
+                        </IonCol>
+                      ))}
+                    </IonRow>
+                  </IonGrid>
+                </div>
+              </>
             )}
 
             {/* Shopping List & Tips: handle normalized formats */}
@@ -1382,9 +1472,38 @@ const MealPlanner: React.FC = () => {
                 </IonCardHeader>
                 <IonCardContent>
                   <div className="shopping-list">
+                    {(() => {
+                      const grouped = mealPlan.shoppingList && !Array.isArray(mealPlan.shoppingList) ? mealPlan.shoppingList : null;
+                      const flat = grouped?.flat ?? [];
+                      const groupedCount =
+                        (grouped?.proteins?.length || 0) +
+                        (grouped?.vegetables?.length || 0) +
+                        (grouped?.carbs?.length || 0) +
+                        (grouped?.others?.length || 0);
+                      const arrayCount = Array.isArray(mealPlan.shoppingList) ? mealPlan.shoppingList.length : 0;
+                      const flatCount = Array.isArray(flat) ? flat.length : 0;
+                      const totalCount = groupedCount + arrayCount + flatCount;
+
+                      if (totalCount > 0) return null;
+                      return <p>No shopping list available yet.</p>;
+                    })()}
+
                     {/* If server returned grouped object */}
                     {mealPlan.shoppingList && !Array.isArray(mealPlan.shoppingList) && (
                       <>
+                        {(mealPlan.shoppingList as any).flat?.length > 0 && (
+                          <div className="shopping-category">
+                            <h4><IonIcon icon={cart} /> Ingredients</h4>
+                            <ul className="shopping-items">
+                              {(mealPlan.shoppingList as any).flat.map((item: any, idx: number) => (
+                                <li key={idx}>
+                                  <IonIcon icon={checkmarkCircle} className="check-icon" />
+                                  <span>{item?.ingredient ?? item?.name ?? String(item)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                         {mealPlan.shoppingList.proteins?.length > 0 && (
                           <div className="shopping-category">
                             <h4><IonIcon icon={nutrition} /> Proteins</h4>
@@ -1445,17 +1564,21 @@ const MealPlanner: React.FC = () => {
             )}
 
             {/* Meal Prep Tips & Nutrition Tips */}
-            {mealPlan.mealPrepTips && (
+            {mealPlan && (
               <IonCard className="info-card tips-card">
                 <IonCardHeader>
                   <IonCardTitle><IonIcon icon={bulb} /> Meal Prep Tips</IonCardTitle>
                 </IonCardHeader>
                 <IonCardContent>
-                  <ul className="tips-list">
-                    {mealPlan.mealPrepTips.map((tip, idx) => (
-                      <li key={idx}><IonIcon icon={listCircle} className="tip-icon" /><span>{tip}</span></li>
-                    ))}
-                  </ul>
+                  {Array.isArray(mealPlan.mealPrepTips) && mealPlan.mealPrepTips.length > 0 ? (
+                    <ul className="tips-list">
+                      {mealPlan.mealPrepTips.map((tip, idx) => (
+                        <li key={idx}><IonIcon icon={listCircle} className="tip-icon" /><span>{tip}</span></li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>No meal prep tips available yet.</p>
+                  )}
                 </IonCardContent>
               </IonCard>
             )}

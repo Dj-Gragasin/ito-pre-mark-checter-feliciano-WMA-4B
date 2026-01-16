@@ -76,3 +76,21 @@ button:hover {
   font-weight: bold;
   color: #66ff99;
 }
+
+@media (max-width: 480px) {
+  .container {
+    padding: 16px;
+    margin: 0.75rem;
+  }
+
+  h2 {
+    font-size: 1.35rem;
+    margin-bottom: 16px;
+  }
+
+  input,
+  select,
+  button {
+    font-size: 15px;
+  }
+}

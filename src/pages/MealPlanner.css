@@ -203,8 +203,53 @@ ion-select-popover,
   gap: 1rem;
   padding-left: 1rem;
   padding-right: 1rem;
-  flex: 0 0 560px;  /* fixed column width (centered) */
+  flex: 1 1 560px; /* allow shrinking on smaller screens */
+  width: 100%;
   max-width: 560px;
+}
+
+@media (max-width: 600px) {
+  .meal-planner-header {
+    padding: 1.25rem 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .meal-planner-header .header-icon {
+    font-size: 2.25rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .meal-planner-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .meal-planner-header p {
+    font-size: 0.9rem;
+  }
+
+  .meal-planner-container {
+    padding: 0.75rem;
+  }
+
+  .config-card {
+    width: calc(100% - 1.5rem);
+  }
+
+  .config-card ion-card-content {
+    padding: 1.25rem;
+  }
+
+  .config-card ion-grid > ion-row > ion-col:first-child {
+    max-width: 100%;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .generate-btn {
+    height: 52px;
+    font-size: 1rem;
+    margin-top: 1.5rem;
+  }
 }
 
 /* Ensure inputs/selects/textarea expand to fill the centered column */
@@ -1895,6 +1940,55 @@ ion-segment-button.segment-button-checked {
   padding: 12px;
   overflow-x: auto;
   display: block;
+}
+
+/* Mobile-friendly weekly list view (used below 768px) */
+.weekly-list-view {
+  display: none;
+  margin-top: 12px;
+}
+
+.week-day-card {
+  margin: 0;
+}
+
+.week-day-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.week-day-label {
+  font-weight: 700;
+  color: #00e676;
+}
+
+.week-day-value {
+  color: #e0e0e0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.week-day-totals {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  font-weight: 700;
+  color: #7efc6a;
+}
+
+@media (max-width: 768px) {
+  .weekly-grid-view {
+    display: none;
+  }
+
+  .weekly-list-view {
+    display: block;
+  }
 }
 
 .week-grid-header {

@@ -12,13 +12,6 @@
   margin-bottom: 1.5rem;
 }
 
-.stats-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
-
 .stat-card {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -56,15 +49,10 @@
   margin: 0;
 }
 
-.equipment-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.5rem;
-}
-
 .equipment-card {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
   border: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 0;
 }
 
 .equipment-header {
@@ -111,6 +99,7 @@
   display: flex;
   gap: 0.5rem;
   margin-top: 1rem;
+  flex-wrap: wrap;
 }
 
 .empty-state {
@@ -128,4 +117,24 @@
   margin-top: 1.5rem;
   --background: linear-gradient(135deg, #00e676 0%, #00c853 100%);
   --color: #000;
+}
+
+@media (max-width: 600px) {
+  .equipment-container {
+    padding: 0.75rem;
+  }
+
+  .equipment-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+
+  .stat-card {
+    padding: 1.1rem;
+  }
+
+  .stat-card h3 {
+    font-size: 1.6rem;
+  }
 }

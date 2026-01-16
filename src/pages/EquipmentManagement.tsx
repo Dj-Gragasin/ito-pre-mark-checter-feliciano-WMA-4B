@@ -7,7 +7,7 @@ import {
   IonContent,
   IonButton,
   IonButtons,
-  IonBackButton,
+  IonMenuButton,
   IonCard,
   IonCardContent,
   IonIcon,
@@ -22,6 +22,9 @@ import {
   IonItem,
   IonLabel,
   useIonToast,
+  IonGrid,
+  IonRow,
+  IonCol,
 } from "@ionic/react";
 import { add, create, trash, barbell, alertCircle, close, checkmark } from "ionicons/icons";
 import "./EquipmentManagement.css";
@@ -214,7 +217,7 @@ const EquipmentManagement: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/admin" />
+            <IonMenuButton />
           </IonButtons>
           <IonTitle>Equipment Management</IonTitle>
           <IonButtons slot="end">
@@ -228,88 +231,114 @@ const EquipmentManagement: React.FC = () => {
 
       <IonContent className="equipment-content">
         <div className="equipment-container">
-          <div className="search-section">
-            <IonSearchbar
-              value={searchText}
-              onIonInput={(e) => setSearchText(e.detail.value!)}
-              placeholder="Search equipment..."
-            />
-          </div>
+          <IonGrid fixed>
+            <IonRow>
+              <IonCol size="12">
+                <div className="search-section">
+                  <IonSearchbar
+                    value={searchText}
+                    onIonInput={(e) => setSearchText(e.detail.value!)}
+                    placeholder="Search equipment..."
+                  />
+                </div>
+              </IonCol>
+            </IonRow>
 
-          <div className="stats-row">
-            <div className="stat-card">
-              <IonIcon icon={barbell} />
-              <h3>{equipments.length}</h3>
-              <p>Total Equipment</p>
-            </div>
-            <div className="stat-card success">
-              <IonIcon icon={checkmark} />
-              <h3>{equipments.filter((e) => e.status === "operational").length}</h3>
-              <p>Operational</p>
-            </div>
-            <div className="stat-card warning">
-              <IonIcon icon={alertCircle} />
-              <h3>{equipments.filter((e) => e.status === "maintenance").length}</h3>
-              <p>In Maintenance</p>
-            </div>
-            <div className="stat-card danger">
-              <IonIcon icon={alertCircle} />
-              <h3>{equipments.filter((e) => e.status === "broken").length}</h3>
-              <p>Broken</p>
-            </div>
-          </div>
+            <IonRow>
+              <IonCol size="12" sizeMd="6" sizeLg="3">
+                <div className="stat-card">
+                  <IonIcon icon={barbell} />
+                  <h3>{equipments.length}</h3>
+                  <p>Total Equipment</p>
+                </div>
+              </IonCol>
+              <IonCol size="12" sizeMd="6" sizeLg="3">
+                <div className="stat-card success">
+                  <IonIcon icon={checkmark} />
+                  <h3>{equipments.filter((e) => e.status === "operational").length}</h3>
+                  <p>Operational</p>
+                </div>
+              </IonCol>
+              <IonCol size="12" sizeMd="6" sizeLg="3">
+                <div className="stat-card warning">
+                  <IonIcon icon={alertCircle} />
+                  <h3>{equipments.filter((e) => e.status === "maintenance").length}</h3>
+                  <p>In Maintenance</p>
+                </div>
+              </IonCol>
+              <IonCol size="12" sizeMd="6" sizeLg="3">
+                <div className="stat-card danger">
+                  <IonIcon icon={alertCircle} />
+                  <h3>{equipments.filter((e) => e.status === "broken").length}</h3>
+                  <p>Broken</p>
+                </div>
+              </IonCol>
+            </IonRow>
 
-          <div className="equipment-grid">
-            {filteredEquipments.length === 0 ? (
-              <div className="empty-state">
-                <IonIcon icon={barbell} />
-                <h3>No Equipment Found</h3>
-                <p>Add your first equipment to get started</p>
-                <IonButton onClick={() => setShowModal(true)}>
-                  <IonIcon icon={add} slot="start" />
-                  Add Equipment
-                </IonButton>
-              </div>
-            ) : (
-              filteredEquipments.map((equipment) => (
-                <IonCard key={equipment.id} className="equipment-card">
-                  <IonCardContent>
-                    <div className="equipment-header">
-                      <h3>{equipment.equipName}</h3>
-                      <span className={`status-badge ${getStatusColor(equipment.status)}`}>
-                        {equipment.status}
-                      </span>
-                    </div>
-                    <div className="equipment-details">
-                      <p><strong>Category:</strong> {equipment.category}</p>
-                      <p><strong>Purchase:</strong> {equipment.purchaseDate}</p>
-                      {equipment.lastMaintenance && (
-                        <p><strong>Last Maintenance:</strong> {equipment.lastMaintenance}</p>
-                      )}
-                      {equipment.nextSchedule && (
-                        <p><strong>Next Schedule:</strong> {equipment.nextSchedule}</p>
-                      )}
-                      {equipment.notes && <p><strong>Notes:</strong> {equipment.notes}</p>}
-                    </div>
-                    <div className="equipment-actions">
-                      <IonButton size="small" onClick={() => handleEdit(equipment)}>
-                        <IonIcon icon={create} slot="start" />
-                        Edit
-                      </IonButton>
-                      <IonButton
-                        size="small"
-                        color="danger"
-                        onClick={() => handleDelete(equipment.id)}
-                      >
-                        <IonIcon icon={trash} slot="start" />
-                        Delete
-                      </IonButton>
-                    </div>
-                  </IonCardContent>
-                </IonCard>
-              ))
-            )}
-          </div>
+            <IonRow>
+              {filteredEquipments.length === 0 ? (
+                <IonCol size="12">
+                  <div className="empty-state">
+                    <IonIcon icon={barbell} />
+                    <h3>No Equipment Found</h3>
+                    <p>Add your first equipment to get started</p>
+                    <IonButton expand="block" onClick={() => setShowModal(true)}>
+                      <IonIcon icon={add} slot="start" />
+                      Add Equipment
+                    </IonButton>
+                  </div>
+                </IonCol>
+              ) : (
+                filteredEquipments.map((equipment) => (
+                  <IonCol key={equipment.id} size="12" sizeMd="6" sizeLg="4">
+                    <IonCard className="equipment-card">
+                      <IonCardContent>
+                        <div className="equipment-header">
+                          <h3>{equipment.equipName}</h3>
+                          <span className={`status-badge ${getStatusColor(equipment.status)}`}>
+                            {equipment.status}
+                          </span>
+                        </div>
+                        <div className="equipment-details">
+                          <p><strong>Category:</strong> {equipment.category}</p>
+                          <p><strong>Purchase:</strong> {equipment.purchaseDate}</p>
+                          {equipment.lastMaintenance && (
+                            <p><strong>Last Maintenance:</strong> {equipment.lastMaintenance}</p>
+                          )}
+                          {equipment.nextSchedule && (
+                            <p><strong>Next Schedule:</strong> {equipment.nextSchedule}</p>
+                          )}
+                          {equipment.notes && <p><strong>Notes:</strong> {equipment.notes}</p>}
+                        </div>
+
+                        <IonGrid>
+                          <IonRow>
+                            <IonCol size="12" sizeMd="6">
+                              <IonButton expand="block" size="small" onClick={() => handleEdit(equipment)}>
+                                <IonIcon icon={create} slot="start" />
+                                Edit
+                              </IonButton>
+                            </IonCol>
+                            <IonCol size="12" sizeMd="6">
+                              <IonButton
+                                expand="block"
+                                size="small"
+                                color="danger"
+                                onClick={() => handleDelete(equipment.id)}
+                              >
+                                <IonIcon icon={trash} slot="start" />
+                                Delete
+                              </IonButton>
+                            </IonCol>
+                          </IonRow>
+                        </IonGrid>
+                      </IonCardContent>
+                    </IonCard>
+                  </IonCol>
+                ))
+              )}
+            </IonRow>
+          </IonGrid>
         </div>
 
         {/* Add/Edit Modal */}

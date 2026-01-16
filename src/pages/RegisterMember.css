@@ -1,15 +1,235 @@
-/* ✅ Paste everything from your <style> here. 
-   No need to change anything — Ionic will load it automatically. */
-:root {
-  --primary: #00e676;
-  --primary-dark: #00c853;
-  --secondary: #64748b;
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --dark: #1e293b;
-  --light: #f8fafc;
-  --border: #e2e8f0;
+/* RegisterMember.css (Member Profile page)
+   Scoped styles to avoid impacting other pages. */
+
+.member-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1rem;
 }
 
-/* ... the rest of your CSS exactly as in your inline style ... */
+/* Layout is handled by IonGrid/IonCol */
+
+/* Sidebar */
+.profile-sidebar {
+  background: rgba(30, 30, 30, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  margin: 0;
+}
+
+.profile-header {
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.profile-avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  margin: 0 auto 0.75rem;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #00e676 0%, #00c853 100%);
+  color: #000;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.profile-name {
+  margin: 0;
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 800;
+  word-break: break-word;
+}
+
+.profile-email {
+  margin-top: 0.35rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+.membership-info {
+  margin-top: 1rem;
+}
+
+.membership-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.membership-header h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.status-active {
+  background: rgba(0, 230, 118, 0.18);
+  border: 1px solid rgba(0, 230, 118, 0.35);
+  color: #00e676;
+}
+
+.membership-progress {
+  --progress-background: rgba(255, 255, 255, 0.08);
+  --progress-bar-background: linear-gradient(135deg, #00e676 0%, #00c853 100%);
+  margin: 0.75rem 0 0.5rem;
+  border-radius: 999px;
+}
+
+.membership-meta {
+  margin-top: 0.75rem;
+  background: transparent;
+}
+
+.membership-meta-item {
+  --background: rgba(0, 0, 0, 0.25);
+  --border-color: rgba(255, 255, 255, 0.06);
+  --color: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  margin-bottom: 0.75rem;
+}
+
+.meta-label {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 0.25rem;
+}
+
+.text-success {
+  color: #00e676;
+  font-weight: 700;
+}
+
+.profile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.btn {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn.btn-primary {
+  background: linear-gradient(135deg, #00e676 0%, #00c853 100%);
+  color: #000;
+  border: 0;
+}
+
+.btn.btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Main content */
+.profile-content {
+  min-width: 0;
+}
+
+.content-section {
+  background: rgba(30, 30, 30, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  margin: 0 0 1.25rem 0;
+}
+
+.section-title {
+  margin: 0;
+  color: #00e676;
+  font-size: 1.15rem;
+}
+
+.stat-card {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 1rem;
+  text-align: center;
+  min-width: 0;
+}
+
+.stat-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.stat-label {
+  margin-top: 0.25rem;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.85rem;
+}
+
+.chart-container {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 1rem;
+  min-width: 0;
+}
+
+.chart-container h3 {
+  margin: 0 0 0.75rem;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.95rem;
+}
+
+.chart-canvas-wrap {
+  height: 260px;
+}
+
+.chart-canvas-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.activity-history {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+  .chart-canvas-wrap {
+    height: 240px;
+  }
+}
+
+@media (max-width: 480px) {
+  .member-page {
+    padding: 0.75rem;
+  }
+
+  .content-section,
+  .profile-sidebar {
+    border-radius: 14px;
+  }
+
+  .stat-value {
+    font-size: 1.35rem;
+  }
+
+  .chart-container canvas {
+    height: 100% !important;
+  }
+}

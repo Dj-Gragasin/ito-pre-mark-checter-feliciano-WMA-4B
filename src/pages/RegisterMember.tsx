@@ -1,173 +1,302 @@
-import React, { useEffect } from 'react';
-import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent } from '@ionic/react';
-import './RegisterMember.css'; // ✅ Moved all styles here
-import { Chart } from "chart.js";
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  IonPage,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonContent,
+  IonButtons,
+  IonMenuButton,
+  IonButton,
+  IonGrid,
+  IonRow,
+  IonCol,
+  IonCard,
+  IonCardHeader,
+  IonCardTitle,
+  IonCardSubtitle,
+  IonCardContent,
+  IonProgressBar,
+  IonList,
+  IonItem,
+  IonLabel,
+  IonText,
+  useIonRouter,
+} from '@ionic/react';
+import Chart from 'chart.js/auto';
+
+import './RegisterMember.css';
+
+type MemberProfile = {
+  memberName: string;
+  memberEmail: string;
+  plan: string;
+  memberSince: string;
+  nextPayment: string;
+  totalWorkouts: string;
+  avgDuration: string;
+  calories: string;
+  attendanceRate: string;
+};
+
 const RegisterMember: React.FC = () => {
+  const router = useIonRouter();
+
+  const [profile, setProfile] = useState<MemberProfile>({
+    memberName: 'John Doe',
+    memberEmail: 'john.doe@email.com',
+    plan: 'Standard Plan',
+    memberSince: 'Jan 2024',
+    nextPayment: 'Oct 2025',
+    totalWorkouts: '12',
+    avgDuration: '45 mins',
+    calories: '3000',
+    attendanceRate: '85%',
+  });
+
+  const membershipProgress = 0.75;
+
+  const workoutCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const fitnessCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const chartsData = useMemo(
+    () => ({
+      workout: {
+        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+        values: [3, 4, 2, 5, 4],
+      },
+      goals: {
+        achieved: 70,
+        remaining: 30,
+      },
+    }),
+    []
+  );
+
   useEffect(() => {
-    // ✅ Load dynamic data after component mounts (previously done with <script>)
-    const memberName = localStorage.getItem('memberName') || 'John Doe';
-    const memberEmail = localStorage.getItem('memberEmail') || 'john.doe@email.com';
-    const plan = localStorage.getItem('memberPlan') || 'Standard Plan';
-    const memberSince = localStorage.getItem('membershipSince') || 'Jan 2024';
-    const nextPayment = localStorage.getItem('nextPayment') || 'Oct 2025';
-    const totalWorkouts = localStorage.getItem('totalWorkouts') || '12';
-    const avgDuration = localStorage.getItem('avgDuration') || '45 mins';
-    const calories = localStorage.getItem('caloriesBurned') || '3000';
-    const attendanceRate = localStorage.getItem('attendanceRate') || '85%';
+    setProfile({
+      memberName: localStorage.getItem('memberName') || 'John Doe',
+      memberEmail: localStorage.getItem('memberEmail') || 'john.doe@email.com',
+      plan: localStorage.getItem('memberPlan') || 'Standard Plan',
+      memberSince: localStorage.getItem('membershipSince') || 'Jan 2024',
+      nextPayment: localStorage.getItem('nextPayment') || 'Oct 2025',
+      totalWorkouts: localStorage.getItem('totalWorkouts') || '12',
+      avgDuration: localStorage.getItem('avgDuration') || '45 mins',
+      calories: localStorage.getItem('caloriesBurned') || '3000',
+      attendanceRate: localStorage.getItem('attendanceRate') || '85%',
+    });
+  }, []);
 
-    (document.getElementById('memberName') as HTMLElement).innerText = memberName;
-    (document.getElementById('memberEmail') as HTMLElement).innerText = memberEmail;
-    (document.getElementById('memberPlan') as HTMLElement).innerText = plan;
-    (document.getElementById('membershipDuration') as HTMLElement).innerText = memberSince;
-    (document.getElementById('membershipExpiry') as HTMLElement).innerText = nextPayment;
-    (document.getElementById('totalWorkouts') as HTMLElement).innerText = totalWorkouts;
-    (document.getElementById('avgDuration') as HTMLElement).innerText = avgDuration;
-    (document.getElementById('caloriesBurned') as HTMLElement).innerText = calories;
-    (document.getElementById('attendance') as HTMLElement).innerText = attendanceRate;
+  useEffect(() => {
+    const ctx1 = workoutCanvasRef.current;
+    const ctx2 = fitnessCanvasRef.current;
 
-    // ✅ Membership Progress Bar
-    const progressEl = document.getElementById('membershipProgress') as HTMLElement;
-    progressEl.style.width = '75%'; // Example: you can calculate based on real data
+    if (!ctx1 || !ctx2) return;
 
-    // ✅ Button listeners
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) logoutBtn.addEventListener('click', () => {
-      localStorage.clear();
-      window.location.href = '/login';
+    const chart1 = new Chart(ctx1, {
+      type: 'line',
+      data: {
+        labels: chartsData.workout.labels,
+        datasets: [
+          {
+            label: 'Workouts',
+            data: chartsData.workout.values,
+            borderColor: '#00e676',
+            backgroundColor: 'rgba(0, 230, 118, 0.12)',
+            tension: 0.35,
+            fill: true,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#cccccc' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+          y: { ticks: { color: '#cccccc' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+        },
+      },
     });
 
-    // ✅ Example: Chart rendering
-   if (Chart) {
-  const ctx1 = document.getElementById('workoutProgress') as HTMLCanvasElement;
-  const ctx2 = document.getElementById('fitnessGoals') as HTMLCanvasElement;
+    const chart2 = new Chart(ctx2, {
+      type: 'doughnut',
+      data: {
+        labels: ['Achieved', 'Remaining'],
+        datasets: [
+          {
+            data: [chartsData.goals.achieved, chartsData.goals.remaining],
+            backgroundColor: ['#00e676', '#e2e8f0'],
+            borderWidth: 0,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#cccccc' } } },
+        cutout: '70%',
+      },
+    });
 
-  new Chart(ctx1, {
-    type: 'line',
-    data: {
-      labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-      datasets: [{ data: [3, 4, 2, 5, 4], borderColor: '#00e676', fill: false }]
-    }
-  });
+    return () => {
+      chart1.destroy();
+      chart2.destroy();
+    };
+  }, [chartsData]);
 
-  new Chart(ctx2, {
-    type: 'doughnut',
-    data: {
-      labels: ['Achieved', 'Remaining'],
-      datasets: [{ data: [70, 30], backgroundColor: ['#00e676', '#e2e8f0'] }]
-    }
-  });
-}
-  }, []);
+  const handleLogout = () => {
+    localStorage.clear();
+    router.push('/login', 'root', 'replace');
+  };
 
   return (
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>Register</IonTitle>
+          <IonButtons slot="start">
+            <IonMenuButton />
+          </IonButtons>
+          <IonTitle>Member Profile</IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={handleLogout}>Logout</IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
       <IonContent className="ion-padding">
         <div className="member-page">
-          <div className="profile-grid">
-            {/* Profile Sidebar */}
-            <aside className="profile-sidebar">
-              <div className="profile-header">
-                <div className="profile-avatar" id="memberAvatar">👤</div>
-                <h1 className="profile-name" id="memberName"></h1>
-                <div className="profile-email" id="memberEmail"></div>
-              </div>
+          <IonGrid fixed>
+            <IonRow>
+              <IonCol size="12" sizeMd="5" sizeLg="4">
+                <IonCard className="profile-sidebar">
+                  <IonCardHeader className="profile-header">
+                    <div className="profile-avatar" aria-hidden="true">👤</div>
+                    <IonCardTitle className="profile-name">{profile.memberName}</IonCardTitle>
+                    <IonCardSubtitle className="profile-email">{profile.memberEmail}</IonCardSubtitle>
+                  </IonCardHeader>
 
-              <div className="membership-info">
-                <div className="membership-header">
-                  <h3>Membership Status</h3>
-                  <span className="status-badge status-active" id="membershipStatus">
-                    Active
-                  </span>
-                </div>
-                <div className="membership-progress">
-                  <div className="progress-bar" id="membershipProgress"></div>
-                </div>
-                <div className="membership-meta">
-                  <div>
-                    <div className="meta-label">Plan</div>
-                    <div id="memberPlan"></div>
-                  </div>
-                  <div>
-                    <div className="meta-label">Member Since</div>
-                    <div id="membershipDuration"></div>
-                  </div>
-                  <div>
-                    <div className="meta-label">Next Payment</div>
-                    <div id="membershipExpiry"></div>
-                  </div>
-                  <div>
-                    <div className="meta-label">Payment Status</div>
-                    <div className="text-success">Paid</div>
-                  </div>
-                </div>
-              </div>
+                  <IonCardContent>
+                    <div className="membership-header">
+                      <h3>Membership Status</h3>
+                      <span className="status-badge status-active">Active</span>
+                    </div>
 
-              <div className="profile-actions">
-                <button className="btn btn-primary" id="editProfileBtn">
-                  <i className="fas fa-user-edit"></i> Edit Profile
-                </button>
-                <button className="btn btn-secondary" onClick={() => window.alert('Exported!')}>
-                  <i className="fas fa-download"></i> Export Data
-                </button>
-                <button className="btn btn-secondary" id="logoutBtn">
-                  <i className="fas fa-sign-out-alt"></i> Logout
-                </button>
-              </div>
-            </aside>
+                    <IonProgressBar value={membershipProgress} className="membership-progress" />
 
-            {/* Main Content */}
-            <main className="profile-content">
-              {/* Statistics Section */}
-              <section className="content-section">
-                <div className="section-header">
-                  <h2 className="section-title">Fitness Overview</h2>
-                </div>
-                <div className="stats-grid">
-                  <div className="stat-card">
-                    <div className="stat-value" id="totalWorkouts"></div>
-                    <div className="stat-label">Total Workouts</div>
-                  </div>
-                  <div className="stat-card">
-                    <div className="stat-value" id="avgDuration"></div>
-                    <div className="stat-label">Avg. Duration</div>
-                  </div>
-                  <div className="stat-card">
-                    <div className="stat-value" id="caloriesBurned"></div>
-                    <div className="stat-label">Calories Burned</div>
-                  </div>
-                  <div className="stat-card">
-                    <div className="stat-value" id="attendance"></div>
-                    <div className="stat-label">Attendance Rate</div>
-                  </div>
-                </div>
+                    <IonList className="membership-meta" lines="none">
+                      <IonItem className="membership-meta-item">
+                        <IonLabel>
+                          <div className="meta-label">Plan</div>
+                          <div>{profile.plan}</div>
+                        </IonLabel>
+                      </IonItem>
+                      <IonItem className="membership-meta-item">
+                        <IonLabel>
+                          <div className="meta-label">Member Since</div>
+                          <div>{profile.memberSince}</div>
+                        </IonLabel>
+                      </IonItem>
+                      <IonItem className="membership-meta-item">
+                        <IonLabel>
+                          <div className="meta-label">Next Payment</div>
+                          <div>{profile.nextPayment}</div>
+                        </IonLabel>
+                      </IonItem>
+                      <IonItem className="membership-meta-item">
+                        <IonLabel>
+                          <div className="meta-label">Payment Status</div>
+                          <div className="text-success">Paid</div>
+                        </IonLabel>
+                      </IonItem>
+                    </IonList>
 
-                <div className="charts-grid">
-                  <div className="chart-container">
-                    <h3>Workout Progress</h3>
-                    <canvas id="workoutProgress"></canvas>
-                  </div>
-                  <div className="chart-container">
-                    <h3>Fitness Goals</h3>
-                    <canvas id="fitnessGoals"></canvas>
-                  </div>
-                </div>
-              </section>
+                    <div className="profile-actions">
+                      <IonButton expand="block" className="btn btn-primary" onClick={() => window.alert('Edit profile: coming soon')}
+                      >
+                        Edit Profile
+                      </IonButton>
+                      <IonButton
+                        expand="block"
+                        fill="outline"
+                        className="btn btn-secondary"
+                        onClick={() => window.alert('Exported!')}
+                      >
+                        Export Data
+                      </IonButton>
+                    </div>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
 
-              {/* Activity History */}
-              <section className="content-section">
-                <div className="section-header">
-                  <h2 className="section-title">Recent Activities</h2>
-                  <a href="#" className="btn btn-secondary">View All</a>
-                </div>
-                <div className="activity-history" id="activityHistory"></div>
-              </section>
-            </main>
-          </div>
+              <IonCol size="12" sizeMd="7" sizeLg="8" className="profile-content">
+                <IonCard className="content-section">
+                  <IonCardHeader>
+                    <IonCardTitle className="section-title">Fitness Overview</IonCardTitle>
+                  </IonCardHeader>
+                  <IonCardContent>
+                    <IonGrid>
+                      <IonRow>
+                        <IonCol size="6" sizeMd="3">
+                          <div className="stat-card">
+                            <div className="stat-value">{profile.totalWorkouts}</div>
+                            <div className="stat-label">Total Workouts</div>
+                          </div>
+                        </IonCol>
+                        <IonCol size="6" sizeMd="3">
+                          <div className="stat-card">
+                            <div className="stat-value">{profile.avgDuration}</div>
+                            <div className="stat-label">Avg. Duration</div>
+                          </div>
+                        </IonCol>
+                        <IonCol size="6" sizeMd="3">
+                          <div className="stat-card">
+                            <div className="stat-value">{profile.calories}</div>
+                            <div className="stat-label">Calories Burned</div>
+                          </div>
+                        </IonCol>
+                        <IonCol size="6" sizeMd="3">
+                          <div className="stat-card">
+                            <div className="stat-value">{profile.attendanceRate}</div>
+                            <div className="stat-label">Attendance Rate</div>
+                          </div>
+                        </IonCol>
+                      </IonRow>
+
+                      <IonRow>
+                        <IonCol size="12" sizeMd="6">
+                          <div className="chart-container">
+                            <h3>Workout Progress</h3>
+                            <div className="chart-canvas-wrap">
+                              <canvas ref={workoutCanvasRef} />
+                            </div>
+                          </div>
+                        </IonCol>
+                        <IonCol size="12" sizeMd="6">
+                          <div className="chart-container">
+                            <h3>Fitness Goals</h3>
+                            <div className="chart-canvas-wrap">
+                              <canvas ref={fitnessCanvasRef} />
+                            </div>
+                          </div>
+                        </IonCol>
+                      </IonRow>
+                    </IonGrid>
+                  </IonCardContent>
+                </IonCard>
+
+                <IonCard className="content-section">
+                  <IonCardHeader>
+                    <IonCardTitle className="section-title">Recent Activities</IonCardTitle>
+                  </IonCardHeader>
+                  <IonCardContent>
+                    <IonText color="medium">
+                      No recent activities yet.
+                    </IonText>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+            </IonRow>
+          </IonGrid>
         </div>
       </IonContent>
     </IonPage>

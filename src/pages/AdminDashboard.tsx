@@ -2,7 +2,18 @@ import React, { useEffect, useState } from "react";
 import {
   IonPage,
   IonContent,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonButtons,
+  IonMenuButton,
+  IonButton,
   IonIcon,
+  IonGrid,
+  IonRow,
+  IonCol,
+  IonCard,
+  IonCardContent,
   useIonRouter,
 } from "@ionic/react";
 import {
@@ -12,7 +23,6 @@ import {
   calendar,
   logOut,
   cash,
-  statsChart,
   checkmarkCircle,
 } from "ionicons/icons";
 import "./AdminDashboard.css";
@@ -22,7 +32,6 @@ import { API_CONFIG } from "../config/api.config";
 const API_URL = API_CONFIG.BASE_URL;
 
 const AdminDashboard: React.FC = () => {
-  const [adminName, setAdminName] = useState("Admin User");
   const [firstName, setFirstName] = useState("Admin");
   const [totalMembers, setTotalMembers] = useState(0);
   const [activeMembers, setActiveMembers] = useState(0);
@@ -37,8 +46,6 @@ const AdminDashboard: React.FC = () => {
     if (userStr) {
       try {
         const user = JSON.parse(userStr);
-        const fullName = `${user.firstName} ${user.lastName}`;
-        setAdminName(fullName);
         setFirstName(user.firstName);
       } catch (err) {
         console.error("Invalid user data");
@@ -182,156 +189,131 @@ const AdminDashboard: React.FC = () => {
 
   return (
     <IonPage>
-      <IonContent className="ion-padding">
-        <div className="dashboard-container">
-          {/* Sidebar with Dashboard Title */}
-          <aside className="sidebar">
-            <div className="dashboard-title-section">
-              <h1 className="dashboard-title">Admin Dashboard</h1>
-            </div>
+      <IonHeader>
+        <IonToolbar>
+          <IonButtons slot="start">
+            <IonMenuButton />
+          </IonButtons>
+          <IonTitle>Admin Dashboard</IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={handleLogout}>
+              <IonIcon icon={logOut} slot="start" />
+              Logout
+            </IonButton>
+          </IonButtons>
+        </IonToolbar>
+      </IonHeader>
 
-            <div className="profile-section">
-              <div className="profile-avatar">
-                <i className="fas fa-user-shield"></i>
-              </div>
-              <h2 className="profile-name">{adminName}</h2>
-              <span className="membership-status">Administrator</span>
-            </div>
-
-            <nav>
-              <ul className="nav-menu">
-                <li className="nav-item">
-                  <button
-                    className="nav-link active"
-                    onClick={() => handleNavigation("/admin")}
-                  >
-                    <IonIcon icon={statsChart} />
-                    Dashboard
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className="nav-link"
-                    onClick={() => handleNavigation("/members-management")}
-                  >
-                    <IonIcon icon={people} />
-                    Members
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className="nav-link"
-                    onClick={() => handleNavigation("/admin-payments")}
-                  >
-                    <IonIcon icon={card} />
-                    Payments
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className="nav-link"
-                    onClick={() => handleNavigation("/admin-attendance")}
-                  >
-                    <IonIcon icon={calendar} />
-                    Attendance
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className="nav-link"
-                    onClick={() => handleNavigation("/equipment-management")}
-                  >
-                    <IonIcon icon={barbell} />
-                    Equipment
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button className="nav-link logout-btn" onClick={handleLogout}>
-                    <IonIcon icon={logOut} />
-                    Logout
-                  </button>
-                </li>
-              </ul>
-            </nav>
-          </aside>
-
-          {/* Main Content */}
-          <main className="main-content">
-            <div className="content-wrapper">
-              <header className="page-header">
-                <div className="welcome-text">
-                  <h1>Welcome back, {firstName}! 👋</h1>
-                  <p>Here's what's happening in your gym today</p>
-                </div>
-                <div className="quick-stats">
-                  <IonIcon icon={checkmarkCircle} />
-                  System Active
-                </div>
-              </header>
-
-              <section className="dashboard-grid">
-                <div className="dashboard-card" onClick={() => handleNavigation("/members-management")}>
-                  <IonIcon icon={people} className="card-icon" />
-                  <h3 className="card-title">Total Members</h3>
-                  <p className="card-stat">{totalMembers}</p>
-                  <p className="card-description">{activeMembers} active members</p>
-                </div>
-
-                <div className="dashboard-card" onClick={() => handleNavigation("/admin-payments")}>
-                  <IonIcon icon={cash} className="card-icon" />
-                  <h3 className="card-title">Total Revenue</h3>
-                  <p className="card-stat">₱{totalRevenue.toLocaleString()}</p>
-                  <p className="card-description">All-time revenue from paid payments</p>
-                </div>
-
-                <div className="dashboard-card" onClick={() => handleNavigation("/equipment-management")}>
-                  <IonIcon icon={barbell} className="card-icon" />
-                  <h3 className="card-title">Equipment</h3>
-                  <p className="card-stat">{totalEquipment}</p>
-                  <p className="card-description">Total equipment items</p>
-                </div>
-
-                <div className="dashboard-card" onClick={() => handleNavigation("/admin-attendance")}>
-                  <IonIcon icon={calendar} className="card-icon" />
-                  <h3 className="card-title">Today's Attendance</h3>
-                  <p className="card-stat">{todayAttendance}</p>
-                  <p className="card-description">Members checked in today</p>
-                </div>
-              </section>
-
-              <section className="progress-section">
-                <div className="progress-header">
-                  <h2 className="progress-title">Quick Actions</h2>
-                </div>
-
-                <div className="progress-grid">
-                  <div className="progress-item action-card" onClick={() => handleNavigation("/members-management")}>
-                    <IonIcon icon={people} style={{ fontSize: '2rem', color: '#4a90e2' }} />
-                    <h4>Manage Members</h4>
-                    <p>Add, edit, or view member details</p>
+      <IonContent fullscreen className="ion-padding">
+        <div className="dashboard-content-wrapper">
+          <IonGrid fixed>
+            <IonRow>
+              <IonCol size="12">
+                <div className="page-header">
+                  <div className="welcome-text">
+                    <h1>Welcome back, {firstName}! 👋</h1>
+                    <p>Here's what's happening in your gym today</p>
                   </div>
-
-                  <div className="progress-item action-card" onClick={() => handleNavigation("/admin-payments")}>
-                    <IonIcon icon={card} style={{ fontSize: '2rem', color: '#00e676' }} />
-                    <h4>View Payments</h4>
-                    <p>{pendingPayments} pending approval</p>
-                  </div>
-
-                  <div className="progress-item action-card" onClick={() => handleNavigation("/admin-attendance")}>
-                    <IonIcon icon={calendar} style={{ fontSize: '2rem', color: '#ffc107' }} />
-                    <h4>QR Attendance</h4>
-                    <p>Generate QR code for check-in</p>
-                  </div>
-
-                  <div className="progress-item action-card" onClick={() => handleNavigation("/equipment-management")}>
-                    <IonIcon icon={barbell} style={{ fontSize: '2rem', color: '#ff6b6b' }} />
-                    <h4>Equipment</h4>
-                    <p>Manage gym equipment inventory</p>
+                  <div className="quick-stats">
+                    <IonIcon icon={checkmarkCircle} />
+                    System Active
                   </div>
                 </div>
-              </section>
-            </div>
-          </main>
+              </IonCol>
+            </IonRow>
+
+            <IonRow>
+              <IonCol size="12" sizeMd="6" sizeLg="3">
+                <IonCard className="dashboard-card" onClick={() => handleNavigation("/members-management")}>
+                  <IonCardContent>
+                    <IonIcon icon={people} className="card-icon" />
+                    <h3 className="card-title">Total Members</h3>
+                    <p className="card-stat">{totalMembers}</p>
+                    <p className="card-description">{activeMembers} active members</p>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+
+              <IonCol size="12" sizeMd="6" sizeLg="3">
+                <IonCard className="dashboard-card" onClick={() => handleNavigation("/admin-payments")}>
+                  <IonCardContent>
+                    <IonIcon icon={cash} className="card-icon" />
+                    <h3 className="card-title">Total Revenue</h3>
+                    <p className="card-stat">₱{totalRevenue.toLocaleString()}</p>
+                    <p className="card-description">All-time revenue from paid payments</p>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+
+              <IonCol size="12" sizeMd="6" sizeLg="3">
+                <IonCard className="dashboard-card" onClick={() => handleNavigation("/equipment-management")}>
+                  <IonCardContent>
+                    <IonIcon icon={barbell} className="card-icon" />
+                    <h3 className="card-title">Equipment</h3>
+                    <p className="card-stat">{totalEquipment}</p>
+                    <p className="card-description">Total equipment items</p>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+
+              <IonCol size="12" sizeMd="6" sizeLg="3">
+                <IonCard className="dashboard-card" onClick={() => handleNavigation("/admin-attendance")}>
+                  <IonCardContent>
+                    <IonIcon icon={calendar} className="card-icon" />
+                    <h3 className="card-title">Today's Attendance</h3>
+                    <p className="card-stat">{todayAttendance}</p>
+                    <p className="card-description">Members checked in today</p>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+            </IonRow>
+
+            <IonRow>
+              <IonCol size="12">
+                <section className="progress-section">
+                  <div className="progress-header">
+                    <h2 className="progress-title">Quick Actions</h2>
+                  </div>
+
+                  <IonGrid>
+                    <IonRow>
+                      <IonCol size="12" sizeMd="6" sizeLg="3">
+                        <div className="progress-item action-card" onClick={() => handleNavigation("/members-management")}>
+                          <IonIcon icon={people} style={{ fontSize: '2rem', color: '#4a90e2' }} />
+                          <h4>Manage Members</h4>
+                          <p>Add, edit, or view member details</p>
+                        </div>
+                      </IonCol>
+
+                      <IonCol size="12" sizeMd="6" sizeLg="3">
+                        <div className="progress-item action-card" onClick={() => handleNavigation("/admin-payments")}>
+                          <IonIcon icon={card} style={{ fontSize: '2rem', color: '#00e676' }} />
+                          <h4>View Payments</h4>
+                          <p>{pendingPayments} pending approval</p>
+                        </div>
+                      </IonCol>
+
+                      <IonCol size="12" sizeMd="6" sizeLg="3">
+                        <div className="progress-item action-card" onClick={() => handleNavigation("/admin-attendance")}>
+                          <IonIcon icon={calendar} style={{ fontSize: '2rem', color: '#ffc107' }} />
+                          <h4>QR Attendance</h4>
+                          <p>Generate QR code for check-in</p>
+                        </div>
+                      </IonCol>
+
+                      <IonCol size="12" sizeMd="6" sizeLg="3">
+                        <div className="progress-item action-card" onClick={() => handleNavigation("/equipment-management")}>
+                          <IonIcon icon={barbell} style={{ fontSize: '2rem', color: '#ff6b6b' }} />
+                          <h4>Equipment</h4>
+                          <p>Manage gym equipment inventory</p>
+                        </div>
+                      </IonCol>
+                    </IonRow>
+                  </IonGrid>
+                </section>
+              </IonCol>
+            </IonRow>
+          </IonGrid>
         </div>
       </IonContent>
     </IonPage>

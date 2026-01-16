@@ -1,5 +1,5 @@
 /* Base Styles */
-ion-content {
+.progress-tracker-content {
   --background: #121212 url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 }
 
@@ -13,9 +13,6 @@ ion-content {
   margin: 20px 0;
   position: relative;
   overflow: hidden;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
 }
 
 /* Remove the overlay effect since we don't have background image */
@@ -102,18 +99,18 @@ ion-label {
   z-index: 2;
 }
 
-ion-button {
+.progress-tracker-content ion-button {
   --border-radius: 10px;
   font-weight: 500;
   text-transform: none;
   min-width: 120px;
 }
 
-ion-button[fill="outline"] {
+.progress-tracker-content ion-button[fill="outline"] {
   --border-width: 2px;
 }
 
-ion-button[color="danger"] {
+.progress-tracker-content ion-button[color="danger"] {
   --color: #ff4961;
   --border-color: #ff4961;
 }
@@ -128,28 +125,43 @@ ion-button[color="danger"] {
   width: 100%;
 }
 
-table {
+.progress-tracker-content table {
   width: 100%;
   border-collapse: collapse;
 }
 
-th, td {
+.progress-tracker-content th,
+.progress-tracker-content td {
   padding: 12px;
   text-align: left;
   border-bottom: 1px solid #444;
 }
 
-th {
+.progress-tracker-content th {
   background-color: #333;
   color: #fff;
 }
 
-tr:hover {
+.progress-tracker-content tr:hover {
   background-color: #333;
 }
 
-tr:hover td {
+.progress-tracker-content tr:hover td {
   background-color: rgba(255, 255, 255, 0.05);
+}
+
+.records-list-wrap {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .records-table-wrap {
+    display: none;
+  }
+
+  .records-list-wrap {
+    display: block;
+  }
 }
 
 td:last-child {
@@ -250,7 +262,7 @@ canvas {
   }
 
   .form-container {
-    grid-template-columns: 1fr;
+    padding: 20px;
   }
 }
 

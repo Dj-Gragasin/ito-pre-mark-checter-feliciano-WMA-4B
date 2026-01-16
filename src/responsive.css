@@ -1,0 +1,40 @@
+/* Global responsive helpers (applies to all pages) */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+/* Prevent horizontal scrolling inside Ionic scroll host */
+ion-content::part(scroll) {
+  overflow-x: hidden;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Better mobile viewport behavior for full-height layouts */
+.ion-page,
+ion-page {
+  min-height: 100dvh;
+}
+
+/* Tables: allow horizontal scroll when needed */
+.table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent long strings (emails/ids) from blowing up layouts */
+* {
+  overflow-wrap: anywhere;
+}

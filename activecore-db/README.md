@@ -175,4 +175,14 @@
 - Implement proper error handling and validation on both frontend and backend.
 - Consider using HTTPS for secure data transmission.
 
+#### Rate limiting
+
+The backend uses `express-rate-limit`.
+
+- Login (`/api/auth/login`): default **20 attempts per 15 minutes per IP** (set `AUTH_RATE_LIMIT_MAX`, counts failed logins)
+- Register (`/api/register`): default **10 requests per hour per IP** (set `REGISTER_RATE_LIMIT_MAX`)
+- General (all routes): default **300 requests per minute per IP** (set `GENERAL_RATE_LIMIT_MAX`)
+
+If you deploy behind a reverse proxy (Vercel/Nginx/Cloudflare), set `TRUST_PROXY=1` so rate limiting uses the real client IP.
+
 This setup provides a basic user registration and login system with a MySQL database. You can expand upon this by adding features like email verification, password reset, and more.

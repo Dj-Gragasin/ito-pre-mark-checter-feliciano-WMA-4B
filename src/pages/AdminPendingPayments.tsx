@@ -13,7 +13,7 @@ import {
   IonIcon,
   IonBadge,
   IonButtons,
-  IonBackButton,
+  IonMenuButton,
   IonAlert,
   useIonToast,
 } from '@ionic/react';
@@ -144,7 +144,7 @@ const AdminPendingPayments: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/admin" />
+            <IonMenuButton />
           </IonButtons>
           <IonTitle>Pending Payments</IonTitle>
           <IonBadge color="warning" style={{marginRight: '1rem'}}>

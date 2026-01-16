@@ -4,7 +4,25 @@ import {
   IonHeader,
   IonToolbar,
   IonTitle,
+  IonButtons,
+  IonMenuButton,
   IonContent,
+  IonGrid,
+  IonRow,
+  IonCol,
+  IonCard,
+  IonCardHeader,
+  IonCardTitle,
+  IonCardSubtitle,
+  IonCardContent,
+  IonList,
+  IonItem,
+  IonLabel,
+  IonInput,
+  IonRadioGroup,
+  IonRadio,
+  IonText,
+  IonButton,
   IonLoading,
   IonAlert,
 } from '@ionic/react';
@@ -53,19 +71,10 @@ const Payment: React.FC = () => {
     'Yearly - ₱4,000': 4000,
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value, name } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [id || name]: value,
-    }));
-    
-    // Clear error when user starts typing
-    if (errors[id || name]) {
-      setErrors(prev => ({
-        ...prev,
-        [id || name]: '',
-      }));
+  const setField = <K extends keyof FormData>(key: K, value: FormData[K]) => {
+    setFormData(prev => ({ ...prev, [key]: value }));
+    if (errors[key as string]) {
+      setErrors(prev => ({ ...prev, [key as string]: '' }));
     }
   };
 
@@ -286,243 +295,236 @@ const Payment: React.FC = () => {
     <IonPage>
       <IonHeader>
         <IonToolbar>
+          <IonButtons slot="start">
+            <IonMenuButton />
+          </IonButtons>
           <IonTitle>Payment</IonTitle>
         </IonToolbar>
       </IonHeader>
       <IonContent className="ion-padding">
-        <div className="payment-container">
-          <header className="header">
-            <h1>Join ActiveCore</h1>
-            <p>Complete your membership registration</p>
-          </header>
+        <IonGrid fixed className="payment-container">
+          <IonRow>
+            <IonCol size="12" sizeMd="10" sizeLg="8" className="ion-margin-horizontal-auto">
+              <IonCard className="payment-card">
+                <IonCardHeader>
+                  <IonCardTitle className="payment-title">Join ActiveCore</IonCardTitle>
+                  <IonCardSubtitle className="payment-subtitle">
+                    Complete your membership registration
+                  </IonCardSubtitle>
+                </IonCardHeader>
+                <IonCardContent>
+                  <form onSubmit={handleSubmit} noValidate>
+                    <IonGrid>
+                      <IonRow>
+                        <IonCol size="12" sizeMd="6">
+                          <IonItem className="payment-item" fill="outline">
+                            <IonLabel position="stacked">Full Name</IonLabel>
+                            <IonInput
+                              value={formData.fullName}
+                              autocomplete="name"
+                              inputmode="text"
+                              onIonInput={(e) => setField('fullName', (e.detail.value ?? '') as any)}
+                            />
+                          </IonItem>
+                          {errors.fullName && (
+                            <IonText className="payment-error" color="danger">
+                              {errors.fullName}
+                            </IonText>
+                          )}
+                        </IonCol>
+                        <IonCol size="12" sizeMd="6">
+                          <IonItem className="payment-item" fill="outline">
+                            <IonLabel position="stacked">Email Address</IonLabel>
+                            <IonInput
+                              type="email"
+                              value={formData.email}
+                              autocomplete="email"
+                              inputmode="email"
+                              onIonInput={(e) => setField('email', (e.detail.value ?? '') as any)}
+                            />
+                          </IonItem>
+                          {errors.email && (
+                            <IonText className="payment-error" color="danger">
+                              {errors.email}
+                            </IonText>
+                          )}
+                        </IonCol>
 
-          <form onSubmit={handleSubmit} noValidate>
-            {/* Personal Information */}
-            <div className="form-section">
-              <div className="form-section-title">
-                <i className="fas fa-user"></i> Personal Information
-              </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="fullName">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  id="fullName"
-                  className="form-control"
-                  value={formData.fullName}
-                  onChange={handleInputChange}
-                />
-                {errors.fullName && <div className="error-message">{errors.fullName}</div>}
-              </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="email">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  className="form-control"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                />
-                {errors.email && <div className="error-message">{errors.email}</div>}
-              </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="password">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  id="password"
-                  className="form-control"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                />
-                {errors.password && <div className="error-message">{errors.password}</div>}
-              </div>
-            </div>
+                        <IonCol size="12">
+                          <IonItem className="payment-item" fill="outline">
+                            <IonLabel position="stacked">Password</IonLabel>
+                            <IonInput
+                              type="password"
+                              value={formData.password}
+                              autocomplete="new-password"
+                              onIonInput={(e) => setField('password', (e.detail.value ?? '') as any)}
+                            />
+                          </IonItem>
+                          {errors.password && (
+                            <IonText className="payment-error" color="danger">
+                              {errors.password}
+                            </IonText>
+                          )}
+                        </IonCol>
 
-            {/* Plan Selection */}
-            <div className="form-section">
-              <div className="form-section-title">
-                <i className="fas fa-crown"></i> Select Membership Plan
-              </div>
-              <div className="plan-options">
-                {Object.keys(planPrices).map((plan) => (
-                  <label key={plan} className="plan-option">
-                    <input
-                      type="radio"
-                      name="plan"
-                      value={plan}
-                      checked={formData.plan === plan}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, plan: e.target.value }))
-                      }
-                    />
-                    <div className="plan-content">
-                      <div className="plan-name">{plan.split(' - ')[0]}</div>
-                      <div className="plan-price">{plan.split(' - ')[1]}</div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-              {errors.plan && <div className="error-message">{errors.plan}</div>}
-            </div>
+                        <IonCol size="12">
+                          <IonText className="payment-section-title">Select Membership Plan</IonText>
+                          <IonRadioGroup
+                            value={formData.plan}
+                            onIonChange={(e) => setField('plan', (e.detail.value ?? '') as any)}
+                          >
+                            <IonList className="payment-radio-list">
+                              {Object.keys(planPrices).map((plan) => {
+                                const [name, price] = plan.split(' - ');
+                                return (
+                                  <IonItem key={plan} className="payment-radio-item" lines="full">
+                                    <IonLabel>
+                                      <div className="payment-plan-name">{name}</div>
+                                      <div className="payment-plan-price">{price}</div>
+                                    </IonLabel>
+                                    <IonRadio slot="end" value={plan} />
+                                  </IonItem>
+                                );
+                              })}
+                            </IonList>
+                          </IonRadioGroup>
+                          {errors.plan && (
+                            <IonText className="payment-error" color="danger">
+                              {errors.plan}
+                            </IonText>
+                          )}
+                        </IonCol>
 
-            {/* Payment Method Selection */}
-            <div className="form-section">
-              <div className="form-section-title">
-                <i className="fas fa-credit-card"></i> Payment Method
-              </div>
-              <div className="payment-method-options">
-                <label className="payment-method-option">
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="card"
-                    checked={formData.paymentMethod === 'card'}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, paymentMethod: e.target.value as any }))
-                    }
-                  />
-                  <div className="payment-method-content">
-                    <i className="fas fa-credit-card"></i>
-                    <span>Credit/Debit Card</span>
-                  </div>
-                </label>
-                <label className="payment-method-option">
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="gcash"
-                    checked={formData.paymentMethod === 'gcash'}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, paymentMethod: e.target.value as any }))
-                    }
-                  />
-                  <div className="payment-method-content">
-                    <i className="fas fa-mobile-alt"></i>
-                    <span>GCash</span>
-                  </div>
-                </label>
-                <label className="payment-method-option">
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="bank"
-                    checked={formData.paymentMethod === 'bank'}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, paymentMethod: e.target.value as any }))
-                    }
-                  />
-                  <div className="payment-method-content">
-                    <i className="fas fa-university"></i>
-                    <span>Online Banking</span>
-                  </div>
-                </label>
-              </div>
-            </div>
+                        <IonCol size="12">
+                          <IonText className="payment-section-title">Payment Method</IonText>
+                          <IonRadioGroup
+                            value={formData.paymentMethod}
+                            onIonChange={(e) =>
+                              setField('paymentMethod', (e.detail.value ?? 'card') as any)
+                            }
+                          >
+                            <IonList className="payment-radio-list">
+                              <IonItem className="payment-radio-item" lines="full">
+                                <IonLabel>Credit / Debit Card</IonLabel>
+                                <IonRadio slot="end" value="card" />
+                              </IonItem>
+                              <IonItem className="payment-radio-item" lines="full">
+                                <IonLabel>GCash</IonLabel>
+                                <IonRadio slot="end" value="gcash" />
+                              </IonItem>
+                              <IonItem className="payment-radio-item" lines="full">
+                                <IonLabel>Online Banking</IonLabel>
+                                <IonRadio slot="end" value="bank" />
+                              </IonItem>
+                            </IonList>
+                          </IonRadioGroup>
+                        </IonCol>
 
-            {/* Card Details - Only show for card payment */}
-            {formData.paymentMethod === 'card' && (
-              <div className="form-section">
-                <div className="form-section-title">
-                  <i className="fas fa-credit-card"></i> Card Details
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="card">
-                    Card Number
-                  </label>
-                  <input
-                    type="text"
-                    id="card"
-                    className="form-control"
-                    maxLength={19}
-                    placeholder="1234 5678 9012 3456"
-                    value={formData.card}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        card: e.target.value
-                          .replace(/\D/g, '')
-                          .replace(/(\d{4})/g, '$1 ')
-                          .trim(),
-                      }))
-                    }
-                  />
-                  {errors.card && <div className="error-message">{errors.card}</div>}
-                </div>
+                        {formData.paymentMethod === 'card' && (
+                          <>
+                            <IonCol size="12">
+                              <IonText className="payment-section-title">Card Details</IonText>
+                            </IonCol>
+                            <IonCol size="12">
+                              <IonItem className="payment-item" fill="outline">
+                                <IonLabel position="stacked">Card Number</IonLabel>
+                                <IonInput
+                                  value={formData.card}
+                                  inputmode="numeric"
+                                  maxlength={19}
+                                  placeholder="1234 5678 9012 3456"
+                                  onIonInput={(e) => {
+                                    const raw = (e.detail.value ?? '').toString();
+                                    const formatted = raw
+                                      .replace(/\D/g, '')
+                                      .slice(0, 16)
+                                      .replace(/(\d{4})/g, '$1 ')
+                                      .trim();
+                                    setField('card', formatted as any);
+                                  }}
+                                />
+                              </IonItem>
+                              {errors.card && (
+                                <IonText className="payment-error" color="danger">
+                                  {errors.card}
+                                </IonText>
+                              )}
+                            </IonCol>
+                            <IonCol size="12" sizeMd="6">
+                              <IonItem className="payment-item" fill="outline">
+                                <IonLabel position="stacked">Expiry Date</IonLabel>
+                                <IonInput
+                                  value={formData.expiry}
+                                  inputmode="numeric"
+                                  maxlength={5}
+                                  placeholder="MM/YY"
+                                  onIonInput={(e) => {
+                                    let value = (e.detail.value ?? '').toString().replace(/\D/g, '');
+                                    value = value.slice(0, 4);
+                                    if (value.length >= 3) {
+                                      value = value.slice(0, 2) + '/' + value.slice(2);
+                                    }
+                                    setField('expiry', value as any);
+                                  }}
+                                />
+                              </IonItem>
+                              {errors.expiry && (
+                                <IonText className="payment-error" color="danger">
+                                  {errors.expiry}
+                                </IonText>
+                              )}
+                            </IonCol>
+                            <IonCol size="12" sizeMd="6">
+                              <IonItem className="payment-item" fill="outline">
+                                <IonLabel position="stacked">CVC</IonLabel>
+                                <IonInput
+                                  value={formData.cvc}
+                                  inputmode="numeric"
+                                  maxlength={4}
+                                  placeholder="123"
+                                  onIonInput={(e) => {
+                                    const value = (e.detail.value ?? '').toString().replace(/\D/g, '');
+                                    setField('cvc', value as any);
+                                  }}
+                                />
+                              </IonItem>
+                              {errors.cvc && (
+                                <IonText className="payment-error" color="danger">
+                                  {errors.cvc}
+                                </IonText>
+                              )}
+                            </IonCol>
+                          </>
+                        )}
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="expiry">
-                      Expiry Date
-                    </label>
-                    <input
-                      type="text"
-                      id="expiry"
-                      className="form-control"
-                      maxLength={5}
-                      placeholder="MM/YY"
-                      value={formData.expiry}
-                      onChange={(e) => {
-                        let value = e.target.value.replace(/\D/g, '');
-                        if (value.length >= 2) value = value.slice(0, 2) + '/' + value.slice(2);
-                        setFormData((prev) => ({ ...prev, expiry: value }));
-                      }}
-                    />
-                    {errors.expiry && <div className="error-message">{errors.expiry}</div>}
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="cvc">
-                      CVC
-                    </label>
-                    <input
-                      type="text"
-                      id="cvc"
-                      className="form-control"
-                      maxLength={4}
-                      placeholder="123"
-                      value={formData.cvc}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          cvc: e.target.value.replace(/\D/g, ''),
-                        }))
-                      }
-                    />
-                    {errors.cvc && <div className="error-message">{errors.cvc}</div>}
-                  </div>
-                </div>
-              </div>
-            )}
+                        {(formData.paymentMethod === 'gcash' || formData.paymentMethod === 'bank') && (
+                          <IonCol size="12">
+                            <IonText color="medium">
+                              {formData.paymentMethod === 'gcash'
+                                ? 'You will be redirected to GCash to complete your payment.'
+                                : "You will be redirected to your bank's secure payment portal."}
+                            </IonText>
+                          </IonCol>
+                        )}
 
-            {/* Payment Info for GCash/Bank */}
-            {(formData.paymentMethod === 'gcash' || formData.paymentMethod === 'bank') && (
-              <div className="form-section">
-                <div className="payment-info">
-                  <i className="fas fa-info-circle"></i>
-                  <p>
-                    {formData.paymentMethod === 'gcash' 
-                      ? 'You will be redirected to GCash to complete your payment.'
-                      : 'You will be redirected to your bank\'s secure payment portal.'
-                    }
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <button type="submit" className="submit-button" disabled={loading}>
-              <i className="fas fa-check-circle"></i> 
-              {loading ? 'Processing...' : 'Complete Registration'}
-            </button>
-
-            <p className="info-text">
-              <i className="fas fa-shield-alt"></i> Your payment information is secure and encrypted
-            </p>
-          </form>
-        </div>
+                        <IonCol size="12">
+                          <IonButton type="submit" expand="block" disabled={loading}>
+                            {loading ? 'Processing…' : 'Complete Registration'}
+                          </IonButton>
+                          <div className="payment-note">
+                            <IonText color="medium">
+                              Your payment information is secure and encrypted
+                            </IonText>
+                          </div>
+                        </IonCol>
+                      </IonRow>
+                    </IonGrid>
+                  </form>
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
+          </IonRow>
+        </IonGrid>
 
         <IonLoading isOpen={loading} message="Processing your payment..." />
         

@@ -4,6 +4,7 @@ import App from "./App";
 
 /* ✅ Global CSS */
 import "./index.css";
+import "./responsive.css";
 
 /* ✅ Ionic Core + CSS utilities */
 import "@ionic/react/css/core.css";

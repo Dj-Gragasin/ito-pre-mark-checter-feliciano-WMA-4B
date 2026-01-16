@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
-  IonButtons, IonBackButton, IonCard, IonCardContent, IonIcon,
+  IonButtons, IonMenuButton, IonCard, IonCardContent, IonIcon,
   IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol,
   IonBadge, IonButton, IonSpinner
 } from "@ionic/react";
@@ -108,7 +108,7 @@ const AdminReports: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/admin" />
+            <IonMenuButton />
           </IonButtons>
           <IonTitle>Reports & Analytics</IonTitle>
           <IonButtons slot="end">

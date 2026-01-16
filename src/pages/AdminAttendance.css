@@ -272,6 +272,10 @@ th {
   background: rgba(0, 0, 0, 0.2);
 }
 
+.attendance-list-wrap {
+  display: none;
+}
+
 .attendance-table {
   width: 100%;
   border-collapse: separate;
@@ -377,6 +381,18 @@ th {
 
   .table-container {
     font-size: 0.85rem;
+  }
+
+  .attendance-table-wrap {
+    display: none;
+  }
+
+  .attendance-list-wrap {
+    display: block;
+  }
+
+  .attendance-table tbody tr:hover {
+    transform: none;
   }
 
   .attendance-table th,

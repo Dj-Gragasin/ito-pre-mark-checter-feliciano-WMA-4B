@@ -1,6 +1,7 @@
 .members-container {
   max-width: 1400px;
   margin: 0 auto;
+  padding: 1rem;
 }
 
 .search-section {
@@ -131,6 +132,38 @@
 .member-actions {
   display: flex;
   gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .member-header {
+    flex-wrap: wrap;
+  }
+
+  .member-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .member-actions ion-button {
+    --padding-start: 0.65rem;
+    --padding-end: 0.65rem;
+    height: 34px;
+  }
+
+  .member-details {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .members-container {
+    padding: 0.75rem;
+  }
+
+  .stat-card {
+    padding: 1rem;
+  }
 }
 
 .member-details {

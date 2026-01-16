@@ -5,13 +5,18 @@ import {
   IonToolbar,
   IonTitle,
   IonContent,
+  IonGrid,
+  IonRow,
+  IonCol,
   IonItem,
   IonLabel,
   IonInput,
   IonButton,
   IonButtons,
-  IonBackButton,
+  IonMenuButton,
   IonIcon,
+  IonCard,
+  IonCardContent,
 } from '@ionic/react';
 import {
   Chart as ChartJS,
@@ -215,74 +220,78 @@ const ProgressTracker: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/member" />
+            <IonMenuButton />
           </IonButtons>
           <IonTitle>Progress Tracker</IonTitle>
         </IonToolbar>
       </IonHeader>
 
-      <IonContent className="ion-padding">
-        <div className="form-container">
-          <div className="form-section">
-            <div className="form-section-title">
-              <IonIcon icon={calendar} />
-              <span>Date & Weight Details</span>
-            </div>
-            <IonItem>
-              <IonLabel position="stacked">Date</IonLabel>
-              <IonInput 
-                type="date"
-                value={date}
-                onIonChange={e => setDate(e.detail.value!)}
-              />
-            </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Weight (kg)</IonLabel>
-              <IonInput
-                type="number"
-                value={weight}
-                onIonChange={e => setWeight(e.detail.value!)}
-                placeholder="Enter your weight"
-              />
-            </IonItem>
-          </div>
+      <IonContent className="ion-padding progress-tracker-content">
+        <IonGrid fixed>
+          <IonRow className="form-container">
+            <IonCol size="12" sizeMd="6">
+              <div className="form-section">
+                <div className="form-section-title">
+                  <IonIcon icon={calendar} />
+                  <span>Date & Weight Details</span>
+                </div>
+                <IonItem>
+                  <IonLabel position="stacked">Date</IonLabel>
+                  <IonInput type="date" value={date} onIonChange={e => setDate(e.detail.value!)} />
+                </IonItem>
+                <IonItem>
+                  <IonLabel position="stacked">Weight (kg)</IonLabel>
+                  <IonInput
+                    type="number"
+                    value={weight}
+                    onIonChange={e => setWeight(e.detail.value!)}
+                    placeholder="Enter your weight"
+                  />
+                </IonItem>
+              </div>
+            </IonCol>
 
-          <div className="form-section">
-            <div className="form-section-title">
-              <IonIcon icon={analytics} />
-              <span>BMI & Notes</span>
-            </div>
-            <IonItem>
-              <IonLabel position="stacked">BMI</IonLabel>
-              <IonInput
-                type="number"
-                value={bmi}
-                onIonChange={e => setBmi(e.detail.value!)}
-                placeholder="Enter your BMI"
-              />
-            </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Notes</IonLabel>
-              <IonInput
-                value={notes}
-                onIonChange={e => setNotes(e.detail.value!)}
-                placeholder="Add notes"
-              />
-            </IonItem>
-          </div>
-        </div>
+            <IonCol size="12" sizeMd="6">
+              <div className="form-section">
+                <div className="form-section-title">
+                  <IonIcon icon={analytics} />
+                  <span>BMI & Notes</span>
+                </div>
+                <IonItem>
+                  <IonLabel position="stacked">BMI</IonLabel>
+                  <IonInput
+                    type="number"
+                    value={bmi}
+                    onIonChange={e => setBmi(e.detail.value!)}
+                    placeholder="Enter your BMI"
+                  />
+                </IonItem>
+                <IonItem>
+                  <IonLabel position="stacked">Notes</IonLabel>
+                  <IonInput value={notes} onIonChange={e => setNotes(e.detail.value!)} placeholder="Add notes" />
+                </IonItem>
+              </div>
+            </IonCol>
+          </IonRow>
 
-        <div className="button-container">
-          <IonButton onClick={clearForm} fill="outline">
-            Clear Form
-          </IonButton>
-          <IonButton onClick={handleUpdate}>
-            Update Progress
-          </IonButton>
-          <IonButton onClick={handleDeleteAll} color="danger" fill="outline">
-            Delete All
-          </IonButton>
-        </div>
+          <IonRow className="button-container">
+            <IonCol size="12" sizeMd="4">
+              <IonButton expand="block" onClick={clearForm} fill="outline">
+                Clear Form
+              </IonButton>
+            </IonCol>
+            <IonCol size="12" sizeMd="4">
+              <IonButton expand="block" onClick={handleUpdate}>
+                Update Progress
+              </IonButton>
+            </IonCol>
+            <IonCol size="12" sizeMd="4">
+              <IonButton expand="block" onClick={handleDeleteAll} color="danger" fill="outline">
+                Delete All
+              </IonButton>
+            </IonCol>
+          </IonRow>
+        </IonGrid>
 
         {records.length > 0 && (
           <div className="chart-container">
@@ -291,39 +300,87 @@ const ProgressTracker: React.FC = () => {
         )}
 
         {records.length > 0 && (
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Weight (kg)</th>
-                  <th>BMI</th>
-                  <th>Notes</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {records.map((record, index) => (
-                  <tr key={index}>
-                    <td>{record.date}</td>
-                    <td>{record.weight}</td>
-                    <td>{record.bmi}</td>
-                    <td>{record.notes}</td>
-                    <td>
-                      <IonButton
-                        fill="clear"
-                        color="danger"
-                        size="small"
-                        onClick={() => handleDeleteRecord(index)}
-                      >
-                        Delete
-                      </IonButton>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {/* Desktop/tablet table */}
+            <div className="records-table-wrap">
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Weight (kg)</th>
+                      <th>BMI</th>
+                      <th>Notes</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {records.map((record, index) => (
+                      <tr key={index}>
+                        <td>{record.date}</td>
+                        <td>{record.weight}</td>
+                        <td>{record.bmi}</td>
+                        <td>{record.notes}</td>
+                        <td>
+                          <IonButton
+                            fill="clear"
+                            color="danger"
+                            size="small"
+                            onClick={() => handleDeleteRecord(index)}
+                          >
+                            Delete
+                          </IonButton>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Mobile stacked cards */}
+            <div className="records-list-wrap">
+              <IonGrid>
+                <IonRow>
+                  {records.map((record, index) => (
+                    <IonCol key={index} size="12">
+                      <IonCard>
+                        <IonCardContent>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                            <div>
+                              <div style={{ fontWeight: 700 }}>{record.date}</div>
+                              <div style={{ color: '#b0b0b0', fontSize: 13 }}>{record.notes || '—'}</div>
+                            </div>
+                            <IonButton
+                              color="danger"
+                              fill="outline"
+                              size="small"
+                              onClick={() => handleDeleteRecord(index)}
+                            >
+                              Delete
+                            </IonButton>
+                          </div>
+
+                          <IonGrid style={{ padding: 0, marginTop: 12 }}>
+                            <IonRow>
+                              <IonCol size="6">
+                                <div style={{ color: '#b0b0b0', fontSize: 12 }}>Weight</div>
+                                <div style={{ fontWeight: 700 }}>{record.weight} kg</div>
+                              </IonCol>
+                              <IonCol size="6">
+                                <div style={{ color: '#b0b0b0', fontSize: 12 }}>BMI</div>
+                                <div style={{ fontWeight: 700 }}>{record.bmi}</div>
+                              </IonCol>
+                            </IonRow>
+                          </IonGrid>
+                        </IonCardContent>
+                      </IonCard>
+                    </IonCol>
+                  ))}
+                </IonRow>
+              </IonGrid>
+            </div>
+          </>
         )}
       </IonContent>
     </IonPage>

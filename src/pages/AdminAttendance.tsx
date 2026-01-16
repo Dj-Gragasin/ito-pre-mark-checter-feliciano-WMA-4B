@@ -12,7 +12,7 @@ import {
   IonCardContent,
   IonIcon,
   IonButtons,
-  IonBackButton,
+  IonMenuButton,
   IonBadge,
   IonRefresher,
   IonRefresherContent,
@@ -149,7 +149,7 @@ const AdminAttendance: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/admin" />
+            <IonMenuButton />
           </IonButtons>
           <IonTitle>Attendance Management</IonTitle>
           <IonButtons slot="end">
@@ -293,56 +293,106 @@ const AdminAttendance: React.FC = () => {
                   <p>Members who check in today will appear here</p>
                 </div>
               ) : (
-                <div className="table-container">
-                  <table className="attendance-table">
-                    <thead>
-                      <tr>
-                        <th>Member</th>
-                        <th>Email</th>
-                        <th>Check-in Time</th>
-                        <th>Location</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {attendanceRecords.map((record) => (
-                        <tr key={record.id}>
-                          <td>
-                            <div className="member-name">
-                              <div className="member-avatar">
-                                {record.fullName.charAt(0).toUpperCase()}
-                              </div>
-                              <span>{record.fullName}</span>
-                            </div>
-                          </td>
-                          <td>
-                            <span className="email">{record.email}</span>
-                          </td>
-                          <td>
-                            <div className="time-cell">
-                              <IonIcon icon={timeOutline} />
-                              <span>{record.time}</span>
-                            </div>
-                          </td>
-                          <td>
-                            <div className="location-cell">
-                              <IonIcon icon={locationOutline} />
-                              <span>{record.location}</span>
-                            </div>
-                          </td>
-                          <td>
-                            <IonBadge
-                              color={record.status === "present" ? "success" : "warning"}
-                              className="status-badge"
-                            >
-                              {record.status.toUpperCase()}
-                            </IonBadge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <>
+                  {/* Desktop/tablet view */}
+                  <div className="attendance-table-wrap">
+                    <div className="table-container">
+                      <table className="attendance-table">
+                        <thead>
+                          <tr>
+                            <th>Member</th>
+                            <th>Email</th>
+                            <th>Check-in Time</th>
+                            <th>Location</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {attendanceRecords.map((record) => (
+                            <tr key={record.id}>
+                              <td>
+                                <div className="member-name">
+                                  <div className="member-avatar">
+                                    {record.fullName.charAt(0).toUpperCase()}
+                                  </div>
+                                  <span>{record.fullName}</span>
+                                </div>
+                              </td>
+                              <td>
+                                <span className="email">{record.email}</span>
+                              </td>
+                              <td>
+                                <div className="time-cell">
+                                  <IonIcon icon={timeOutline} />
+                                  <span>{record.time}</span>
+                                </div>
+                              </td>
+                              <td>
+                                <div className="location-cell">
+                                  <IonIcon icon={locationOutline} />
+                                  <span>{record.location}</span>
+                                </div>
+                              </td>
+                              <td>
+                                <IonBadge
+                                  color={record.status === "present" ? "success" : "warning"}
+                                  className="status-badge"
+                                >
+                                  {record.status.toUpperCase()}
+                                </IonBadge>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Mobile view (no horizontal scroll) */}
+                  <div className="attendance-list-wrap">
+                    <IonGrid>
+                      <IonRow>
+                        {attendanceRecords.map((record) => (
+                          <IonCol key={record.id} size="12">
+                            <IonCard className="attendance-item-card">
+                              <IonCardContent>
+                                <div className="member-name">
+                                  <div className="member-avatar">
+                                    {record.fullName.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ fontWeight: 600, color: '#fff' }}>{record.fullName}</div>
+                                    <div className="email">{record.email}</div>
+                                  </div>
+                                </div>
+
+                                <div className="attendance-details" style={{ marginTop: 12 }}>
+                                  <div className="detail-item">
+                                    <IonIcon icon={timeOutline} />
+                                    <span>{record.time}</span>
+                                  </div>
+                                  <div className="detail-item">
+                                    <IonIcon icon={locationOutline} />
+                                    <span>{record.location}</span>
+                                  </div>
+                                </div>
+
+                                <div style={{ marginTop: 12 }}>
+                                  <IonBadge
+                                    color={record.status === 'present' ? 'success' : 'warning'}
+                                    className="status-badge"
+                                  >
+                                    {record.status.toUpperCase()}
+                                  </IonBadge>
+                                </div>
+                              </IonCardContent>
+                            </IonCard>
+                          </IonCol>
+                        ))}
+                      </IonRow>
+                    </IonGrid>
+                  </div>
+                </>
               )}
             </IonCardContent>
           </IonCard>

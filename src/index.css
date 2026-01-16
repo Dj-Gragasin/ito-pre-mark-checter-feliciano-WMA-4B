@@ -11,6 +11,10 @@ body {
   background-color: var(--ion-color-light);
   color: #1e293b;
 }
+/* App menu width: keep it usable on laptop screens */
+ion-menu.app-menu {
+  --width: min(320px, 85vw);
+}
 
 /* Style headers */
 h1, h2, h3 {

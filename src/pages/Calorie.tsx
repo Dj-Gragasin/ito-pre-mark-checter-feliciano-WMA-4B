@@ -7,14 +7,21 @@ import {
   IonContent,
   IonButton,
   IonButtons,
-  IonIcon,
-  useIonRouter,
+  IonCard,
+  IonCardContent,
+  IonGrid,
+  IonRow,
+  IonCol,
+  IonItem,
+  IonLabel,
+  IonInput,
+  IonSelect,
+  IonSelectOption,
+  IonMenuButton,
 } from "@ionic/react";
-import { arrowBack } from "ionicons/icons";
 import "./Calorie.css";
 
 const Calorie: React.FC = () => {
-  const router = useIonRouter();
   const [gender, setGender] = useState("male");
   const [age, setAge] = useState<number | "">("");
   const [weight, setWeight] = useState<number | "">("");
@@ -75,60 +82,85 @@ const Calorie: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonButton onClick={() => router.push("/member", "back")}>
-              <IonIcon icon={arrowBack} />
-            </IonButton>
+            <IonMenuButton />
           </IonButtons>
           <IonTitle>Calorie Calculator</IonTitle>
         </IonToolbar>
       </IonHeader>
 
       <IonContent className="ion-padding">
-        <div className="container">
-          <h2>Calorie Calculator</h2>
-          
-          <label>Gender</label>
-          <select value={gender} onChange={(e) => setGender(e.target.value)}>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-          </select>
+        <IonGrid fixed>
+          <IonRow className="ion-justify-content-center">
+            <IonCol size="12" sizeMd="8" sizeLg="6">
+              <IonCard className="container">
+                <IonCardContent>
+                  <h2>Calorie Calculator</h2>
 
-          <label>Age (years)</label>
-          <input
-            type="number"
-            value={age}
-            onChange={(e) => setAge(Number(e.target.value))}
-          />
+                  <IonItem lines="full">
+                    <IonLabel position="stacked">Gender</IonLabel>
+                    <IonSelect value={gender} onIonChange={(e) => setGender(e.detail.value)}>
+                      <IonSelectOption value="male">Male</IonSelectOption>
+                      <IonSelectOption value="female">Female</IonSelectOption>
+                    </IonSelect>
+                  </IonItem>
 
-          <label>Weight (kg)</label>
-          <input
-            type="number"
-            value={weight}
-            onChange={(e) => setWeight(Number(e.target.value))}
-          />
+                  <IonRow>
+                    <IonCol size="12" sizeMd="4">
+                      <IonItem lines="full">
+                        <IonLabel position="stacked">Age (years)</IonLabel>
+                        <IonInput
+                          type="number"
+                          inputMode="numeric"
+                          value={age}
+                          onIonInput={(e) => setAge(e.detail.value ? Number(e.detail.value) : "")}
+                        />
+                      </IonItem>
+                    </IonCol>
+                    <IonCol size="12" sizeMd="4">
+                      <IonItem lines="full">
+                        <IonLabel position="stacked">Weight (kg)</IonLabel>
+                        <IonInput
+                          type="number"
+                          inputMode="decimal"
+                          value={weight}
+                          onIonInput={(e) => setWeight(e.detail.value ? Number(e.detail.value) : "")}
+                        />
+                      </IonItem>
+                    </IonCol>
+                    <IonCol size="12" sizeMd="4">
+                      <IonItem lines="full">
+                        <IonLabel position="stacked">Height (cm)</IonLabel>
+                        <IonInput
+                          type="number"
+                          inputMode="decimal"
+                          value={height}
+                          onIonInput={(e) => setHeight(e.detail.value ? Number(e.detail.value) : "")}
+                        />
+                      </IonItem>
+                    </IonCol>
+                  </IonRow>
 
-          <label>Height (cm)</label>
-          <input
-            type="number"
-            value={height}
-            onChange={(e) => setHeight(Number(e.target.value))}
-          />
+                  <IonItem lines="full">
+                    <IonLabel position="stacked">Activity Level</IonLabel>
+                    <IonSelect value={activity} onIonChange={(e) => setActivity(Number(e.detail.value))}>
+                      <IonSelectOption value={1.2}>Sedentary (little or no exercise)</IonSelectOption>
+                      <IonSelectOption value={1.375}>Light (exercise 1-3 times/week)</IonSelectOption>
+                      <IonSelectOption value={1.55}>Moderate (exercise 4-5 times/week)</IonSelectOption>
+                      <IonSelectOption value={1.725}>Active (daily exercise)</IonSelectOption>
+                      <IonSelectOption value={1.9}>Very Active (intense exercise 6-7 times/week)</IonSelectOption>
+                    </IonSelect>
+                  </IonItem>
 
-          <label>Activity Level</label>
-          <select
-            value={activity}
-            onChange={(e) => setActivity(Number(e.target.value))}
-          >
-            <option value={1.2}>Sedentary (little or no exercise)</option>
-            <option value={1.375}>Light (exercise 1-3 times/week)</option>
-            <option value={1.55}>Moderate (exercise 4-5 times/week)</option>
-            <option value={1.725}>Active (daily exercise)</option>
-            <option value={1.9}>Very Active (intense exercise 6-7 times/week)</option>
-          </select>
+                  <IonButton expand="block" onClick={calculateCalories}>
+                    Calculate
+                  </IonButton>
 
-          <button onClick={calculateCalories}>Calculate</button>
-          {result}
-        </div>
+                  {result}
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
+          </IonRow>
+        </IonGrid>
       </IonContent>
     </IonPage>
   );

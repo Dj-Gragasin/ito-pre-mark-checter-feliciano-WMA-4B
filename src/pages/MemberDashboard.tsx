@@ -8,20 +8,24 @@ import {
   IonButton,
   IonIcon,
   IonButtons,
+  IonMenuButton,
+  IonGrid,
+  IonRow,
+  IonCol,
+  IonCard,
+  IonCardContent,
   useIonRouter,
 } from "@ionic/react";
 import {
-  home,
   qrCode,
-  calendarOutline,
   calculator,
   restaurant,
   trendingUp,
   barbell,
   logOut,
-  card,
   calendar,
   flame,
+  cardOutline,
 } from "ionicons/icons";
 import "./MemberDashboard.css";
 
@@ -30,7 +34,6 @@ import { API_CONFIG } from "../config/api.config";
 const API_URL = API_CONFIG.BASE_URL;
 
 const MemberDashboard: React.FC = () => {
-  const [memberName, setMemberName] = useState("John Doe");
   const [firstName, setFirstName] = useState("John");
   const [streak, setStreak] = useState<number>(0); // added
   const [motivation, setMotivation] = useState<string>(''); // added
@@ -41,8 +44,6 @@ const MemberDashboard: React.FC = () => {
     if (userStr) {
       try {
         const user = JSON.parse(userStr);
-        const fullName = `${user.firstName} ${user.lastName}`;
-        setMemberName(fullName);
         setFirstName(user.firstName);
       } catch (err) {
         console.error("Invalid user data in localStorage");
@@ -104,6 +105,9 @@ const MemberDashboard: React.FC = () => {
     <IonPage>
       <IonHeader>
         <IonToolbar>
+          <IonButtons slot="start">
+            <IonMenuButton />
+          </IonButtons>
           <IonTitle>Member Dashboard</IonTitle>
           <IonButtons slot="end">
             <IonButton onClick={handleLogout}>
@@ -115,231 +119,148 @@ const MemberDashboard: React.FC = () => {
       </IonHeader>
 
       <IonContent className="ion-padding">
-        <div className="dashboard-container">
-          {/* Sidebar */}
-          <aside className="sidebar">
-            <div className="profile-section">
-              <div className="profile-avatar">
-                <i className="fas fa-user"></i>
-              </div>
-              <h2 className="profile-name">{memberName}</h2>
-              <span className="membership-status">Premium Member</span>
-            </div>
+        <div className="dashboard-content-wrapper">
+          <IonGrid fixed>
+            <IonRow>
+              <IonCol size="12">
+                <div className="page-header">
+                  <div className="welcome-text">
+                    <h1>Welcome back, {firstName}!</h1>
+                    <p>Track your fitness journey and achieve your goals</p>
+                  </div>
 
-            <nav>
-              <ul className="nav-menu">
-                <li className="nav-item">
-                  <button
-                    className="nav-link"
-                    onClick={() => handleNavigation("/member")}
-                  >
-                    <IonIcon icon={home} />
-                    Dashboard
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className="nav-link"
-                    onClick={() => handleNavigation("/member/qr")}
-                  >
-                    <IonIcon icon={qrCode} />
-                    QR Attendance
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className="nav-link"
-                    onClick={() => handleNavigation("/member/attendance")}
-                  >
-                    <IonIcon icon={calendarOutline} />
-                    My Attendance
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className="nav-link"
-                    onClick={() => handleNavigation("/member/calorie")}
-                  >
-                    <IonIcon icon={calculator} />
-                    Calorie Calculator
-                  </button>
-                </li>
-                
-                <li className="nav-item">
-                  <button
-                    className="nav-link"
-                    onClick={() => handleNavigation("/member/meal-planner")}
-                  >
-                    <IonIcon icon={restaurant} />
-                    Meal Planner
-                  </button>
-                </li>
-
-                <li className="nav-item">
-                  <button
-                    className="nav-link"
-                    onClick={() => handleNavigation("/member/progress")}
-                  >
-                    <IonIcon icon={trendingUp} />
-                    Progress Tracker
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className="nav-link"
-                    onClick={() => handleNavigation("/member/muscle-gain")}
-                  >
-                    <IonIcon icon={barbell} />
-                    Muscle Gain Tracker
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button className="nav-link logout-btn" onClick={handleLogout}>
-                    <IonIcon icon={logOut} />
-                    Logout
-                  </button>
-                </li>
-              </ul>
-            </nav>
-          </aside>
-
-          {/* Main Content */}
-          <main className="main-content">
-            <div className="content-wrapper">
-              <header className="page-header">
-                <div className="welcome-text">
-                  <h1>Welcome back, {firstName}! 👋</h1>
-                  <p>Track your fitness journey and achieve your goals</p>
-                </div>
-
-                {/* replaced quick-stats with motivation and streak */}
-                <div className="hero-motivation">
-                  <div className="motivation-text">{motivation}</div>
-                  <div className="streak-pill">
-                    <IonIcon icon={flame} /> Streak: {streak} days
+                  <div className="hero-motivation">
+                    <div className="motivation-text">{motivation}</div>
+                    <div className="streak-pill">
+                      <IonIcon icon={flame} /> Streak: {streak} days
+                    </div>
                   </div>
                 </div>
-              </header>
+              </IonCol>
+            </IonRow>
 
-              <section className="dashboard-grid">
-                <div
-                  className="dashboard-card"
-                  onClick={() => handleNavigation("/member/qr")}
-                >
-                  <IonIcon icon={qrCode} className="card-icon" />
-                  <h3 className="card-title">QR Attendance</h3>
-                  <p className="card-description">Scan to check-in</p>
-                </div>
+            <IonRow>
+              <IonCol size="12" sizeMd="6" sizeLg="4">
+                <IonCard className="dashboard-card" onClick={() => handleNavigation("/member/qr")}>
+                  <IonCardContent>
+                    <IonIcon icon={qrCode} className="card-icon" />
+                    <h3 className="card-title">QR Attendance</h3>
+                    <p className="card-description">Scan to check-in</p>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
 
-                <div
-                  className="dashboard-card"
-                  onClick={() => handleNavigation("/member/calorie")}
-                >
-                  <IonIcon icon={calculator} className="card-icon" />
-                  <h3 className="card-title">Calorie Calculator</h3>
-                  <p className="card-description">Track your calories</p>
-                </div>
+              <IonCol size="12" sizeMd="6" sizeLg="4">
+                <IonCard className="dashboard-card" onClick={() => handleNavigation("/member/calorie")}>
+                  <IonCardContent>
+                    <IonIcon icon={calculator} className="card-icon" />
+                    <h3 className="card-title">Calorie Calculator</h3>
+                    <p className="card-description">Track your calories</p>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
 
-                <div
-                  className="dashboard-card"
-                  onClick={() => handleNavigation("/member/meal-planner")}
-                >
-                  <IonIcon icon={restaurant} className="card-icon" />
-                  <h3 className="card-title">Meal Planner</h3>
-                  <p className="card-description">Plan your meals</p>
-                </div>
+              <IonCol size="12" sizeMd="6" sizeLg="4">
+                <IonCard className="dashboard-card" onClick={() => handleNavigation("/member/meal-planner")}>
+                  <IonCardContent>
+                    <IonIcon icon={restaurant} className="card-icon" />
+                    <h3 className="card-title">Meal Planner</h3>
+                    <p className="card-description">Plan your meals</p>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
 
-                <div
-                  className="dashboard-card"
-                  onClick={() => handleNavigation("/member/progress")}
-                >
-                  <IonIcon icon={trendingUp} className="card-icon" />
-                  <h3 className="card-title">Progress Tracker</h3>
-                  <p className="card-description">Track your progress</p>
-                </div>
+              <IonCol size="12" sizeMd="6" sizeLg="4">
+                <IonCard className="dashboard-card" onClick={() => handleNavigation("/member/progress")}>
+                  <IonCardContent>
+                    <IonIcon icon={trendingUp} className="card-icon" />
+                    <h3 className="card-title">Progress Tracker</h3>
+                    <p className="card-description">Track your progress</p>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
 
-                <div
-                  className="dashboard-card"
-                  onClick={() => handleNavigation("/member/muscle-gain")}
-                >
-                  <IonIcon icon={barbell} className="card-icon" />
-                  <h3 className="card-title">Muscle Gain</h3>
-                  <p className="card-description">Build muscle</p>
-                </div>
-              </section>
+              <IonCol size="12" sizeMd="6" sizeLg="4">
+                <IonCard className="dashboard-card" onClick={() => handleNavigation("/member/muscle-gain")}>
+                  <IonCardContent>
+                    <IonIcon icon={barbell} className="card-icon" />
+                    <h3 className="card-title">Muscle Gain</h3>
+                    <p className="card-description">Build muscle</p>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+            </IonRow>
 
-              <section className="progress-section">
-                <div className="progress-header">
-                  <h2 className="progress-title">Daily Motivation</h2>
-                  <p className="progress-subtitle">Short reminders to keep you consistent</p>
-                </div>
-
-                <div className="progress-grid">
-                  {(() => {
-                    const allMotivations = [
-                      "One step at a time — your progress matters.",
-                      "Show up today. Your future self will thank you.",
-                      "Consistency beats intensity. Keep going!",
-                      "Small gains every day add up to big results.",
-                      "Fuel your body. Honor your training.",
-                      "Today's effort is tomorrow's strength.",
-                      "Discipline creates freedom — train for it."
-                    ];
-                    const baseIdx = new Date().getDate() % allMotivations.length;
-                    const mot1 = allMotivations[baseIdx];
-                    const mot2 = allMotivations[(baseIdx + 1) % allMotivations.length];
-                    const mot3 = allMotivations[(baseIdx + 2) % allMotivations.length];
-
-                    return (
-                      <>
-                        <div className="progress-item motivation-card">
-                          <IonIcon icon={calendar} style={{ fontSize: '2rem', color: 'var(--primary-color)' }} />
-                          <h4>Motivation</h4>
-                          <p>{mot1}</p>
-                        </div>
-
-                        <div className="progress-item motivation-card">
-                          <IonIcon icon={flame} style={{ fontSize: '2rem', color: 'var(--primary-color)' }} />
-                          <h4>Tip</h4>
-                          <p>{mot2}</p>
-                        </div>
-
-                        <div className="progress-item motivation-card">
-                          <IonIcon icon={trendingUp} style={{ fontSize: '2rem', color: 'var(--primary-color)' }} />
-                          <h4>Goal</h4>
-                          <p>{mot3}</p>
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-              </section>
-
-              <section className="progress-section">
-                <div className="progress-header">
-                  <h2 className="progress-title">Subscription Status</h2>
-                </div>
-                
-                <div className="progress-grid">
-                  <div className="progress-item" style={{ gridColumn: '1 / -1' }}>
-                    <IonIcon icon={card} style={{ fontSize: '2rem', color: 'var(--primary-color)' }} />
-                    <h4>Active Membership</h4>
-                    <p>Monthly Plan</p>
+            <IonRow>
+              <IonCol size="12">
+                <section className="progress-section">
+                  <div className="progress-header">
+                    <div>
+                      <h2 className="progress-title">Daily Motivation</h2>
+                      <p className="progress-subtitle">Short reminders to keep you consistent</p>
+                    </div>
                   </div>
-                </div>
-              </section>
 
-              <IonButton 
-                expand="block" 
-                color="medium"
-                disabled
-                style={{ marginTop: '2rem' }}
-              >
-                <IonIcon icon={card} slot="start" />
-                Renew Subscription - Coming Soon
-              </IonButton>
-            </div>
-          </main>
+                  <IonGrid>
+                    <IonRow>
+                      {(() => {
+                        const allMotivations = [
+                          "One step at a time — your progress matters.",
+                          "Show up today. Your future self will thank you.",
+                          "Consistency beats intensity. Keep going!",
+                          "Small gains every day add up to big results.",
+                          "Fuel your body. Honor your training.",
+                          "Today's effort is tomorrow's strength.",
+                          "Discipline creates freedom — train for it.",
+                        ];
+                        const baseIdx = new Date().getDate() % allMotivations.length;
+                        const mot1 = allMotivations[baseIdx];
+                        const mot2 = allMotivations[(baseIdx + 1) % allMotivations.length];
+                        const mot3 = allMotivations[(baseIdx + 2) % allMotivations.length];
+
+                        return (
+                          <>
+                            <IonCol size="12" sizeMd="4">
+                              <div className="progress-item motivation-card">
+                                <IonIcon icon={calendar} style={{ fontSize: "2rem", color: "var(--primary-color)" }} />
+                                <h4>Motivation</h4>
+                                <p>{mot1}</p>
+                              </div>
+                            </IonCol>
+
+                            <IonCol size="12" sizeMd="4">
+                              <div className="progress-item motivation-card">
+                                <IonIcon icon={flame} style={{ fontSize: "2rem", color: "var(--primary-color)" }} />
+                                <h4>Tip</h4>
+                                <p>{mot2}</p>
+                              </div>
+                            </IonCol>
+
+                            <IonCol size="12" sizeMd="4">
+                              <div className="progress-item motivation-card">
+                                <IonIcon icon={trendingUp} style={{ fontSize: "2rem", color: "var(--primary-color)" }} />
+                                <h4>Focus</h4>
+                                <p>{mot3}</p>
+                              </div>
+                            </IonCol>
+                          </>
+                        );
+                      })()}
+                    </IonRow>
+                  </IonGrid>
+                </section>
+              </IonCol>
+            </IonRow>
+
+            <IonRow>
+              <IonCol size="12" sizeMd="6" sizeLg="4">
+                <IonButton expand="block" color="medium" disabled>
+                  <IonIcon icon={cardOutline} slot="start" />
+                  Renew Subscription - Coming Soon
+                </IonButton>
+              </IonCol>
+            </IonRow>
+          </IonGrid>
         </div>
       </IonContent>
     </IonPage>
