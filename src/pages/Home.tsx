@@ -8,10 +8,12 @@ import {
   IonTitle,
   IonButton,
   IonIcon,
+  IonLoading,
   IonModal,
   IonItem,
   IonLabel,
   IonInput,
+  IonSpinner,
   IonButtons,
   IonGrid,
   IonRow,
@@ -30,11 +32,22 @@ const Home: React.FC = () => {
   const [showLogin, setShowLogin] = useState(false);
   const [showLearnMore, setShowLearnMore] = useState(false);
   const [error, setError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginMessage, setLoginMessage] = useState('Logging in…');
   const router = useIonRouter();
 
   const handleLogin = async () => {
+    if (isLoggingIn) return;
+
     try {
       setError('');
+      setIsLoggingIn(true);
+      setLoginMessage('Logging in…');
+
+      const slowTimer = window.setTimeout(() => {
+        setLoginMessage('Logging in… (this can take a moment)');
+      }, 5000);
+
       const result = await loginUser(email, password);
       if (result.user.role === 'admin') {
         router.push('/admin', 'root', 'replace');
@@ -42,9 +55,12 @@ const Home: React.FC = () => {
         router.push('/member', 'root', 'replace');
       }
       setShowLogin(false);
+      window.clearTimeout(slowTimer);
     } catch (error: any) {
       setError(error.message);
       console.error('Login error:', error);
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -213,11 +229,16 @@ const Home: React.FC = () => {
             <IonToolbar>
               <IonTitle>Login</IonTitle>
               <IonButtons slot="end">
-                <IonButton onClick={() => setShowLogin(false)}>Close</IonButton>
+                <IonButton disabled={isLoggingIn} onClick={() => setShowLogin(false)}>Close</IonButton>
               </IonButtons>
             </IonToolbar>
           </IonHeader>
           <IonContent className="ion-padding">
+            <IonLoading
+              isOpen={isLoggingIn}
+              message={loginMessage}
+              backdropDismiss={false}
+            />
             <div className="login-form">
               {error && (
                 <IonItem color="danger" lines="none">
@@ -231,6 +252,7 @@ const Home: React.FC = () => {
                   value={email}
                   onIonChange={e => setEmail(e.detail.value || '')}
                   placeholder="Enter your email"
+                  disabled={isLoggingIn}
                 />
               </IonItem>
               <IonItem>
@@ -240,11 +262,19 @@ const Home: React.FC = () => {
                   value={password}
                   onIonChange={e => setPassword(e.detail.value || '')}
                   placeholder="Enter your password"
+                  disabled={isLoggingIn}
                 />
               </IonItem>
               <div className="ion-padding-top">
-                <IonButton expand="block" onClick={handleLogin}>
-                  Log In
+                <IonButton expand="block" onClick={handleLogin} disabled={isLoggingIn}>
+                  {isLoggingIn ? (
+                    <>
+                      <IonSpinner name="crescent" style={{ marginRight: 10 }} />
+                      Logging in…
+                    </>
+                  ) : (
+                    'Log In'
+                  )}
                 </IonButton>
               </div>
             </div>
