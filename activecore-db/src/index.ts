@@ -2514,16 +2514,6 @@ app.get('/', (req: Request, res: Response) => {
 // QR Token Generation - register BEFORE 404 handler
 app.use('/api/admin/qr-token', qrTokenRouter);
 
-// 404 handler - must be registered BEFORE initialize()
-app.use((req: Request, res: Response) => {
-  res.status(404).json({
-    success: false,
-    message: 'Endpoint not found',
-    path: req.path,
-    method: req.method
-  });
-});
-
 // Initialize database and start server - WILL BE CALLED AT THE END OF FILE
 async function initialize() {
   try {
@@ -3199,6 +3189,16 @@ app.delete('/api/equipment/:id', authenticateToken, requireAdmin, async (req: Au
 
     res.status(500).json({ success: false, message: 'Failed to capture PayPal payment' });
   }
+});
+
+// 404 handler - must be registered AFTER all routes
+app.use((req: Request, res: Response) => {
+  res.status(404).json({
+    success: false,
+    message: 'Endpoint not found',
+    path: req.path,
+    method: req.method,
+  });
 });
 
 // Start server AFTER all routes and middleware are registered
