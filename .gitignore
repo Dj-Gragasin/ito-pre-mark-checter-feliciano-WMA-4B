@@ -6,6 +6,8 @@ dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.bak
+*.bak
 .env
 .env.local
 .env.*.local
@@ -24,6 +26,7 @@ activecore-db/.env
 android/key.properties
 android/local.properties
 **/*.keystore
+**/*.keystore.*
 **/*.jks
 **/*.p12
 

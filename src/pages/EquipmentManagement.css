@@ -8,6 +8,31 @@
   padding: 1rem;
 }
 
+/* ===== MODAL: match MembersManagement modal sizing + safe area padding ===== */
+ion-modal.equipment-modal {
+  --width: min(720px, 96vw);
+  --height: min(92vh, 960px);
+}
+
+ion-content.equipment-modal-content {
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --padding-top: 16px;
+  /* Reserve space so the last fields aren't hidden behind the footer */
+  --padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px) + 96px);
+}
+
+.equipment-modal-actions {
+  z-index: 10;
+  padding: 12px;
+  background: var(--ion-background-color, #121212);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.equipment-modal-actions ion-button {
+  margin-top: 8px;
+}
+
 .search-section {
   margin-bottom: 1.5rem;
 }

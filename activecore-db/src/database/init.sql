@@ -45,6 +45,20 @@ CREATE TABLE IF NOT EXISTS qr_attendance_tokens (
   INDEX idx_expires (expires_at)
 );
 
+-- Equipment table
+CREATE TABLE IF NOT EXISTS equipment (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  equip_name VARCHAR(255) NOT NULL,
+  category VARCHAR(50) NOT NULL DEFAULT 'cardio',
+  purchase_date DATE NOT NULL,
+  status ENUM('operational','maintenance','broken') NOT NULL DEFAULT 'operational',
+  last_maintenance DATE NULL,
+  next_schedule DATE NULL,
+  notes TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT NOW(),
+  updated_at DATETIME NOT NULL DEFAULT NOW()
+);
+
 -- Rewards table
 CREATE TABLE IF NOT EXISTS rewards (
   id INT PRIMARY KEY AUTO_INCREMENT,

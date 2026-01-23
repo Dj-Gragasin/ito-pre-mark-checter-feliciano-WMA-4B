@@ -204,6 +204,54 @@ body {
   font-size: 1.15rem;
 }
 
+/* Absence reminder */
+.absence-alert-card {
+  background: linear-gradient(135deg, rgba(0, 230, 118, 0.14), rgba(56, 128, 255, 0.10));
+  border: 1px solid rgba(0, 230, 118, 0.25);
+  border-radius: 14px;
+  margin-top: 0;
+}
+
+.absence-alert-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.absence-alert-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.absence-alert-subtitle {
+  margin: 0.4rem 0 0;
+  color: var(--text-secondary);
+}
+
+.absence-alert-settings {
+  margin-top: 0.75rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+}
+
+.absence-setting-item {
+  --background: transparent;
+  --inner-padding-end: 0;
+  --padding-start: 0;
+  color: var(--text-secondary);
+}
+
+.absence-alert-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 /* Dashboard Grid */
 .dashboard-grid {
   display: grid;

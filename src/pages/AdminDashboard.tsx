@@ -69,7 +69,13 @@ const AdminDashboard: React.FC = () => {
       loadDashboardStats();
     };
 
+    const onEquipmentUpdate = () => {
+      console.log('🔄 Equipment updated; refreshing dashboard stats...');
+      loadDashboardStats();
+    };
+
     window.addEventListener('payments:updated', onPaymentUpdate);
+    window.addEventListener('equipment:updated', onEquipmentUpdate);
     console.log('👂 Admin Dashboard listening for payment events');
 
     const interval = setInterval(() => {
@@ -79,6 +85,7 @@ const AdminDashboard: React.FC = () => {
 
     return () => {
       window.removeEventListener('payments:updated', onPaymentUpdate);
+      window.removeEventListener('equipment:updated', onEquipmentUpdate);
       clearInterval(interval);
     };
   }, [router]);
@@ -164,10 +171,19 @@ const AdminDashboard: React.FC = () => {
         setTodayAttendance(0);
       }
 
-      const equipmentStr = localStorage.getItem('equipments');
-      if (equipmentStr) {
-        const equipments = JSON.parse(equipmentStr);
-        setTotalEquipment(equipments.length);
+      // Equipment count (shared DB)
+      try {
+        const equipmentRes = await fetch(`${API_URL}/equipment`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const equipmentData = await equipmentRes.json().catch(() => ({}));
+        if (equipmentRes.ok && equipmentData?.success && Array.isArray(equipmentData.equipments)) {
+          setTotalEquipment(equipmentData.equipments.length);
+        } else {
+          setTotalEquipment(0);
+        }
+      } catch {
+        setTotalEquipment(0);
       }
 
       console.log('===== DASHBOARD STATS LOADED =====\n');

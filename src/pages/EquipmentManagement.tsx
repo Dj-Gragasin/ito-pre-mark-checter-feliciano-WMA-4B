@@ -5,6 +5,7 @@ import {
   IonToolbar,
   IonTitle,
   IonContent,
+  IonFooter,
   IonButton,
   IonButtons,
   IonMenuButton,
@@ -28,9 +29,10 @@ import {
 } from "@ionic/react";
 import { add, create, trash, barbell, alertCircle, close, checkmark } from "ionicons/icons";
 import "./EquipmentManagement.css";
+import { API_CONFIG } from "../config/api.config";
 
 interface Equipment {
-  id: string;
+  id: number;
   equipName: string;
   category: string;
   purchaseDate: string;
@@ -40,6 +42,8 @@ interface Equipment {
   notes: string;
 }
 
+const API_URL = API_CONFIG.BASE_URL;
+
 const EquipmentManagement: React.FC = () => {
   const [equipments, setEquipments] = useState<Equipment[]>([]);
   const [filteredEquipments, setFilteredEquipments] = useState<Equipment[]>([]);
@@ -47,7 +51,8 @@ const EquipmentManagement: React.FC = () => {
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [searchText, setSearchText] = useState("");
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
-  const [equipmentToDelete, setEquipmentToDelete] = useState<string | null>(null);
+  const [equipmentToDelete, setEquipmentToDelete] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
   const [presentToast] = useIonToast();
 
   const [formData, setFormData] = useState({
@@ -60,12 +65,34 @@ const EquipmentManagement: React.FC = () => {
     notes: "",
   });
 
-  const loadEquipments = useCallback(() => {
-    const stored = localStorage.getItem("equipments");
-    if (stored) {
-      const data = JSON.parse(stored);
-      setEquipments(data);
-      setFilteredEquipments(data);
+  const loadEquipments = useCallback(async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setEquipments([]);
+        setFilteredEquipments([]);
+        return;
+      }
+
+      const res = await fetch(`${API_URL}/equipment`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok && data?.success && Array.isArray(data.equipments)) {
+        setEquipments(data.equipments);
+        setFilteredEquipments(data.equipments);
+      } else {
+        console.error('Failed to load equipments:', data);
+        setEquipments([]);
+        setFilteredEquipments([]);
+      }
+    } catch (err) {
+      console.error('Failed to load equipments:', err);
+      setEquipments([]);
+      setFilteredEquipments([]);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -91,7 +118,7 @@ const EquipmentManagement: React.FC = () => {
     filterEquipments();
   }, [filterEquipments]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     console.log('💾 Attempting to save equipment:', formData);
     
     // ✅ Only validate required fields
@@ -117,42 +144,57 @@ const EquipmentManagement: React.FC = () => {
 
     console.log('✅ Validation passed, saving equipment...');
 
-    let updatedEquipments = [...equipments];
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        presentToast({ message: '⚠️ Please login again', duration: 2000, color: 'warning' });
+        return;
+      }
 
-    if (editingEquipment) {
-      // Editing existing equipment
-      updatedEquipments = updatedEquipments.map((eq) =>
-        eq.id === editingEquipment.id ? { ...formData, id: eq.id } : eq
-      );
-      console.log('✏️ Updated equipment:', editingEquipment.id);
-      
-      presentToast({
-        message: '✅ Equipment updated successfully',
-        duration: 2000,
-        color: 'success'
+      const isEdit = Boolean(editingEquipment?.id);
+      const url = isEdit ? `${API_URL}/equipment/${editingEquipment!.id}` : `${API_URL}/equipment`;
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          equipName: formData.equipName,
+          category: formData.category,
+          purchaseDate: formData.purchaseDate,
+          status: formData.status,
+          lastMaintenance: formData.lastMaintenance || null,
+          nextSchedule: formData.nextSchedule || null,
+          notes: formData.notes || '',
+        }),
       });
-    } else {
-      // Adding new equipment
-      const newEquipment: Equipment = {
-        ...formData,
-        id: Date.now().toString(),
-      };
-      updatedEquipments.push(newEquipment);
-      console.log('➕ Added new equipment:', newEquipment.id, newEquipment);
-      
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success === false) {
+        presentToast({
+          message: data?.message || '❌ Failed to save equipment',
+          duration: 2200,
+          color: 'danger',
+        });
+        return;
+      }
+
       presentToast({
-        message: '✅ Equipment added successfully',
+        message: isEdit ? '✅ Equipment updated successfully' : '✅ Equipment added successfully',
         duration: 2000,
-        color: 'success'
+        color: 'success',
       });
+
+      resetForm();
+      await loadEquipments();
+      window.dispatchEvent(new CustomEvent('equipment:updated'));
+    } catch (err) {
+      console.error('Failed to save equipment:', err);
+      presentToast({ message: '❌ Failed to save equipment', duration: 2200, color: 'danger' });
     }
-
-    localStorage.setItem("equipments", JSON.stringify(updatedEquipments));
-    setEquipments(updatedEquipments);
-    resetForm();
-    
-    // Notify AdminDashboard to refresh
-    window.dispatchEvent(new CustomEvent('equipment:updated'));
   };
 
   const handleEdit = (equipment: Equipment) => {
@@ -162,26 +204,39 @@ const EquipmentManagement: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (id: number) => {
     setEquipmentToDelete(id);
     setShowDeleteAlert(true);
   };
 
-  const confirmDelete = () => {
-    if (equipmentToDelete) {
-      const updated = equipments.filter((eq) => eq.id !== equipmentToDelete);
-      localStorage.setItem("equipments", JSON.stringify(updated));
-      setEquipments(updated);
-      setEquipmentToDelete(null);
-      
-      presentToast({
-        message: '✅ Equipment deleted successfully',
-        duration: 2000,
-        color: 'success'
+  const confirmDelete = async () => {
+    if (!equipmentToDelete) return;
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        presentToast({ message: '⚠️ Please login again', duration: 2000, color: 'warning' });
+        return;
+      }
+
+      const res = await fetch(`${API_URL}/equipment/${equipmentToDelete}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
       });
-      
-      // Notify AdminDashboard to refresh
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success === false) {
+        presentToast({ message: data?.message || '❌ Failed to delete equipment', duration: 2200, color: 'danger' });
+        return;
+      }
+
+      setEquipmentToDelete(null);
+      setShowDeleteAlert(false);
+      presentToast({ message: '✅ Equipment deleted successfully', duration: 2000, color: 'success' });
+      await loadEquipments();
       window.dispatchEvent(new CustomEvent('equipment:updated'));
+    } catch (err) {
+      console.error('Failed to delete equipment:', err);
+      presentToast({ message: '❌ Failed to delete equipment', duration: 2200, color: 'danger' });
     }
   };
 
@@ -280,8 +335,8 @@ const EquipmentManagement: React.FC = () => {
                 <IonCol size="12">
                   <div className="empty-state">
                     <IonIcon icon={barbell} />
-                    <h3>No Equipment Found</h3>
-                    <p>Add your first equipment to get started</p>
+                    <h3>{loading ? 'Loading Equipment...' : 'No Equipment Found'}</h3>
+                    <p>{loading ? 'Please wait' : 'Add your first equipment to get started'}</p>
                     <IonButton expand="block" onClick={() => setShowModal(true)}>
                       <IonIcon icon={add} slot="start" />
                       Add Equipment
@@ -342,7 +397,7 @@ const EquipmentManagement: React.FC = () => {
         </div>
 
         {/* Add/Edit Modal */}
-        <IonModal isOpen={showModal} onDidDismiss={resetForm}>
+        <IonModal isOpen={showModal} onDidDismiss={resetForm} className="equipment-modal">
           <IonHeader>
             <IonToolbar>
               <IonTitle>{editingEquipment ? 'Edit Equipment' : 'Add Equipment'}</IonTitle>
@@ -353,13 +408,13 @@ const EquipmentManagement: React.FC = () => {
               </IonButtons>
             </IonToolbar>
           </IonHeader>
-          <IonContent className="ion-padding">
+          <IonContent className="equipment-modal-content">
             <IonList>
               <IonItem>
                 <IonLabel position="stacked">Equipment Name *</IonLabel>
                 <IonInput
                   value={formData.equipName}
-                  onIonChange={(e) => setFormData({ ...formData, equipName: e.detail.value || "" })}
+                  onIonInput={(e) => setFormData({ ...formData, equipName: e.detail.value || "" })}
                   placeholder="Enter equipment name"
                 />
               </IonItem>
@@ -420,32 +475,26 @@ const EquipmentManagement: React.FC = () => {
                 <IonLabel position="stacked">Notes (Optional)</IonLabel>
                 <IonTextarea
                   value={formData.notes}
-                  onIonChange={(e) => setFormData({ ...formData, notes: e.detail.value || "" })}
+                  onIonInput={(e) => setFormData({ ...formData, notes: e.detail.value || "" })}
                   placeholder="Additional notes..."
                   rows={4}
                 />
               </IonItem>
             </IonList>
-
-            <IonButton
-              expand="block"
-              onClick={handleSave}
-              className="save-btn"
-              style={{ marginTop: '1.5rem' }}
-            >
-              <IonIcon icon={checkmark} slot="start" />
-              {editingEquipment ? 'Update Equipment' : 'Add Equipment'}
-            </IonButton>
-
-            <IonButton
-              expand="block"
-              fill="outline"
-              onClick={resetForm}
-              style={{ marginTop: '0.5rem' }}
-            >
-              Cancel
-            </IonButton>
           </IonContent>
+
+          <IonFooter>
+            <div className="equipment-modal-actions">
+              <IonButton expand="block" onClick={handleSave} className="save-btn">
+                <IonIcon icon={checkmark} slot="start" />
+                {editingEquipment ? 'Update Equipment' : 'Add Equipment'}
+              </IonButton>
+
+              <IonButton expand="block" fill="outline" onClick={resetForm}>
+                Cancel
+              </IonButton>
+            </div>
+          </IonFooter>
         </IonModal>
 
         <IonAlert

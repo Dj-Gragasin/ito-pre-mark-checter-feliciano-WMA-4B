@@ -3,6 +3,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import { Capacitor } from "@capacitor/core";
 import { useHistory } from "react-router-dom";
 import { API_CONFIG } from "../config/api.config";
+import { formatLocalDate, formatLocalTime } from '../utils/dateTime';
 import {
   IonPage,
   IonHeader,
@@ -253,11 +254,15 @@ const QrAttendance: React.FC = () => {
       if (data.success) {
         console.log("✅ Attendance recorded successfully!");
 
-        if (data.attendance?.date && data.attendance?.time && data.attendance?.location) {
+        const iso = data.attendance?.checkInTime;
+        const dateStr = iso ? formatLocalDate(iso) : '';
+        const timeStr = iso ? formatLocalTime(iso) : '';
+
+        if (dateStr && timeStr && data.attendance?.location) {
           setSuccessMessage(
             `✅ Check-in Successful!\n\n` +
-            `📅 ${data.attendance.date}\n` +
-            `🕐 ${data.attendance.time}\n` +
+            `📅 ${dateStr}\n` +
+            `🕐 ${timeStr}\n` +
             `📍 ${data.attendance.location}\n\n` +
             `Streak: 🔥 ${data.streak ?? 0} days\n` +
             `Total: 📊 ${data.totalAttendance ?? 0} days`

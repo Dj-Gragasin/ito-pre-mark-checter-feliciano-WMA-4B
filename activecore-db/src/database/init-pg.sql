@@ -51,6 +51,24 @@ CREATE TABLE qr_attendance_tokens (
 CREATE INDEX idx_qr_token ON qr_attendance_tokens(token);
 CREATE INDEX idx_qr_expires ON qr_attendance_tokens(expires_at);
 
+-- Create equipment table
+CREATE TABLE IF NOT EXISTS equipment (
+    id SERIAL PRIMARY KEY,
+    equip_name VARCHAR(255) NOT NULL,
+    category VARCHAR(50) NOT NULL DEFAULT 'cardio',
+    purchase_date DATE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'operational' CHECK (status IN ('operational', 'maintenance', 'broken')),
+    last_maintenance DATE,
+    next_schedule DATE,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_equipment_status ON equipment(status);
+CREATE INDEX IF NOT EXISTS idx_equipment_category ON equipment(category);
+CREATE INDEX IF NOT EXISTS idx_equipment_purchase_date ON equipment(purchase_date);
+
 -- Create rewards table
 CREATE TABLE rewards (
     id SERIAL PRIMARY KEY,

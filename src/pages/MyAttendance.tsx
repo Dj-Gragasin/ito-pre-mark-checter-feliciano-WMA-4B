@@ -35,6 +35,7 @@ import {
 import "./MyAttendance.css";
 
 import { API_CONFIG } from "../config/api.config";
+import { formatLocalDate, formatLocalTime } from '../utils/dateTime';
 
 const API_URL = API_CONFIG.BASE_URL;
 
@@ -43,8 +44,8 @@ interface AttendanceRecord {
   checkInTime: string;
   location: string;
   status: string;
-  date: string;
-  time: string;
+  date?: string;
+  time?: string;
 }
 
 interface Reward {
@@ -298,12 +299,12 @@ const MyAttendance: React.FC = () => {
                       <IonCardContent>
                         <div className="attendance-date">
                           <IonIcon icon={calendar} />
-                          <span>{record.date}</span>
+                          <span>{record.checkInTime ? formatLocalDate(record.checkInTime) : ''}</span>
                         </div>
                         <div className="attendance-details">
                           <div className="detail-item">
                             <IonIcon icon={timeOutline} />
-                            <span>{record.time}</span>
+                            <span>{record.checkInTime ? formatLocalTime(record.checkInTime) : ''}</span>
                           </div>
                           <div className="detail-item">
                             <IonIcon icon={location} />

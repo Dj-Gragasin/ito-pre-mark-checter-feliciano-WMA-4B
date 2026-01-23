@@ -35,6 +35,7 @@ import { QRCodeSVG } from "qrcode.react";
 import "./AdminAttendance.css";
 
 import { API_CONFIG } from "../config/api.config";
+import { formatLocalTime } from "../utils/dateTime";
 
 interface AttendanceRecord {
   id: number;
@@ -42,8 +43,8 @@ interface AttendanceRecord {
   fullName: string;
   email: string;
   checkInTime: string;
-  date: string;
-  time: string;
+  date?: string;
+  time?: string;
   location: string;
   status: "present" | "late";
 }
@@ -324,7 +325,7 @@ const AdminAttendance: React.FC = () => {
                               <td>
                                 <div className="time-cell">
                                   <IonIcon icon={timeOutline} />
-                                  <span>{record.time}</span>
+                                  <span>{record.checkInTime ? formatLocalTime(record.checkInTime) : ''}</span>
                                 </div>
                               </td>
                               <td>
@@ -369,7 +370,7 @@ const AdminAttendance: React.FC = () => {
                                 <div className="attendance-details" style={{ marginTop: 12 }}>
                                   <div className="detail-item">
                                     <IonIcon icon={timeOutline} />
-                                    <span>{record.time}</span>
+                                    <span>{record.checkInTime ? formatLocalTime(record.checkInTime) : ''}</span>
                                   </div>
                                   <div className="detail-item">
                                     <IonIcon icon={locationOutline} />

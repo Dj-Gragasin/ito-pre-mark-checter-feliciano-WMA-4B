@@ -1,5 +1,8 @@
 import dotenv from 'dotenv';
-dotenv.config();
+import path from 'path';
+
+// Load env vars from activecore-db/.env even if the server is started from a different working directory.
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 // Initialize Sentry FIRST, before any other code
 import { initSentry, sentryRequestHandler, sentryErrorHandler } from './config/sentry.config';
@@ -45,6 +48,9 @@ if (process.env.TRUST_PROXY && process.env.TRUST_PROXY !== '0' && process.env.TR
 // SECURITY: Validate JWT_SECRET at startup
 // ============================================
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  console.error('\n❌ JWT_SECRET is missing or too short. It must be at least 32 characters.');
+  console.error('   Fix: set JWT_SECRET in activecore-db/.env (local) or in Render env vars (production).');
+  console.error('   Tip: run `npm run gen:jwt` in activecore-db to generate one.\n');
   process.exit(1);
 }
 
@@ -253,6 +259,59 @@ const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) 
     });
   }
 };
+
+const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if ((req.user?.role || '') !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Admin access required' });
+  }
+  next();
+};
+
+async function ensureEquipmentTable() {
+  // Prefer PostgreSQL DDL (this backend uses `pg` behind a MySQL-placeholder wrapper).
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS equipment (
+        id SERIAL PRIMARY KEY,
+        equip_name VARCHAR(255) NOT NULL,
+        category VARCHAR(50) NOT NULL DEFAULT 'cardio',
+        purchase_date DATE NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'operational' CHECK (status IN ('operational', 'maintenance', 'broken')),
+        last_maintenance DATE,
+        next_schedule DATE,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_equipment_status ON equipment(status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_equipment_category ON equipment(category)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_equipment_purchase_date ON equipment(purchase_date)`);
+    return;
+  } catch (err: any) {
+    // fall through
+  }
+
+  // MySQL fallback for local setups.
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS equipment (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        equip_name VARCHAR(255) NOT NULL,
+        category VARCHAR(50) NOT NULL DEFAULT 'cardio',
+        purchase_date DATE NOT NULL,
+        status ENUM('operational','maintenance','broken') NOT NULL DEFAULT 'operational',
+        last_maintenance DATE NULL,
+        next_schedule DATE NULL,
+        notes TEXT NULL,
+        created_at DATETIME NOT NULL DEFAULT NOW(),
+        updated_at DATETIME NOT NULL DEFAULT NOW()
+      )
+    `);
+  } catch (err: any) {
+    logWarn('Failed to ensure equipment table', err?.message || String(err));
+  }
+}
 
 // ===== HELPER FUNCTIONS =====
 
@@ -2062,9 +2121,9 @@ app.post('/api/attendance/checkin', authenticateToken, async (req: AuthRequest, 
 
     const tokenId = Number(tokenRows[0].id);
 
-    // Prevent duplicate check-in for today
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
+    // Prevent duplicate check-in for today (PH time)
+    const PH_TZ = 'Asia/Manila';
+    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: PH_TZ });
     const [existing] = await pool.query<any>(
      
       `SELECT id FROM attendance WHERE user_id = ? AND DATE(check_in_time) = ?`,
@@ -2118,8 +2177,6 @@ app.post('/api/attendance/checkin', authenticateToken, async (req: AuthRequest, 
       attendance: {
         id: attendanceRow?.id,
         checkInTime: checkInTimeStr,
-        date: checkInTimeStr.split('T')[0],
-        time: new Date(checkInTimeStr).toLocaleTimeString(),
         location: attendanceRow?.location ?? (location || 'Main Gym'),
         status: attendanceRow?.status ?? 'present',
       },
@@ -2135,6 +2192,7 @@ app.post('/api/attendance/checkin', authenticateToken, async (req: AuthRequest, 
 app.get('/api/attendance/history', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
+    const PH_TZ = 'Asia/Manila';
     const [rows] = await pool.query<any>(
       `SELECT id, check_in_time, location, status FROM attendance WHERE user_id = ? ORDER BY check_in_time DESC`,
       [userId]
@@ -2156,8 +2214,6 @@ app.get('/api/attendance/history', authenticateToken, async (req: AuthRequest, r
         checkInTime: checkInTimeStr,
         location: r.location,
         status: r.status,
-        date: checkInTimeStr.split('T')[0],
-        time: new Date(checkInTimeStr).toLocaleTimeString(),
       };
     });
 
@@ -2165,7 +2221,7 @@ app.get('/api/attendance/history', authenticateToken, async (req: AuthRequest, r
     let currentStreak = 0;
     let prevDate = null;
     for (const record of attendance) {
-      const date = record.checkInTime.split('T')[0];
+      const date = new Date(record.checkInTime).toLocaleDateString('en-CA', { timeZone: PH_TZ });
       if (!prevDate) {
         prevDate = date;
         currentStreak = 1;
@@ -2195,10 +2251,40 @@ app.get('/api/attendance/history', authenticateToken, async (req: AuthRequest, r
   }
 });
 
+// Member Absence Status Route (for reminders/notifications)
+app.get('/api/attendance/absence-status', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const thresholdDaysRaw = req.query.thresholdDays as string | undefined;
+    const thresholdDays = Math.max(1, Number.isFinite(Number(thresholdDaysRaw)) ? Number(thresholdDaysRaw) : 3);
+
+    const [rows] = await pool.query<any>(
+      'SELECT DATE(MAX(check_in_time)) AS last_day, DATEDIFF(CURDATE(), DATE(MAX(check_in_time))) AS days_since FROM attendance WHERE user_id = ?',
+      [userId]
+    );
+
+    const lastDay: string | null = rows?.[0]?.last_day ? String(rows[0].last_day) : null;
+    const daysSinceLastAttendance: number | null =
+      rows?.[0]?.days_since === null || rows?.[0]?.days_since === undefined ? null : Number(rows[0].days_since);
+
+    const isAbsent = lastDay === null ? true : (daysSinceLastAttendance ?? 0) >= thresholdDays;
+
+    return res.json({
+      success: true,
+      lastAttendanceDate: lastDay,
+      daysSinceLastAttendance,
+      thresholdDays,
+      isAbsent,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch absence status.', error: getErrorMessage(err) });
+  }
+});
+
 // Admin: Who is present today
 app.get('/api/admin/attendance/today', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
     const [rows] = await pool.query<any>(
       `SELECT a.id, a.user_id, a.check_in_time, a.location, u.first_name, u.last_name, u.email
        FROM attendance a
@@ -2215,7 +2301,8 @@ app.get('/api/admin/attendance/today', authenticateToken, async (req: AuthReques
 
 app.get('/api/admin/attendance', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const date = req.query.date as string || new Date().toISOString().split('T')[0];
+    const PH_TZ = 'Asia/Manila';
+    const date = (req.query.date as string) || new Date().toLocaleDateString('en-CA', { timeZone: PH_TZ });
     const [rows] = await pool.query<any>(
       `SELECT a.id, a.user_id, a.check_in_time, a.location, u.first_name, u.last_name, u.email
        FROM attendance a
@@ -2225,17 +2312,21 @@ app.get('/api/admin/attendance', authenticateToken, async (req: AuthRequest, res
       [date]
     );
     // Format for frontend
-    const attendance = rows.map(r => ({
-      id: r.id,
-      userId: r.user_id,
-      fullName: `${r.first_name} ${r.last_name}`,
-      email: r.email,
-      checkInTime: r.check_in_time,
-      date: new Date(r.check_in_time).toLocaleDateString(),
-      time: new Date(r.check_in_time).toLocaleTimeString(),
-      location: r.location,
-      status: "present"
-    }));
+    const attendance = rows.map(r => {
+      const checkInTimeStr =
+        typeof r.check_in_time === 'string'
+          ? r.check_in_time
+          : (r.check_in_time instanceof Date ? r.check_in_time.toISOString() : String(r.check_in_time));
+      return {
+        id: r.id,
+        userId: r.user_id,
+        fullName: `${r.first_name} ${r.last_name}`,
+        email: r.email,
+        checkInTime: checkInTimeStr,
+        location: r.location,
+        status: "present"
+      };
+    });
     res.json({ success: true, attendance });
   } catch (err: any) {
     res.status(500).json({ success: false, message: "Failed to fetch attendance." });
@@ -2472,6 +2563,13 @@ async function initialize() {
         INDEX (type)
       )
     `);
+  } catch (err) {
+  }
+})();
+
+(async function ensureEquipmentTableAtStartup() {
+  try {
+    await ensureEquipmentTable();
   } catch (err) {
   }
 })();
@@ -2859,6 +2957,151 @@ app.post('/api/payments/paypal/capture-order', authenticateToken, async (req: Au
     const { orderId } = req.body;
 
     if (!orderId) {
+
+// ==================== EQUIPMENT ROUTES (ADMIN) ====================
+
+type EquipmentRow = {
+  id: number;
+  equip_name: string;
+  category: string;
+  purchase_date: any;
+  status: string;
+  last_maintenance: any;
+  next_schedule: any;
+  notes: string | null;
+};
+
+const toIsoDateOrEmpty = (input: any): string => {
+  if (!input) return '';
+  if (typeof input === 'string') return input.slice(0, 10);
+  if (input instanceof Date) return input.toISOString().slice(0, 10);
+  return String(input).slice(0, 10);
+};
+
+const mapEquipmentRow = (r: EquipmentRow) => ({
+  id: r.id,
+  equipName: r.equip_name,
+  category: r.category,
+  purchaseDate: toIsoDateOrEmpty(r.purchase_date),
+  status: r.status,
+  lastMaintenance: toIsoDateOrEmpty(r.last_maintenance),
+  nextSchedule: toIsoDateOrEmpty(r.next_schedule),
+  notes: r.notes || '',
+});
+
+app.get('/api/equipment', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const [rows] = await pool.query<EquipmentRow>(
+      `SELECT id, equip_name, category, purchase_date, status, last_maintenance, next_schedule, notes
+       FROM equipment
+       ORDER BY equip_name ASC, id DESC`
+    );
+    res.json({ success: true, equipments: (rows || []).map(mapEquipmentRow) });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Failed to fetch equipment', error: getErrorMessage(err) });
+  }
+});
+
+app.post('/api/equipment', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const {
+      equipName,
+      category,
+      purchaseDate,
+      status,
+      lastMaintenance,
+      nextSchedule,
+      notes,
+    } = req.body || {};
+
+    if (!equipName || String(equipName).trim() === '') {
+      return res.status(400).json({ success: false, message: 'Equipment name is required' });
+    }
+    if (!purchaseDate || String(purchaseDate).trim() === '') {
+      return res.status(400).json({ success: false, message: 'Purchase date is required' });
+    }
+
+    const [rows] = await pool.query<any>(
+      `INSERT INTO equipment (
+        equip_name, category, purchase_date, status, last_maintenance, next_schedule, notes, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+      RETURNING id`,
+      [
+        String(equipName).trim(),
+        String(category || 'cardio'),
+        String(purchaseDate).slice(0, 10),
+        String(status || 'operational'),
+        lastMaintenance ? String(lastMaintenance).slice(0, 10) : null,
+        nextSchedule ? String(nextSchedule).slice(0, 10) : null,
+        notes ? String(notes) : null,
+      ]
+    );
+
+    const newId = rows?.[0]?.id;
+    res.status(201).json({ success: true, id: newId });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Failed to add equipment', error: getErrorMessage(err) });
+  }
+});
+
+app.put('/api/equipment/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid equipment id' });
+    }
+
+    const {
+      equipName,
+      category,
+      purchaseDate,
+      status,
+      lastMaintenance,
+      nextSchedule,
+      notes,
+    } = req.body || {};
+
+    if (!equipName || String(equipName).trim() === '') {
+      return res.status(400).json({ success: false, message: 'Equipment name is required' });
+    }
+    if (!purchaseDate || String(purchaseDate).trim() === '') {
+      return res.status(400).json({ success: false, message: 'Purchase date is required' });
+    }
+
+    await pool.query(
+      `UPDATE equipment
+       SET equip_name = ?, category = ?, purchase_date = ?, status = ?, last_maintenance = ?, next_schedule = ?, notes = ?, updated_at = NOW()
+       WHERE id = ?`,
+      [
+        String(equipName).trim(),
+        String(category || 'cardio'),
+        String(purchaseDate).slice(0, 10),
+        String(status || 'operational'),
+        lastMaintenance ? String(lastMaintenance).slice(0, 10) : null,
+        nextSchedule ? String(nextSchedule).slice(0, 10) : null,
+        notes ? String(notes) : null,
+        id,
+      ]
+    );
+
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Failed to update equipment', error: getErrorMessage(err) });
+  }
+});
+
+app.delete('/api/equipment/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid equipment id' });
+    }
+    await pool.query('DELETE FROM equipment WHERE id = ?', [id]);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Failed to delete equipment', error: getErrorMessage(err) });
+  }
+});
       return res.status(400).json({ success: false, message: 'Missing orderId' });
     }
 

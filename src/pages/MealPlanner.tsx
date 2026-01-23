@@ -5,6 +5,7 @@ import {
   IonToolbar,
   IonTitle,
   IonContent,
+  IonFooter,
   IonCard,
   IonCardContent,
   IonButton,
@@ -1597,7 +1598,7 @@ const MealPlanner: React.FC = () => {
               </IonButtons>
             </IonToolbar>
           </IonHeader>
-          <IonContent className="ion-padding">
+          <IonContent className="mp-modal-content">
             {editingMeal && (
               <div className="modal-content">
                 <p className="modal-info">
@@ -1606,13 +1607,18 @@ const MealPlanner: React.FC = () => {
                 <p className="modal-description">
                   This will generate a DIFFERENT Filipino dish while keeping the same nutritional targets.
                 </p>
+              </div>
+            )}
+          </IonContent>
+
+          {editingMeal && (
+            <IonFooter>
+              <div className="mp-modal-actions">
                 <IonButton
                   expand="block"
                   color="warning"
                   onClick={async () => {
-                    if (editingMeal) {
-                      await regenerateMeal(editingMeal.dayIndex, editingMeal.mealType);
-                    }
+                    await regenerateMeal(editingMeal.dayIndex, editingMeal.mealType);
                   }}
                   disabled={loading}
                   className="regenerate-btn"
@@ -1629,9 +1635,13 @@ const MealPlanner: React.FC = () => {
                     </>
                   )}
                 </IonButton>
+
+                <IonButton expand="block" fill="outline" color="medium" onClick={() => setShowEditModal(false)}>
+                  Cancel
+                </IonButton>
               </div>
-            )}
-          </IonContent>
+            </IonFooter>
+          )}
         </IonModal>
 
         {/* Recipe Modal */}
@@ -1646,7 +1656,7 @@ const MealPlanner: React.FC = () => {
               </IonButtons>
             </IonToolbar>
           </IonHeader>
-          <IonContent className="ion-padding recipe-modal">
+          <IonContent className="mp-modal-content recipe-modal">
             {selectedMeal && (
               <div className="recipe-content">
                 <h3 className="recipe-title">{selectedMeal.day} - {selectedMeal.mealType.toUpperCase()}</h3>
@@ -1711,7 +1721,7 @@ const MealPlanner: React.FC = () => {
               </IonButtons>
             </IonToolbar>
           </IonHeader>
-          <IonContent className="ion-padding">
+          <IonContent className="mp-modal-content">
             <IonItem>
               <IonLabel position="stacked">Plan name</IonLabel>
               <IonInput
@@ -1720,12 +1730,15 @@ const MealPlanner: React.FC = () => {
                 onIonChange={(e: any) => setPlanName(e.detail?.value as string)}
               />
             </IonItem>
+          </IonContent>
 
-            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          <IonFooter>
+            <div className="mp-modal-actions">
               <IonButton
+                expand="block"
                 color="primary"
                 onClick={async () => {
-                  await saveMealPlan(); // uses existing saveMealPlan() in file
+                  await saveMealPlan();
                 }}
                 disabled={!mealPlan}
               >
@@ -1733,15 +1746,11 @@ const MealPlanner: React.FC = () => {
                 Save
               </IonButton>
 
-              <IonButton
-                color="medium"
-                fill="outline"
-                onClick={() => setShowSaveModal(false)}
-              >
+              <IonButton expand="block" color="medium" fill="outline" onClick={() => setShowSaveModal(false)}>
                 Cancel
               </IonButton>
             </div>
-          </IonContent>
+          </IonFooter>
         </IonModal>
 
         {/* Saved Plans Modal */}
@@ -1756,7 +1765,7 @@ const MealPlanner: React.FC = () => {
               </IonButtons>
             </IonToolbar>
           </IonHeader>
-          <IonContent>
+          <IonContent className="mp-modal-content">
             <div className="saved-plans-list">
               {savedPlans.length === 0 ? (
                 <div className="empty-state">
