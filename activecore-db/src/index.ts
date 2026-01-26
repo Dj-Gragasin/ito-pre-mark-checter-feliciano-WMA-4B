@@ -99,10 +99,7 @@ app.use(securityHeaders);
 // Apply general rate limiting to all requests
 app.use(generalLimiter);
 
-// Debug: log incoming requests and origin so we can diagnose CORS issues
-app.use((req: Request, res: Response, next: NextFunction) => {
-  next();
-});
+
 
 // CORS: allow all in development; set safe origin + support preflight
 if (process.env.NODE_ENV === 'development') {
@@ -2880,6 +2877,7 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 process.on('unhandledRejection', (reason: any) => {
+  console.error('Unhandled promise rejection:', reason);
 });
 
 // ===== START SERVER =====
