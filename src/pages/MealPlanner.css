@@ -130,11 +130,35 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
+/* Prevent stacked labels from overlapping form controls */
+.config-card ion-item.item-label-stacked,
+.config-card ion-item.item-label-floating {
+  --padding-top: 12px;
+  --padding-bottom: 12px;
+  --inner-padding-top: 12px;
+  --inner-padding-bottom: 12px;
+  --min-height: 74px;
+}
+
+.config-card ion-item.item-label-stacked ion-label,
+.config-card ion-item.item-label-floating ion-label {
+  margin: 0 0 8px 0 !important;
+  line-height: 1.15;
+}
+
+.config-card ion-item.item-label-stacked ion-select,
+.config-card ion-item.item-label-stacked ion-input,
+.config-card ion-item.item-label-stacked ion-textarea,
+.config-card ion-item.item-label-floating ion-select,
+.config-card ion-item.item-label-floating ion-input,
+.config-card ion-item.item-label-floating ion-textarea {
+  margin-top: 2px;
+}
+
 .config-card ion-label {
   color: #00e676 !important;
   font-weight: 600;
   font-size: 1rem;
-  margin-bottom: 0.5rem;
 }
 
 /* Ion Select - Dark Theme */

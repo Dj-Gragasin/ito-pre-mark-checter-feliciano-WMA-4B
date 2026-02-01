@@ -1,5 +1,9 @@
 ### Step 1: Set Up MySQL Database
 
+> Note (2026): This backend runs on PostgreSQL in production (e.g. Supabase) via the `pg` driver.
+> For local development, put your Supabase connection string and secrets in `activecore-db/.env.local`.
+> See `activecore-db/.env.local.example` for the required keys.
+
 1. **Install MySQL**: If you haven't already, install MySQL on your local machine or use a cloud-based MySQL service.
 
 2. **Create a Database**:

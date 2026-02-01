@@ -18,7 +18,6 @@ import {
   IonIcon,
   IonModal,
   IonButtons,
-  IonTextarea,
   IonGrid,
   IonRow,
   IonCol,
@@ -52,6 +51,7 @@ import {
 import "./MealPlanner.css";
 
 import { API_CONFIG } from "../config/api.config";
+import { ensureToken } from "../services/auth.service";
 
 const API_URL = API_CONFIG.BASE_URL;
 
@@ -207,7 +207,7 @@ const MealPlanner: React.FC = () => {
   const [mealType, setMealType] = useState<string>("balanced");
   const [goal, setGoal] = useState<string>("muscle_gain");
   const [diet, setDiet] = useState<string>(""); 
-  const [dietaryRestrictions, setDietaryRestrictions] = useState<string>("");
+  const [allergies, setAllergies] = useState<string[]>([]);
   const [calorieTarget, setCalorieTarget] = useState<number>(2000);
   const [proteinTarget, setProteinTarget] = useState<number>(150);
   const [carbsTarget, setCarbsTarget] = useState<number>(200);
@@ -251,12 +251,53 @@ const MealPlanner: React.FC = () => {
     loadSavedPlans();
   }, []);
 
+  const COMMON_ALLERGIES: Array<{ value: string; label: string }> = [
+    { value: 'dairy', label: 'Dairy (Milk, Cheese)' },
+    { value: 'egg', label: 'Egg' },
+    { value: 'fish', label: 'Fish' },
+    { value: 'shellfish', label: 'Shellfish (Shrimp/Crab)' },
+    { value: 'peanut', label: 'Peanuts' },
+    { value: 'tree_nut', label: 'Tree Nuts (Cashew/Almond)' },
+    { value: 'soy', label: 'Soy' },
+    { value: 'wheat_gluten', label: 'Wheat / Gluten' },
+    { value: 'sesame', label: 'Sesame' },
+  ];
+
+  const parseDelimitedSelection = (input: any): string[] => {
+    if (!input) return [];
+    if (Array.isArray(input)) return input.map(String).map(s => s.trim()).filter(Boolean);
+    if (typeof input !== 'string') return [];
+    return input
+      .split(/[\r\n,;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  };
+
+  const normalizeToKnownValues = (raw: string[], known: Array<{ value: string; label: string }>): string[] => {
+    const knownByValue = new Map(known.map((k) => [k.value.toLowerCase(), k.value]));
+    const knownByLabel = new Map(known.map((k) => [k.label.toLowerCase(), k.value]));
+    return raw
+      .map((r) => String(r || '').trim())
+      .filter(Boolean)
+      .map((r) => {
+        const low = r.toLowerCase();
+        return knownByValue.get(low) || knownByLabel.get(low) || null;
+      })
+      .filter(Boolean) as string[];
+  };
+
   const loadPreferences = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = (await ensureToken()) || localStorage.getItem("token") || "";
+      if (!token) return;
       const response = await fetch(`${API_URL}/meal-planner/preferences`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
+      if (!response.ok) {
+        // Preferences are optional; avoid noisy console errors on first run.
+        return;
+      }
 
       const data = await response.json();
       if (data.success && data.hasPreferences) {
@@ -264,7 +305,10 @@ const MealPlanner: React.FC = () => {
         setLifestyle(pref.lifestyle);
         setMealType(pref.mealType);
         setGoal(pref.goal);
-        setDietaryRestrictions(pref.dietaryRestrictions || "");
+        // Backward compatible: if older prefs stored a free-text restrictions field,
+        // best-effort map it into our known allergy options.
+        const prefAllergiesRaw = parseDelimitedSelection(pref.allergies || pref.dietaryRestrictions || '');
+        setAllergies(normalizeToKnownValues(prefAllergiesRaw, COMMON_ALLERGIES));
         if (pref.targets) {
           setCalorieTarget(pref.targets.calories || 2000);
           setProteinTarget(pref.targets.protein || 150);
@@ -323,7 +367,7 @@ const MealPlanner: React.FC = () => {
         mealType,
         goal,
         diet, // NEW: Add diet to the request
-        dietaryRestrictions,
+        allergies,
         targets: {
           calories: calorieTarget,
           protein: proteinTarget,
@@ -417,10 +461,19 @@ const MealPlanner: React.FC = () => {
   // Update loadSavedPlans to handle rows with/without updatedAt
   const loadSavedPlans = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = (await ensureToken()) || localStorage.getItem("token") || "";
+      if (!token) {
+        setSavedPlans([]);
+        return;
+      }
       const response = await fetch(`${API_URL}/meal-planner/plans`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
+      if (!response.ok) {
+        setSavedPlans([]);
+        return;
+      }
 
       const data = await response.json();
       if (data.success) {
@@ -837,7 +890,8 @@ const MealPlanner: React.FC = () => {
         lifestyle,
         preference: mealType,
         goal,
-        dietaryRestrictions,
+        diet,
+        allergies,
         targets: {
           calories: calorieTarget,
           protein: proteinTarget,
@@ -1076,23 +1130,31 @@ const MealPlanner: React.FC = () => {
 
                 {/* Allergies/Restrictions Section */}
                 <div className="form-group">
-                  <IonItem className="custom-item">
+                  <IonItem className="custom-item" lines="none">
                     <IonLabel position="stacked">
-                      <IonIcon icon={warning} style={{ color: "#ff9800" }} /> Allergies & Dietary Restrictions
+                      <IonIcon icon={warning} style={{ color: "#ff9800" }} /> Allergies
                     </IonLabel>
-                    <IonTextarea
-                      placeholder="e.g., Allergic to seafood, shellfish, dairy, nuts, gluten-free, vegetarian..."
-                      value={dietaryRestrictions}
-                      onIonChange={(e) => setDietaryRestrictions(e.detail.value!)}
-                      rows={3}
-                      className="custom-textarea"
-                    />
+                    <IonSelect
+                      multiple
+                      value={allergies}
+                      placeholder="Select allergies (optional)"
+                      onIonChange={(e) => setAllergies((e.detail.value as string[]) || [])}
+                    >
+                      {COMMON_ALLERGIES.map((opt) => (
+                        <IonSelectOption key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </IonSelectOption>
+                      ))}
+                    </IonSelect>
                   </IonItem>
                 </div>
-                {dietaryRestrictions && (
+                {allergies.length > 0 && (
                   <div className="restriction-chip">
                     <IonIcon icon={checkmarkCircle} />
-                    <IonLabel>Restrictions Applied</IonLabel>
+                    <IonLabel>
+                      Preferences Applied
+                      {` • ${allergies.length} allerg${allergies.length === 1 ? 'y' : 'ies'}`}
+                    </IonLabel>
                   </div>
                 )}
 

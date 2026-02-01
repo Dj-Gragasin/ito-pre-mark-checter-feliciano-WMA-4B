@@ -22,6 +22,10 @@ activecore-db/node_modules/
 activecore-db/.env
 *.backup.*
 
+# Local meal import source files (keep out of git)
+activecore-db/*.docx
+activecore-db/60newMeals_*.md
+
 # Android / signing secrets (never commit)
 android/key.properties
 android/local.properties

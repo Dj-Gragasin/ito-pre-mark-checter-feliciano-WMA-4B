@@ -1,8 +1,21 @@
 import { Pool, QueryResult, PoolClient } from 'pg';
 import dotenv from 'dotenv';
 import fs from 'fs';
+import path from 'path';
 
-dotenv.config();
+// When running via `npm --prefix`, the process CWD may be the repo root (not activecore-db/).
+// Load env files relative to this package so local dev picks up activecore-db/.env reliably.
+const envCandidates = [
+  path.resolve(__dirname, '../../.env.local'),
+  path.resolve(__dirname, '../../.env'),
+];
+
+const envPath = envCandidates.find(p => fs.existsSync(p));
+if (envPath) {
+  dotenv.config({ path: envPath, override: true });
+} else {
+  dotenv.config();
+}
 
 const parseBool = (value: string | undefined, fallback: boolean): boolean => {
   if (value === undefined) return fallback;
@@ -61,9 +74,33 @@ const sslCaInline = process.env.DB_SSL_CA?.trim();
 const sslCaFilePath = process.env.DB_SSL_CA_FILE?.trim();
 let sslCa: string | undefined;
 
+const looksLikePemCertificate = (value: string): boolean => {
+  const normalized = value.trim();
+  return normalized.includes('-----BEGIN CERTIFICATE-----') && normalized.includes('-----END CERTIFICATE-----');
+};
+
+const looksLikeFilePath = (value: string): boolean => {
+  const v = value.trim();
+  // Windows drive path (e.g. C:\...) or unix-ish absolute path.
+  if (/^[a-zA-Z]:\\/.test(v) || v.startsWith('/') || v.startsWith('\\\\')) return true;
+  // Common cert file extensions.
+  if (/\.(crt|pem|cer)$/i.test(v)) return true;
+  return false;
+};
+
 if (sslCaInline) {
   // Allow newline-escaped PEM values in env vars.
-  sslCa = sslCaInline.includes('\\n') ? sslCaInline.replace(/\\n/g, '\n') : sslCaInline;
+  const expanded = sslCaInline.includes('\\n') ? sslCaInline.replace(/\\n/g, '\n') : sslCaInline;
+  if (looksLikePemCertificate(expanded)) {
+    sslCa = expanded;
+  } else {
+    if (looksLikeFilePath(expanded)) {
+      console.warn('⚠️  DB_SSL_CA looks like a file path, not PEM contents. Ignoring DB_SSL_CA and continuing.');
+      console.warn('   Use DB_SSL_CA with the PEM text, or DB_SSL_CA_FILE with a readable container path.');
+    } else {
+      console.warn('⚠️  DB_SSL_CA is set but does not look like a PEM certificate. Ignoring DB_SSL_CA.');
+    }
+  }
 } else if (sslCaFilePath) {
   try {
     sslCa = fs.readFileSync(sslCaFilePath, 'utf8');

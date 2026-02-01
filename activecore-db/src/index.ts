@@ -1,8 +1,20 @@
 import dotenv from 'dotenv';
+import fs from 'fs';
 import path from 'path';
 
-// Load env vars from activecore-db/.env even if the server is started from a different working directory.
-dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+// When started from the repo root (e.g. `npm --prefix activecore-db ...`), CWD may not be activecore-db/.
+// Load env files relative to this package so local dev reliably picks up activecore-db/.env.local.
+const envCandidates = [
+  path.resolve(__dirname, '..', '.env.local'),
+  path.resolve(__dirname, '..', '.env'),
+];
+
+const envPath = envCandidates.find((p) => fs.existsSync(p));
+if (envPath) {
+  dotenv.config({ path: envPath, override: true });
+} else {
+  dotenv.config();
+}
 
 // Initialize Sentry FIRST, before any other code
 import { initSentry, sentryRequestHandler, sentryErrorHandler } from './config/sentry.config';
@@ -47,11 +59,23 @@ if (process.env.TRUST_PROXY && process.env.TRUST_PROXY !== '0' && process.env.TR
 // ============================================
 // SECURITY: Validate JWT_SECRET at startup
 // ============================================
+// In production we require JWT_SECRET explicitly.
+// In development, allow the dev fallback secret (see getJwtSecret()) but warn.
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
-  console.error('\n❌ JWT_SECRET is missing or too short. It must be at least 32 characters.');
-  console.error('   Fix: set JWT_SECRET in activecore-db/.env (local) or in Render env vars (production).');
-  console.error('   Tip: run `npm run gen:jwt` in activecore-db to generate one.\n');
-  process.exit(1);
+  const isDev = process.env.NODE_ENV === 'development';
+  const message = [
+    'JWT_SECRET is missing or too short. It should be at least 32 characters.',
+    'Fix: set JWT_SECRET in activecore-db/.env.local (local) or in your host env vars (production).',
+    'Tip: run `npm run gen:jwt` in activecore-db to generate one.',
+  ].join('\n   ');
+
+  if (isDev) {
+    console.warn(`\n⚠️  ${message}`);
+    console.warn('   Continuing in development with a fallback secret (tokens will not be stable across restarts).\n');
+  } else {
+    console.error(`\n❌ ${message}\n`);
+    process.exit(1);
+  }
 }
 
 // Track OpenAI availability globally
@@ -233,6 +257,14 @@ interface AuthRequest extends Request {
   user?: any;
 }
 
+function getJwtSecret(): string {
+  const secret = (process.env.JWT_SECRET || '').trim();
+  if (secret) return secret;
+  if (process.env.NODE_ENV === 'development') return 'dev_jwt_secret_change_me';
+  // In production, require explicit secret.
+  throw new Error('JWT_SECRET is not configured');
+}
+
 const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -246,7 +278,7 @@ const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) 
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+    const decoded = jwt.verify(token, getJwtSecret()) as any;
     req.user = decoded;
     next();
   } catch (err: any) {
@@ -670,11 +702,108 @@ function pickUniqueMeals(source: any[], used: Set<string>, count: number) {
   return picked;
 }
 
-function generateWeekPlan(aiDay: any | null, targets: any, goal: string) {
+function normalizeSelectionList(input: any): string[] {
+  if (!input) return [];
+  if (Array.isArray(input)) {
+    return input.map(String).map(s => s.trim()).filter(Boolean);
+  }
+  if (typeof input === 'string') {
+    return input
+      .split(/[\r\n,;]+/)
+      .map(s => s.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+const MEAL_FILTER_KEYWORDS_BY_TOKEN: Record<string, string[]> = {
+  dairy: ['milk', 'cheese', 'butter', 'cream', 'yogurt', 'gatas', 'kesong', 'keso'],
+  dairy_free: ['milk', 'cheese', 'butter', 'cream', 'yogurt', 'gatas', 'kesong', 'keso'],
+  egg: ['egg', 'itlog'],
+  egg_free: ['egg', 'itlog'],
+  fish: ['fish', 'bangus', 'tilapia', 'tuna', 'sardines', 'galunggong'],
+  seafood_free: ['fish', 'bangus', 'tilapia', 'tuna', 'sardines', 'galunggong', 'seafood'],
+  shellfish: ['shrimp', 'prawn', 'hipon', 'crab', 'alimango', 'alimasag', 'lobster', 'shellfish'],
+  shellfish_free: ['shrimp', 'prawn', 'hipon', 'crab', 'alimango', 'alimasag', 'lobster', 'shellfish'],
+  peanut: ['peanut', 'mani'],
+  tree_nut: ['cashew', 'kasuy', 'almond', 'walnut', 'pistachio', 'hazelnut', 'macadamia', 'pecan', 'nut'],
+  nut_free: ['cashew', 'kasuy', 'almond', 'walnut', 'pistachio', 'hazelnut', 'macadamia', 'pecan', 'nut', 'peanut', 'mani'],
+  soy: ['soy', 'tofu', 'tokwa', 'soya', 'soy sauce', 'toyo'],
+  soy_free: ['soy', 'tofu', 'tokwa', 'soya', 'soy sauce', 'toyo'],
+  wheat_gluten: ['wheat', 'gluten', 'flour', 'bread', 'pasta', 'noodle', 'noodles', 'miki', 'pancit', 'bihon', 'misua', 'sotanghon'],
+  gluten_free: ['wheat', 'gluten', 'flour', 'bread', 'pasta', 'noodle', 'noodles', 'miki', 'pancit', 'bihon', 'misua', 'sotanghon'],
+  sesame: ['sesame'],
+};
+
+function dishTextForFilter(dish: any): string {
+  const name = String(dish?.name || '').toLowerCase();
+  const rawIngredients = dish?.ingredients ?? dish?.ingredient ?? dish?.ings ?? '';
+  let ingredientsText = '';
+  if (Array.isArray(rawIngredients)) {
+    ingredientsText = rawIngredients.map(String).join(' ').toLowerCase();
+  } else {
+    ingredientsText = String(rawIngredients || '').toLowerCase();
+  }
+  return `${name} ${ingredientsText}`.trim();
+}
+
+function filterDishesByTokens<T extends any>(source: T[], tokens: string[]): T[] {
+  if (!Array.isArray(source) || source.length === 0) return source;
+  const normalizedTokens = (tokens || []).map(t => String(t || '').toLowerCase().trim()).filter(Boolean);
+  if (normalizedTokens.length === 0) return source;
+
+  const keywordSets = normalizedTokens
+    .map(t => MEAL_FILTER_KEYWORDS_BY_TOKEN[t])
+    .filter(Boolean)
+    .flat();
+
+  if (!keywordSets || keywordSets.length === 0) return source;
+
+  const filtered = source.filter((dish: any) => {
+    const hay = dishTextForFilter(dish);
+    // exclude if any keyword matches
+    return !keywordSets.some((kw) => hay.includes(String(kw).toLowerCase()));
+  });
+
+  return filtered.length > 0 ? filtered : source;
+}
+
+function humanizeTokens(tokens: string[]): string {
+  const map: Record<string, string> = {
+    dairy: 'Dairy',
+    egg: 'Egg',
+    fish: 'Fish',
+    shellfish: 'Shellfish',
+    peanut: 'Peanuts',
+    tree_nut: 'Tree nuts',
+    soy: 'Soy',
+    wheat_gluten: 'Wheat/Gluten',
+    sesame: 'Sesame',
+    gluten_free: 'Gluten-free',
+    dairy_free: 'Dairy-free',
+    egg_free: 'Egg-free',
+    nut_free: 'Nut-free',
+    soy_free: 'Soy-free',
+    seafood_free: 'Seafood-free',
+    shellfish_free: 'Shellfish-free',
+    low_sodium: 'Low sodium',
+    low_sugar: 'Low sugar',
+    halal: 'Halal',
+  };
+  const uniq = Array.from(new Set((tokens || []).map(t => String(t || '').trim()).filter(Boolean)));
+  if (uniq.length === 0) return 'none';
+  return uniq.map(t => map[t] || t).join(', ');
+}
+
+function generateWeekPlan(aiDay: any | null, targets: any, goal: string, restrictionTokens: string[] = []) {
   const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   const used = new Set<string>();
   const usedSnacks = new Set<string>();
   const weekPlan: any[] = [];
+
+  // Best-effort filtering for fallback generation based on allergies/restriction tokens.
+  const mealsPool = filterDishesByTokens(trustedFilipinoMealsDetailed, restrictionTokens);
+  const snacksPool = filterDishesByTokens(filipinoSnacks, restrictionTokens);
 
   if (aiDay && aiDay.meals) {
     Object.values(aiDay.meals).forEach((m: any) => {
@@ -702,16 +831,17 @@ function generateWeekPlan(aiDay: any | null, targets: any, goal: string) {
     }
 
     // Pick 3 main meals (breakfast, lunch, dinner) from meals list
-    const picks = pickUniqueMeals(trustedFilipinoMealsDetailed, used, 3);
+    const picks = pickUniqueMeals(mealsPool, used, 3);
 
     while (picks.length < 3) {
-      const fallback = trustedFilipinoMealsDetailed[Math.floor(Math.random() * trustedFilipinoMealsDetailed.length)];
+      const fallbackSource = mealsPool.length > 0 ? mealsPool : trustedFilipinoMealsDetailed;
+      const fallback = fallbackSource[Math.floor(Math.random() * fallbackSource.length)];
       if (!picks.find(p => p.name === fallback.name)) picks.push(fallback);
     }
 
     // Pick 2 snacks from SNACKS list only
-    const snack1 = pickUniqueMeals(filipinoSnacks, usedSnacks, 1)[0];
-    const snack2 = pickUniqueMeals(filipinoSnacks, usedSnacks, 1)[0];
+    const snack1 = pickUniqueMeals(snacksPool, usedSnacks, 1)[0];
+    const snack2 = pickUniqueMeals(snacksPool, usedSnacks, 1)[0];
 
     const mealsObj: any = {
       breakfast: createMealObject(picks[0]),
@@ -971,7 +1101,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 
     const token = jwt.sign(
       { id: user.id, role: user.role },
-      process.env.JWT_SECRET!,
+      getJwtSecret(),
       { expiresIn: '24h' }
     );
 
@@ -988,6 +1118,51 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     });
   } catch (error: any) {
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ===== DEV UTILITIES (development only) =====
+// Creates a JWT for an existing user by email, for local/dev convenience.
+app.post('/api/dev/token', async (req, res) => {
+  try {
+    if (process.env.NODE_ENV !== 'development') {
+      return res.status(404).json({ success: false, message: 'Not found' });
+    }
+
+    const email = String(req.body?.email || '').trim();
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+
+    const [users] = await pool.query<any>(
+      'SELECT id, email, first_name, last_name, role FROM users WHERE email = ?',
+      [email]
+    );
+
+    if (!Array.isArray(users) || users.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const user = users[0];
+    const token = jwt.sign(
+      { id: user.id, role: user.role },
+      getJwtSecret(),
+      { expiresIn: '24h' }
+    );
+
+    return res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        role: user.role,
+      },
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: 'Failed to issue dev token', error: getErrorMessage(err) });
   }
 });
 
@@ -1698,15 +1873,191 @@ app.get('/api/admin/payments/summary', authenticateToken, async (req: AuthReques
 });
 
 // ===== MEAL PLANNER ROUTES =====
+function parseJsonValue(value: any): any {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'object') return value;
+  const str = String(value || '').trim();
+  if (!str) return null;
+  try {
+    return JSON.parse(str);
+  } catch {
+    return null;
+  }
+}
+
+async function getUserMealPreferences(userId: number): Promise<any | null> {
+  try {
+    const [rows] = await pool.query<any>(
+      'SELECT * FROM user_meal_preferences WHERE user_id = ? ORDER BY id DESC LIMIT 1',
+      [userId]
+    );
+    if (!Array.isArray(rows) || rows.length === 0) return null;
+
+    const row = rows[0] as any;
+    const prefJson = row.preferences ? (parseJsonValue(row.preferences) || {}) : null;
+
+    let allergies: any[] = [];
+    if (prefJson && typeof prefJson === 'object' && Array.isArray((prefJson as any).allergies)) {
+      allergies = (prefJson as any).allergies;
+    } else if (row.allergies) {
+      const parsed = parseJsonValue(row.allergies);
+      if (Array.isArray(parsed)) allergies = parsed;
+    } else if (row.dietary_restrictions) {
+      const dr = parseJsonValue(row.dietary_restrictions) ?? row.dietary_restrictions;
+      if (Array.isArray(dr)) {
+        allergies = dr;
+      } else if (dr && typeof dr === 'object') {
+        const maybe = (dr as any).allergies || (dr as any).avoid || (dr as any).tokens;
+        if (Array.isArray(maybe)) allergies = maybe;
+      }
+    }
+
+    const targets = parseJsonValue(row.targets) ?? row.targets ?? (prefJson ? (prefJson as any).targets : null);
+
+    return {
+      lifestyle: prefJson?.lifestyle ?? row.lifestyle ?? null,
+      mealType: prefJson?.mealType ?? row.meal_type ?? row.mealType ?? null,
+      goal: prefJson?.goal ?? row.goal ?? null,
+      diet: prefJson?.diet ?? row.diet ?? null,
+      allergies,
+      targets: targets && typeof targets === 'object' ? targets : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function upsertUserMealPreferences(userId: number, prefs: any): Promise<void> {
+  const payload = prefs && typeof prefs === 'object' ? prefs : {};
+
+  // Schema detection (supports both legacy JSON `preferences` and column-based schemas).
+  const hasPrefsJson = await dbColumnExists('user_meal_preferences', 'preferences');
+  if (hasPrefsJson) {
+    const [rows] = await pool.query<any>('SELECT id FROM user_meal_preferences WHERE user_id = ? LIMIT 1', [userId]);
+    const json = JSON.stringify(payload);
+    if (Array.isArray(rows) && rows.length > 0) {
+      await pool.query('UPDATE user_meal_preferences SET preferences = ? WHERE user_id = ?', [json, userId]);
+    } else {
+      await pool.query(
+        'INSERT INTO user_meal_preferences (user_id, preferences, created_at) VALUES (?, ?, NOW())',
+        [userId, json]
+      );
+    }
+    return;
+  }
+
+  const hasLifestyle = await dbColumnExists('user_meal_preferences', 'lifestyle');
+  const hasMealType = await dbColumnExists('user_meal_preferences', 'meal_type');
+  const hasGoal = await dbColumnExists('user_meal_preferences', 'goal');
+  const hasDiet = await dbColumnExists('user_meal_preferences', 'diet');
+  const hasDietaryRestrictions = await dbColumnExists('user_meal_preferences', 'dietary_restrictions');
+  const hasTargets = await dbColumnExists('user_meal_preferences', 'targets');
+
+  const setClauses: string[] = [];
+  const values: any[] = [];
+
+  if (hasLifestyle) { setClauses.push('lifestyle = ?'); values.push(payload.lifestyle ?? null); }
+  if (hasMealType) { setClauses.push('meal_type = ?'); values.push(payload.mealType ?? payload.meal_type ?? null); }
+  if (hasGoal) { setClauses.push('goal = ?'); values.push(payload.goal ?? null); }
+  if (hasDiet) { setClauses.push('diet = ?'); values.push(payload.diet ?? null); }
+  if (hasDietaryRestrictions) {
+    const dr = {
+      allergies: Array.isArray(payload.allergies) ? payload.allergies : [],
+      deprecatedDietaryRestrictions: Array.isArray(payload.dietaryRestrictions) ? payload.dietaryRestrictions : [],
+    };
+    setClauses.push('dietary_restrictions = ?');
+    values.push(JSON.stringify(dr));
+  }
+  if (hasTargets) {
+    setClauses.push('targets = ?');
+    values.push(payload.targets ? JSON.stringify(payload.targets) : null);
+  }
+
+  if (setClauses.length === 0) return;
+
+  const [rows] = await pool.query<any>('SELECT id FROM user_meal_preferences WHERE user_id = ? LIMIT 1', [userId]);
+  if (Array.isArray(rows) && rows.length > 0) {
+    await pool.query(`UPDATE user_meal_preferences SET ${setClauses.join(', ')} WHERE user_id = ?`, [...values, userId]);
+  } else {
+    const insertCols: string[] = ['user_id'];
+    const insertVals: any[] = [userId];
+    const insertPlaceholders: string[] = ['?'];
+
+    // Mirror the set clauses into an INSERT.
+    if (hasLifestyle) { insertCols.push('lifestyle'); insertVals.push(payload.lifestyle ?? null); insertPlaceholders.push('?'); }
+    if (hasMealType) { insertCols.push('meal_type'); insertVals.push(payload.mealType ?? payload.meal_type ?? null); insertPlaceholders.push('?'); }
+    if (hasGoal) { insertCols.push('goal'); insertVals.push(payload.goal ?? null); insertPlaceholders.push('?'); }
+    if (hasDiet) { insertCols.push('diet'); insertVals.push(payload.diet ?? null); insertPlaceholders.push('?'); }
+    if (hasDietaryRestrictions) {
+      const dr = {
+        allergies: Array.isArray(payload.allergies) ? payload.allergies : [],
+        deprecatedDietaryRestrictions: Array.isArray(payload.dietaryRestrictions) ? payload.dietaryRestrictions : [],
+      };
+      insertCols.push('dietary_restrictions'); insertVals.push(JSON.stringify(dr)); insertPlaceholders.push('?');
+    }
+    if (hasTargets) { insertCols.push('targets'); insertVals.push(payload.targets ? JSON.stringify(payload.targets) : null); insertPlaceholders.push('?'); }
+
+    await pool.query(
+      `INSERT INTO user_meal_preferences (${insertCols.join(', ')}) VALUES (${insertPlaceholders.join(', ')})`,
+      insertVals
+    );
+  }
+}
+
+// Load saved preferences for the current user.
+app.get('/api/meal-planner/preferences', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const preferences = await getUserMealPreferences(userId);
+    return res.json({ success: true, hasPreferences: !!preferences, preferences: preferences || {} });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: 'Failed to load preferences', error: getErrorMessage(err) });
+  }
+});
+
+// Save/update preferences for the current user.
+app.post('/api/meal-planner/preferences', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    await upsertUserMealPreferences(userId, req.body || {});
+    const preferences = await getUserMealPreferences(userId);
+    return res.json({ success: true, hasPreferences: !!preferences, preferences: preferences || {} });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: 'Failed to save preferences', error: getErrorMessage(err) });
+  }
+});
+
 // GENERATE MEAL PLAN (AI-POWERED)
 app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthRequest, res: Response) => {
 
   try {
     const userId = req.user!.id;
-    const { lifestyle, mealType, goal, diet, dietaryRestrictions, targets, planName } = req.body;
+    const { lifestyle, mealType, goal, diet, allergies, dietaryRestrictions, targets, planName } = req.body;
+
+    // Dietary restrictions dropdown was removed in the client; keep backwards compatibility
+    // by treating any provided dietaryRestrictions as additional "avoid" tokens.
+    const allergyTokens = normalizeSelectionList(allergies);
+    const deprecatedRestrictionTokens = normalizeSelectionList(dietaryRestrictions);
+    const allRestrictionTokens = Array.from(new Set([...allergyTokens, ...deprecatedRestrictionTokens]));
+
+    // Best-effort persist preferences for later reload in the UI.
+    try {
+      await upsertUserMealPreferences(userId, {
+        lifestyle,
+        mealType,
+        goal,
+        diet,
+        allergies: allergyTokens,
+        // keep deprecated field for older schemas/clients
+        dietaryRestrictions: deprecatedRestrictionTokens,
+        targets,
+      });
+    } catch {
+      // ignore preference persistence errors
+    }
 
     if (!dbConnected) {
-      const weekPlan = generateWeekPlan(null, targets, goal);
+      const weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens);
       return res.status(503).json({
         success: false,
         message: 'Database not connected — returning fallback plan',
@@ -1722,7 +2073,10 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
 
     const [dbDishes] = await pool.query<any>('SELECT * FROM filipino_dishes ORDER BY name ASC');
 
-    const dishesForPrompt = dbDishes.map(d => ({
+  // Apply best-effort filtering so restricted dishes aren't even offered to the AI.
+  const filteredDbDishes = filterDishesByTokens(dbDishes || [], allRestrictionTokens);
+
+    const dishesForPrompt = filteredDbDishes.map((d: any) => ({
       name: d.name,
       category: d.category,
       calories: Number(d.calories ?? d.cal ?? 0),
@@ -1774,7 +2128,7 @@ You are a professional Filipino nutritionist and meal planner. The user preferen
 - Lifestyle: ${lifestyle}
 - Type: ${mealType}
 - Goal: ${goal}${dietConstraint}
-- Restrictions: ${dietaryRestrictions}
+- Allergies / Avoid: ${humanizeTokens(allRestrictionTokens)}
 - Targets: ${targets?.calories ?? 2000} kcal, ${targets?.protein ?? 150}g protein, ${targets?.carbs ?? 250}g carbs, ${targets?.fats ?? 70}g fats
 
 Only use meals from the provided DB list (JSON) below:
@@ -1825,19 +2179,19 @@ Rules:
         }
 
         if (parsed && Array.isArray(parsed.weekPlan) && parsed.weekPlan.length === 7) {
-          weekPlan = await enhanceAIWeekPlanWithDetails(parsed.weekPlan, dbDishes);
+          weekPlan = await enhanceAIWeekPlanWithDetails(parsed.weekPlan, filteredDbDishes);
           weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
         } else {
           const aiDay = parsed && parsed.weekPlan && parsed.weekPlan[0] ? parsed.weekPlan[0] : null;
-          weekPlan = generateWeekPlan(aiDay, targets, goal);
+          weekPlan = generateWeekPlan(aiDay, targets, goal, allRestrictionTokens);
           weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
         }
       } catch (aiErr: any) {
-        weekPlan = generateWeekPlan(null, targets, goal);
+        weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens);
         weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
       }
     } else {
-      weekPlan = generateWeekPlan(null, targets, goal);
+      weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens);
       weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
     }
 
@@ -1899,7 +2253,11 @@ Rules:
 app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     // Accept flexible input shapes:
-    const { dayIndex, day, mealType, mealKey, mealTypeKey, mealPlan, planId, excludeMealNames = [], currentMeal, dietaryRestrictions, targets, goal, lifestyle } = req.body || {};
+    const { dayIndex, day, mealType, mealKey, mealTypeKey, mealPlan, planId, excludeMealNames = [], currentMeal, allergies, dietaryRestrictions, targets, goal, lifestyle, diet } = req.body || {};
+
+    const allergyTokens = normalizeSelectionList(allergies);
+    const deprecatedRestrictionTokens = normalizeSelectionList(dietaryRestrictions);
+    const allRestrictionTokens = Array.from(new Set([...allergyTokens, ...deprecatedRestrictionTokens]));
 
     // Determine category for dish selection
     const category = mealTypeKey || mealType || mealKey || null;
@@ -1933,13 +2291,18 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
 
     // Fallback sample if no DB dishes
     if (!Array.isArray(dishes) || dishes.length === 0) {
-      const fallbackDish = isSnack 
-        ? filipinoSnacks[Math.floor(Math.random() * filipinoSnacks.length)]
-        : trustedFilipinoMealsDetailed[Math.floor(Math.random() * trustedFilipinoMealsDetailed.length)];
+      const fallbackSource = isSnack
+        ? filterDishesByTokens(filipinoSnacks, allRestrictionTokens)
+        : filterDishesByTokens(trustedFilipinoMealsDetailed, allRestrictionTokens);
+
+      const fallbackDish = fallbackSource[Math.floor(Math.random() * fallbackSource.length)];
       const mealObj = createMealObject(fallbackDish);
       const recipe = await generateRecipeInstructions(mealObj.name, mealObj.ingredients);
       return res.json({ success: true, newMeal: { ...mealObj, recipe }, source: 'fallback' });
     }
+
+    // Apply best-effort filtering for fallback picks
+    const candidateDishes = filterDishesByTokens(dishes, allRestrictionTokens);
 
     // Helper: pick random excluding excludeArr
     function pickRandomExcluding(list: any[], exclude: string[]) {
@@ -1953,12 +2316,13 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
     }
 
     // Build prompt for AI if needed
-    const dishListJson = JSON.stringify(dishes.map(d => ({ name: d.name, calories: d.calories, protein: d.protein, carbs: d.carbs, fats: d.fats })));
+    const dishListJson = JSON.stringify(candidateDishes.map(d => ({ name: d.name, calories: d.calories, protein: d.protein, carbs: d.carbs, fats: d.fats })));
     const excludeText = excludeArr.length > 0 ? `\nDo NOT return these dish names: ${excludeArr.join(', ')}` : '';
     const prompt = `
 You are a Filipino nutritionist. Choose a single ${isSnack ? 'snack' : String(category || mealType || 'meal')} best suited for the user from the list below.
 User targets: ${targets?.calories ?? 2000} kcal, ${targets?.protein ?? 150}g protein, ${targets?.carbs ?? 250}g carbs, ${targets?.fats ?? 70}g fats.
-Dietary restrictions: ${dietaryRestrictions || 'none'}.
+  Diet type: ${diet || 'none'}.
+  Allergies / Avoid: ${humanizeTokens(allRestrictionTokens)}.
 ${excludeText}
 List: ${dishListJson}
 Return JSON: { "newMeal": { "name":"...", "ingredients":[...], "calories":..., "protein":..., "carbs":..., "fats":..., "recipe":"..." } }
@@ -2011,7 +2375,7 @@ Return JSON: { "newMeal": { "name":"...", "ingredients":[...], "calories":..., "
     }
 
     // fallback deterministic pick that avoids excluded names
-    const picked = pickRandomExcluding(dishes, excludeArr);
+    const picked = pickRandomExcluding(candidateDishes, excludeArr);
     const mealObj = createMealObject(picked);
     const recipe = await generateRecipeInstructions(mealObj.name, mealObj.ingredients);
     return res.json({ success: true, newMeal: { ...mealObj, recipe }, source: 'fallback' });
@@ -2025,11 +2389,13 @@ Return JSON: { "newMeal": { "name":"...", "ingredients":[...], "calories":..., "
 async function dbColumnExists(table: string, column: string): Promise<boolean> {
   try {
     const dbName = process.env.DB_NAME || 'activecore';
+    const schema = (process.env.DB_SCHEMA || '').trim() || 'public';
     const [rows] = await pool.query<any>(
       `SELECT COUNT(*) as cnt 
        FROM information_schema.COLUMNS 
-       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-      [dbName, table, column]
+       WHERE TABLE_NAME = ? AND COLUMN_NAME = ?
+         AND (TABLE_SCHEMA = ? OR TABLE_SCHEMA = ? OR TABLE_SCHEMA = 'public')`,
+      [table, column, schema, dbName]
     );
     return !!(rows && rows[0] && Number(rows[0].cnt) > 0);
   } catch (err: any) {
@@ -2370,7 +2736,14 @@ app.get('/api/attendance/absence-status', authenticateToken, async (req: AuthReq
     const thresholdDays = Math.max(1, Number.isFinite(Number(thresholdDaysRaw)) ? Number(thresholdDaysRaw) : 3);
 
     const [rows] = await pool.query<any>(
-      'SELECT DATE(MAX(check_in_time)) AS last_day, DATEDIFF(CURDATE(), DATE(MAX(check_in_time))) AS days_since FROM attendance WHERE user_id = ?',
+      `SELECT
+         DATE(MAX(check_in_time)) AS last_day,
+         CASE
+           WHEN MAX(check_in_time) IS NULL THEN NULL
+           ELSE (CURRENT_DATE - DATE(MAX(check_in_time)))::int
+         END AS days_since
+       FROM attendance
+       WHERE user_id = ?`,
       [userId]
     );
 
