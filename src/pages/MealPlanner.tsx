@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   IonPage,
   IonHeader,
@@ -54,6 +54,41 @@ import { API_CONFIG } from "../config/api.config";
 import { ensureToken } from "../services/auth.service";
 
 const API_URL = API_CONFIG.BASE_URL;
+
+const COMMON_ALLERGIES: Array<{ value: string; label: string }> = [
+  { value: 'dairy', label: 'Dairy (Milk, Cheese)' },
+  { value: 'egg', label: 'Egg' },
+  { value: 'fish', label: 'Fish' },
+  { value: 'shellfish', label: 'Shellfish (Shrimp/Crab)' },
+  { value: 'peanut', label: 'Peanuts' },
+  { value: 'tree_nut', label: 'Tree Nuts (Cashew/Almond)' },
+  { value: 'soy', label: 'Soy' },
+  { value: 'wheat_gluten', label: 'Wheat / Gluten' },
+  { value: 'sesame', label: 'Sesame' },
+];
+
+const parseDelimitedSelection = (input: any): string[] => {
+  if (!input) return [];
+  if (Array.isArray(input)) return input.map(String).map(s => s.trim()).filter(Boolean);
+  if (typeof input !== 'string') return [];
+  return input
+    .split(/[\r\n,;]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+};
+
+const normalizeToKnownValues = (raw: string[], known: Array<{ value: string; label: string }>): string[] => {
+  const knownByValue = new Map(known.map((k) => [k.value.toLowerCase(), k.value]));
+  const knownByLabel = new Map(known.map((k) => [k.label.toLowerCase(), k.value]));
+  return raw
+    .map((r) => String(r || '').trim())
+    .filter(Boolean)
+    .map((r) => {
+      const low = r.toLowerCase();
+      return knownByValue.get(low) || knownByLabel.get(low) || null;
+    })
+    .filter(Boolean) as string[];
+};
 
 // ============ MODERN UI COMPONENTS ============
 // Summary Bar - persistent top summary
@@ -246,47 +281,7 @@ const MealPlanner: React.FC = () => {
   
   const [presentToast] = useIonToast();
 
-  useEffect(() => {
-    loadPreferences();
-    loadSavedPlans();
-  }, []);
-
-  const COMMON_ALLERGIES: Array<{ value: string; label: string }> = [
-    { value: 'dairy', label: 'Dairy (Milk, Cheese)' },
-    { value: 'egg', label: 'Egg' },
-    { value: 'fish', label: 'Fish' },
-    { value: 'shellfish', label: 'Shellfish (Shrimp/Crab)' },
-    { value: 'peanut', label: 'Peanuts' },
-    { value: 'tree_nut', label: 'Tree Nuts (Cashew/Almond)' },
-    { value: 'soy', label: 'Soy' },
-    { value: 'wheat_gluten', label: 'Wheat / Gluten' },
-    { value: 'sesame', label: 'Sesame' },
-  ];
-
-  const parseDelimitedSelection = (input: any): string[] => {
-    if (!input) return [];
-    if (Array.isArray(input)) return input.map(String).map(s => s.trim()).filter(Boolean);
-    if (typeof input !== 'string') return [];
-    return input
-      .split(/[\r\n,;]+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-  };
-
-  const normalizeToKnownValues = (raw: string[], known: Array<{ value: string; label: string }>): string[] => {
-    const knownByValue = new Map(known.map((k) => [k.value.toLowerCase(), k.value]));
-    const knownByLabel = new Map(known.map((k) => [k.label.toLowerCase(), k.value]));
-    return raw
-      .map((r) => String(r || '').trim())
-      .filter(Boolean)
-      .map((r) => {
-        const low = r.toLowerCase();
-        return knownByValue.get(low) || knownByLabel.get(low) || null;
-      })
-      .filter(Boolean) as string[];
-  };
-
-  const loadPreferences = async () => {
+  const loadPreferences = useCallback(async () => {
     try {
       const token = (await ensureToken()) || localStorage.getItem("token") || "";
       if (!token) return;
@@ -319,7 +314,7 @@ const MealPlanner: React.FC = () => {
     } catch (error) {
       console.error("Error loading preferences:", error);
     }
-  };
+  }, []);
 
   async function checkBackendStatus(token?: string) {
     try {
@@ -459,7 +454,7 @@ const MealPlanner: React.FC = () => {
   };
 
   // Update loadSavedPlans to handle rows with/without updatedAt
-  const loadSavedPlans = async () => {
+  const loadSavedPlans = useCallback(async () => {
     try {
       const token = (await ensureToken()) || localStorage.getItem("token") || "";
       if (!token) {
@@ -494,7 +489,12 @@ const MealPlanner: React.FC = () => {
       console.error("Failed to load saved plans:", error);
       setSavedPlans([]);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadPreferences();
+    loadSavedPlans();
+  }, [loadPreferences, loadSavedPlans]);
 
   // Load single saved plan by id (calls backend /plans/:id)
   const loadSavedPlanById = async (planId: number) => {
