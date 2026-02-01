@@ -578,9 +578,29 @@ async function enhanceAIWeekPlanWithDetails(parsedWeekPlan: any[], dishes: any[]
 }
 
 function createMealObject(meal: any) {
+  let ingredients: any = meal?.ingredients ?? meal?.ingredient ?? [];
+  if (typeof ingredients === 'string') {
+    const raw = ingredients.trim();
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          ingredients = parsed;
+        } else {
+          ingredients = raw.split(/[\r\n,;]+/).map((s) => s.trim()).filter(Boolean);
+        }
+      } catch {
+        ingredients = raw.split(/[\r\n,;]+/).map((s) => s.trim()).filter(Boolean);
+      }
+    } else {
+      ingredients = [];
+    }
+  }
+  if (!Array.isArray(ingredients)) ingredients = [];
+
   return {
     name: meal.name || "Unnamed Meal",
-    ingredients: meal.ingredients || [],
+    ingredients,
     portionSize: meal.portionSize || "1 serving",
     calories: Number(meal.calories ?? meal.cal ?? 0),
     protein: Number(meal.protein ?? meal.pro ?? 0),
@@ -795,15 +815,48 @@ function humanizeTokens(tokens: string[]): string {
   return uniq.map(t => map[t] || t).join(', ');
 }
 
-function generateWeekPlan(aiDay: any | null, targets: any, goal: string, restrictionTokens: string[] = []) {
+function normalizeDishCategory(raw: any): string {
+  const s = String(raw || '').toLowerCase().trim();
+  if (!s) return '';
+  if (s === 'snack' || s === 'snacks' || s.includes('snack')) return 'snacks';
+  if (s === 'breakfast' || s.includes('breakfast')) return 'breakfast';
+  if (s === 'lunch' || s.includes('lunch')) return 'lunch';
+  if (s === 'dinner' || s.includes('dinner')) return 'dinner';
+  return s;
+}
+
+function generateWeekPlan(
+  aiDay: any | null,
+  targets: any,
+  goal: string,
+  restrictionTokens: string[] = [],
+  dishesSource?: any[]
+) {
   const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   const used = new Set<string>();
   const usedSnacks = new Set<string>();
   const weekPlan: any[] = [];
 
+  const hasDbSource = Array.isArray(dishesSource) && dishesSource.length > 0;
+
   // Best-effort filtering for fallback generation based on allergies/restriction tokens.
-  const mealsPool = filterDishesByTokens(trustedFilipinoMealsDetailed, restrictionTokens);
-  const snacksPool = filterDishesByTokens(filipinoSnacks, restrictionTokens);
+  // If DB dishes exist, prefer them (this makes prod behavior clearly DB-driven even without OpenAI).
+  const mainSourceRaw = hasDbSource ? (dishesSource as any[]) : trustedFilipinoMealsDetailed;
+  const mainSourceFiltered = filterDishesByTokens(mainSourceRaw, restrictionTokens);
+
+  const breakfastPool = mainSourceFiltered.filter((d: any) => normalizeDishCategory(d?.category) === 'breakfast');
+  const lunchPool = mainSourceFiltered.filter((d: any) => normalizeDishCategory(d?.category) === 'lunch');
+  const dinnerPool = mainSourceFiltered.filter((d: any) => normalizeDishCategory(d?.category) === 'dinner');
+
+  // Some DB rows may not have a category; treat them as generic mains.
+  const genericMainPool = mainSourceFiltered.filter((d: any) => normalizeDishCategory(d?.category) !== 'snacks');
+  const allMainPool = genericMainPool.length > 0 ? genericMainPool : mainSourceFiltered;
+
+  const dbSnackPool = hasDbSource
+    ? mainSourceFiltered.filter((d: any) => normalizeDishCategory(d?.category) === 'snacks')
+    : [];
+  const snacksSourceRaw = dbSnackPool.length > 0 ? dbSnackPool : filipinoSnacks;
+  const snacksPool = filterDishesByTokens(snacksSourceRaw, restrictionTokens);
 
   if (aiDay && aiDay.meals) {
     Object.values(aiDay.meals).forEach((m: any) => {
@@ -830,23 +883,22 @@ function generateWeekPlan(aiDay: any | null, targets: any, goal: string, restric
       continue;
     }
 
-    // Pick 3 main meals (breakfast, lunch, dinner) from meals list
-    const picks = pickUniqueMeals(mealsPool, used, 3);
-
-    while (picks.length < 3) {
-      const fallbackSource = mealsPool.length > 0 ? mealsPool : trustedFilipinoMealsDetailed;
-      const fallback = fallbackSource[Math.floor(Math.random() * fallbackSource.length)];
-      if (!picks.find(p => p.name === fallback.name)) picks.push(fallback);
-    }
+    // Pick meals by category when possible, otherwise fallback to the full pool.
+    const breakfastPick = pickUniqueMeals(breakfastPool.length > 0 ? breakfastPool : allMainPool, used, 1)[0]
+      || (allMainPool[Math.floor(Math.random() * allMainPool.length)] || { name: 'Breakfast' });
+    const lunchPick = pickUniqueMeals(lunchPool.length > 0 ? lunchPool : allMainPool, used, 1)[0]
+      || (allMainPool[Math.floor(Math.random() * allMainPool.length)] || { name: 'Lunch' });
+    const dinnerPick = pickUniqueMeals(dinnerPool.length > 0 ? dinnerPool : allMainPool, used, 1)[0]
+      || (allMainPool[Math.floor(Math.random() * allMainPool.length)] || { name: 'Dinner' });
 
     // Pick 2 snacks from SNACKS list only
     const snack1 = pickUniqueMeals(snacksPool, usedSnacks, 1)[0];
     const snack2 = pickUniqueMeals(snacksPool, usedSnacks, 1)[0];
 
     const mealsObj: any = {
-      breakfast: createMealObject(picks[0]),
-      lunch: createMealObject(picks[1]),
-      dinner: createMealObject(picks[2]),
+      breakfast: createMealObject(breakfastPick),
+      lunch: createMealObject(lunchPick),
+      dinner: createMealObject(dinnerPick),
       snack1: createMealObject(snack1),
       snack2: createMealObject(snack2),
     };
@@ -2183,15 +2235,15 @@ Rules:
           weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
         } else {
           const aiDay = parsed && parsed.weekPlan && parsed.weekPlan[0] ? parsed.weekPlan[0] : null;
-          weekPlan = generateWeekPlan(aiDay, targets, goal, allRestrictionTokens);
+          weekPlan = generateWeekPlan(aiDay, targets, goal, allRestrictionTokens, filteredDbDishes);
           weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
         }
       } catch (aiErr: any) {
-        weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens);
+        weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens, filteredDbDishes);
         weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
       }
     } else {
-      weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens);
+      weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens, filteredDbDishes);
       weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
     }
 
