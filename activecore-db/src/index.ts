@@ -514,6 +514,76 @@ function addRiceSidesToMeals(weekPlan: any[]) {
   });
 }
 
+function scaleMealPortion(meal: any, factor: number) {
+  if (!meal || typeof meal !== 'object') return meal;
+  const f = Number(factor);
+  if (!Number.isFinite(f) || f <= 0) return meal;
+
+  const scaled: any = { ...meal };
+  const scaleField = (key: string) => {
+    const v = Number((scaled as any)[key] ?? 0);
+    if (Number.isFinite(v)) (scaled as any)[key] = Math.round(v * f);
+  };
+
+  scaleField('calories');
+  scaleField('protein');
+  scaleField('carbs');
+  scaleField('fats');
+  scaleField('fiber');
+
+  const portion = Math.round(f * 10) / 10;
+  const basePortion = String(scaled.portionSize || '1 serving');
+  // Avoid stacking multiple multipliers if regenerate/generate is called repeatedly.
+  if (!/\bx\s*serving\b/i.test(basePortion) && !/\bservings\b/i.test(basePortion)) {
+    scaled.portionSize = `${portion}x serving`;
+  } else {
+    scaled.portionSize = `${portion}x serving`;
+  }
+
+  return scaled;
+}
+
+function scaleWeekPlanToCalorieTarget(weekPlan: any[], targets: any) {
+  if (!Array.isArray(weekPlan) || weekPlan.length === 0) return weekPlan;
+
+  const desired = Number(targets?.calories);
+  if (!Number.isFinite(desired) || desired <= 0) return weekPlan;
+
+  // Keep it realistic-ish; ultra low/high targets will be clamped.
+  const desiredClamped = Math.min(5000, Math.max(800, desired));
+
+  return weekPlan.map((day: any) => {
+    const meals = day?.meals && typeof day.meals === 'object' ? day.meals : {};
+    const totals = sumMacros(Object.values(meals));
+    const current = Number(totals.calories || 0);
+    if (!Number.isFinite(current) || current <= 0) return day;
+
+    // If already close, don't touch (prevents unnecessary churn).
+    const ratioRaw = desiredClamped / current;
+    if (Math.abs(1 - ratioRaw) <= 0.08) {
+      return day;
+    }
+
+    // Clamp scaling to avoid extreme/unrealistic portions.
+    const ratio = Math.min(2.2, Math.max(0.6, ratioRaw));
+
+    const scaledMeals: any = {};
+    for (const [k, v] of Object.entries(meals)) {
+      scaledMeals[k] = scaleMealPortion(v, ratio);
+    }
+
+    const scaledTotals = sumMacros(Object.values(scaledMeals));
+    return {
+      ...day,
+      meals: scaledMeals,
+      totalCalories: scaledTotals.calories,
+      totalProtein: scaledTotals.protein,
+      totalCarbs: scaledTotals.carbs,
+      totalFats: scaledTotals.fats,
+    };
+  });
+}
+
 async function enhanceAIWeekPlanWithDetails(parsedWeekPlan: any[], dishes: any[]) {
   if (!Array.isArray(parsedWeekPlan)) return [];
 
@@ -832,6 +902,46 @@ function generateWeekPlan(
   restrictionTokens: string[] = [],
   dishesSource?: any[]
 ) {
+  const toFiniteNumber = (value: any, fallback: number) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  };
+
+  const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+  const dishCalories = (dish: any) => toFiniteNumber(dish?.calories ?? dish?.cal ?? 0, 0);
+
+  const pickUniqueClosestCalories = (
+    source: any[],
+    usedSet: Set<string>,
+    desiredCalories: number
+  ) => {
+    if (!Array.isArray(source) || source.length === 0) return null;
+
+    let pool = source.filter((m: any) => m && m.name && !usedSet.has(m.name));
+    if (pool.length === 0) {
+      // Allow repeats only when we run out of unique options.
+      usedSet.clear();
+      pool = source.filter((m: any) => m && m.name);
+    }
+    if (pool.length === 0) return null;
+
+    const withCalories = pool.filter((m: any) => dishCalories(m) > 0);
+    const candidates = withCalories.length > 0 ? withCalories : pool;
+
+    let best = candidates[0];
+    let bestDiff = Math.abs(dishCalories(best) - desiredCalories);
+    for (const m of candidates) {
+      const diff = Math.abs(dishCalories(m) - desiredCalories);
+      if (diff < bestDiff) {
+        best = m;
+        bestDiff = diff;
+      }
+    }
+
+    usedSet.add(best.name);
+    return best;
+  };
+
   const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   const used = new Set<string>();
   const usedSnacks = new Set<string>();
@@ -864,6 +974,15 @@ function generateWeekPlan(
     });
   }
 
+  // Targets are best-effort in fallback generation (AI may do better), but we should still
+  // try to respect the requested calories so 1500 vs 3000 produces meaningfully different plans.
+  const dailyCalorieTarget = clamp(toFiniteNumber(targets?.calories, 2000), 800, 5000);
+  // The API adds rice sides later via addRiceSidesToMeals(). Budget for it here so totals stay close.
+  const riceSideCaloriesEstimate = 150;
+  const breakfastCaloriesTarget = dailyCalorieTarget * 0.25;
+  const lunchCaloriesTargetBase = Math.max(150, dailyCalorieTarget * 0.3 - riceSideCaloriesEstimate);
+  const dinnerCaloriesTargetBase = Math.max(150, dailyCalorieTarget * 0.3 - riceSideCaloriesEstimate);
+
   for (const day of DAYS) {
     if (aiDay && aiDay.day === day) {
       const normalizedMeals: any = {};
@@ -884,16 +1003,40 @@ function generateWeekPlan(
     }
 
     // Pick meals by category when possible, otherwise fallback to the full pool.
-    const breakfastPick = pickUniqueMeals(breakfastPool.length > 0 ? breakfastPool : allMainPool, used, 1)[0]
-      || (allMainPool[Math.floor(Math.random() * allMainPool.length)] || { name: 'Breakfast' });
-    const lunchPick = pickUniqueMeals(lunchPool.length > 0 ? lunchPool : allMainPool, used, 1)[0]
-      || (allMainPool[Math.floor(Math.random() * allMainPool.length)] || { name: 'Lunch' });
-    const dinnerPick = pickUniqueMeals(dinnerPool.length > 0 ? dinnerPool : allMainPool, used, 1)[0]
-      || (allMainPool[Math.floor(Math.random() * allMainPool.length)] || { name: 'Dinner' });
+    const breakfastPick =
+      pickUniqueClosestCalories(
+        breakfastPool.length > 0 ? breakfastPool : allMainPool,
+        used,
+        breakfastCaloriesTarget
+      ) || (allMainPool[Math.floor(Math.random() * allMainPool.length)] || { name: 'Breakfast' });
 
-    // Pick 2 snacks from SNACKS list only
-    const snack1 = pickUniqueMeals(snacksPool, usedSnacks, 1)[0];
-    const snack2 = pickUniqueMeals(snacksPool, usedSnacks, 1)[0];
+    const lunchPick =
+      pickUniqueClosestCalories(
+        lunchPool.length > 0 ? lunchPool : allMainPool,
+        used,
+        lunchCaloriesTargetBase
+      ) || (allMainPool[Math.floor(Math.random() * allMainPool.length)] || { name: 'Lunch' });
+
+    const dinnerPick =
+      pickUniqueClosestCalories(
+        dinnerPool.length > 0 ? dinnerPool : allMainPool,
+        used,
+        dinnerCaloriesTargetBase
+      ) || (allMainPool[Math.floor(Math.random() * allMainPool.length)] || { name: 'Dinner' });
+
+    // Pick 2 snacks, aiming to fill remaining calories for the day.
+    const mainsCalories = dishCalories(breakfastPick) + dishCalories(lunchPick) + dishCalories(dinnerPick);
+    const snacksTotalTarget = Math.max(0, dailyCalorieTarget - mainsCalories);
+    const snack1Target = snacksTotalTarget / 2;
+
+    const snack1 =
+      pickUniqueClosestCalories(snacksPool, usedSnacks, snack1Target) ||
+      pickUniqueMeals(snacksPool, usedSnacks, 1)[0];
+
+    const snack2Target = Math.max(0, snacksTotalTarget - dishCalories(snack1));
+    const snack2 =
+      pickUniqueClosestCalories(snacksPool, usedSnacks, snack2Target) ||
+      pickUniqueMeals(snacksPool, usedSnacks, 1)[0];
 
     const mealsObj: any = {
       breakfast: createMealObject(breakfastPick),
@@ -2128,7 +2271,9 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
     }
 
     if (!dbConnected) {
-      const weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens);
+      let weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens);
+      weekPlan = addRiceSidesToMeals(weekPlan);
+      weekPlan = scaleWeekPlanToCalorieTarget(weekPlan, targets);
       return res.status(503).json({
         success: false,
         message: 'Database not connected — returning fallback plan',
@@ -2252,18 +2397,22 @@ Rules:
         if (parsed && Array.isArray(parsed.weekPlan) && parsed.weekPlan.length === 7) {
           weekPlan = await enhanceAIWeekPlanWithDetails(parsed.weekPlan, filteredDbDishes);
           weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
+          weekPlan = scaleWeekPlanToCalorieTarget(weekPlan, targets);
         } else {
           const aiDay = parsed && parsed.weekPlan && parsed.weekPlan[0] ? parsed.weekPlan[0] : null;
           weekPlan = generateWeekPlan(aiDay, targets, goal, allRestrictionTokens, filteredDbDishes);
           weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
+          weekPlan = scaleWeekPlanToCalorieTarget(weekPlan, targets);
         }
       } catch (aiErr: any) {
         weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens, filteredDbDishes);
         weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
+        weekPlan = scaleWeekPlanToCalorieTarget(weekPlan, targets);
       }
     } else {
       weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens, filteredDbDishes);
       weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
+      weekPlan = scaleWeekPlanToCalorieTarget(weekPlan, targets);
     }
 
     // Build today's shopping list
@@ -2332,7 +2481,87 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
 
     // Determine category for dish selection
     const category = mealTypeKey || mealType || mealKey || null;
-    const isSnack = category === 'snack1' || category === 'snack2' || category === 'snacks';
+    const normalizedCategory = (category === 'snack1' || category === 'snack2') ? 'snacks' : category;
+    const isSnack = normalizedCategory === 'snacks';
+
+    const toFiniteNumber = (value: any, fallback: number) => {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : fallback;
+    };
+    const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+
+    const dailyTarget = clamp(toFiniteNumber(targets?.calories, 2000), 800, 5000);
+
+    // Compute how many calories this regenerated meal should aim for.
+    // If we have the current week plan/day, compute remaining calories after other meals.
+    const computeDesiredMealCalories = () => {
+      const idx = Number(dayIndex);
+      const key = String(category || '').toLowerCase().trim();
+      const keyNorm = (key === 'snack1' || key === 'snack2') ? 'snacks' : key;
+
+      const distributionFallback = () => {
+        if (keyNorm === 'breakfast') return dailyTarget * 0.25;
+        if (keyNorm === 'lunch') return dailyTarget * 0.30;
+        if (keyNorm === 'dinner') return dailyTarget * 0.30;
+        // snacks
+        return dailyTarget * 0.075;
+      };
+
+      if (!Array.isArray(mealPlan) || !Number.isFinite(idx) || idx < 0 || idx >= mealPlan.length) {
+        return clamp(Math.round(distributionFallback()), 100, dailyTarget);
+      }
+
+      const dayObj = mealPlan[idx];
+      const meals = dayObj?.meals && typeof dayObj.meals === 'object' ? dayObj.meals : null;
+      if (!meals) return clamp(Math.round(distributionFallback()), 100, dailyTarget);
+
+      // Exclude the meal we're regenerating from the "other" sum.
+      const regenKey = String(mealTypeKey || mealType || mealKey || '').trim();
+      const otherMeals = Object.entries(meals).filter(([k]) => String(k).trim() !== regenKey).map(([, v]) => v);
+      const otherTotals = sumMacros(otherMeals as any[]);
+      const remaining = dailyTarget - Number(otherTotals.calories || 0);
+      return clamp(Math.round(remaining), 100, dailyTarget);
+    };
+
+    const desiredMealCalories = computeDesiredMealCalories();
+
+    const addRiceSideToSingleMealIfMissing = (mealObj: any) => {
+      const cat = String(normalizedCategory || '').toLowerCase().trim();
+      if (cat !== 'lunch' && cat !== 'dinner') return mealObj;
+
+      const name = String(mealObj?.name || '').toLowerCase();
+      if (name.includes('rice')) return mealObj;
+
+      const riceSideDishes = [
+        { name: 'Sinangag na Kanin (Garlic Fried Rice)', calories: 180, carbs: 35, protein: 4, fats: 2 },
+        { name: 'Plain Steamed Rice', calories: 130, carbs: 28, protein: 2.7, fats: 0.3 },
+        { name: 'Fried Rice', calories: 160, carbs: 30, protein: 3, fats: 3 }
+      ];
+      const randomRice = riceSideDishes[Math.floor(Math.random() * riceSideDishes.length)];
+
+      const updated = {
+        ...mealObj,
+        name: `${mealObj.name} with ${randomRice.name}`,
+        calories: (mealObj.calories || 0) + randomRice.calories,
+        carbs: (mealObj.carbs || 0) + randomRice.carbs,
+        protein: (mealObj.protein || 0) + randomRice.protein,
+        fats: (mealObj.fats || 0) + randomRice.fats,
+        ingredients: Array.isArray(mealObj.ingredients)
+          ? [...mealObj.ingredients, 'Garlic Fried Rice or Steamed Rice']
+          : ['Garlic Fried Rice or Steamed Rice']
+      };
+
+      return updated;
+    };
+
+    const scaleMealToDesiredCalories = (mealObj: any) => {
+      const cur = Number(mealObj?.calories || 0);
+      if (!Number.isFinite(cur) || cur <= 0) return mealObj;
+      const ratioRaw = desiredMealCalories / cur;
+      if (Math.abs(1 - ratioRaw) <= 0.08) return mealObj;
+      const ratio = clamp(ratioRaw, 0.6, 2.2);
+      return scaleMealPortion(mealObj, ratio);
+    };
 
     // Get dishes by category if category provided else fetch all
     let dishes: any[] = [];
@@ -2340,8 +2569,8 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
     // Use snacks list if this is a snack regeneration
     if (isSnack) {
       dishes = filipinoSnacks;
-    } else if (category) {
-      const [rows] = await pool.query<any>('SELECT * FROM filipino_dishes WHERE category = ?', [category]);
+    } else if (normalizedCategory) {
+      const [rows] = await pool.query<any>('SELECT * FROM filipino_dishes WHERE category = ?', [normalizedCategory]);
       dishes = rows || [];
     }
     
@@ -2392,6 +2621,7 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
     const prompt = `
 You are a Filipino nutritionist. Choose a single ${isSnack ? 'snack' : String(category || mealType || 'meal')} best suited for the user from the list below.
 User targets: ${targets?.calories ?? 2000} kcal, ${targets?.protein ?? 150}g protein, ${targets?.carbs ?? 250}g carbs, ${targets?.fats ?? 70}g fats.
+Aim for around ${desiredMealCalories} kcal for THIS regenerated ${isSnack ? 'snack' : 'meal'} so the whole day stays near the daily target.
   Diet type: ${diet || 'none'}.
   Allergies / Avoid: ${humanizeTokens(allRestrictionTokens)}.
 ${excludeText}
@@ -2426,18 +2656,24 @@ Return JSON: { "newMeal": { "name":"...", "ingredients":[...], "calories":..., "
           // If AI returns excluded name, fallback
           if (excludeArr.includes(nameLower)) {
             const picked = pickRandomExcluding(dishes, excludeArr);
-            const mealObj = createMealObject(picked);
+            let mealObj: any = createMealObject(picked);
+            mealObj = addRiceSideToSingleMealIfMissing(mealObj);
+            mealObj = scaleMealToDesiredCalories(mealObj);
             const recipe = await generateRecipeInstructions(mealObj.name, mealObj.ingredients);
             return res.json({ success: true, newMeal: { ...mealObj, recipe }, source: 'fallback-excluded' });
           }
           // If DB contains this dish, use DB result for accurate macros
           const found = dishes.find(d => String(d.name || '').toLowerCase().trim() === nameLower);
           if (found) {
-            const mealObj = createMealObject(found);
+            let mealObj: any = createMealObject(found);
+            mealObj = addRiceSideToSingleMealIfMissing(mealObj);
+            mealObj = scaleMealToDesiredCalories(mealObj);
             const recipe = await generateRecipeInstructions(mealObj.name, mealObj.ingredients);
             return res.json({ success: true, newMeal: { ...mealObj, recipe }, source: 'ai' });
           }
-          const mealObj = createMealObject(parsed.newMeal);
+          let mealObj: any = createMealObject(parsed.newMeal);
+          mealObj = addRiceSideToSingleMealIfMissing(mealObj);
+          mealObj = scaleMealToDesiredCalories(mealObj);
           const recipe = await generateRecipeInstructions(mealObj.name, mealObj.ingredients);
           return res.json({ success: true, newMeal: { ...mealObj, recipe }, source: 'ai' });
         }
@@ -2445,9 +2681,29 @@ Return JSON: { "newMeal": { "name":"...", "ingredients":[...], "calories":..., "
       }
     }
 
-    // fallback deterministic pick that avoids excluded names
-    const picked = pickRandomExcluding(candidateDishes, excludeArr);
-    const mealObj = createMealObject(picked);
+    // fallback deterministic-ish pick that avoids excluded names and tries to fit the calorie budget
+    const pickClosestExcluding = (list: any[], exclude: string[], desiredCalories: number) => {
+      const pool = list.filter(d => !exclude.includes(String(d.name || '').toLowerCase().trim()));
+      const usePool = pool.length > 0 ? pool : list;
+      if (!Array.isArray(usePool) || usePool.length === 0) return null;
+
+      let best = usePool[0];
+      let bestDiff = Math.abs(toFiniteNumber(best?.calories ?? best?.cal ?? 0, 0) - desiredCalories);
+      for (const d of usePool) {
+        const cals = toFiniteNumber(d?.calories ?? d?.cal ?? 0, 0);
+        const diff = Math.abs(cals - desiredCalories);
+        if (diff < bestDiff) {
+          best = d;
+          bestDiff = diff;
+        }
+      }
+      return best;
+    };
+
+    const picked = pickClosestExcluding(candidateDishes, excludeArr, desiredMealCalories) || pickRandomExcluding(candidateDishes, excludeArr);
+    let mealObj: any = createMealObject(picked);
+    mealObj = addRiceSideToSingleMealIfMissing(mealObj);
+    mealObj = scaleMealToDesiredCalories(mealObj);
     const recipe = await generateRecipeInstructions(mealObj.name, mealObj.ingredients);
     return res.json({ success: true, newMeal: { ...mealObj, recipe }, source: 'fallback' });
 
