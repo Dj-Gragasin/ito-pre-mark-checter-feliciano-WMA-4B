@@ -115,6 +115,18 @@ ion-label {
   --border-color: #ff4961;
 }
 
+.bmi-calc-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 6px 0 12px 0;
+}
+
+.bmi-calc-hint {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 12px;
+}
+
 /* Table Styles */
 .table-container {
   overflow-x: auto;
@@ -175,6 +187,15 @@ td:last-child {
   border-radius: 12px;
   margin: 1rem 0;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.report-segment-wrap {
+  margin: 0.5rem 0 1rem 0;
+}
+
+.report-segment-wrap ion-segment {
+  --background: rgba(26, 26, 26, 0.9);
+  border-radius: 12px;
 }
 
 canvas {
