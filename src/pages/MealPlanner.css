@@ -117,6 +117,38 @@
   gap: 0.5rem;
 }
 
+/* Daily Targets (inputs) - make Ionic grid behave nicely on small phones */
+.targets-grid {
+  --ion-grid-padding: 0;
+  --ion-grid-column-padding: 8px;
+}
+
+.targets-grid ion-row {
+  margin: 0;
+}
+
+.targets-grid ion-col {
+  padding: 6px;
+}
+
+@media (max-width: 420px) {
+  /* On very small screens, stack targets vertically (1 per row) */
+  .targets-grid {
+    --ion-grid-column-padding: 6px;
+  }
+
+  .targets-grid ion-col {
+    flex: 0 0 100%;
+    max-width: 100%;
+    width: 100%;
+    padding: 6px 0;
+  }
+
+  .targets-section h3 {
+    font-size: 1.05rem;
+  }
+}
+
 /* Ion Items - Dark Theme Override */
 .config-card ion-item {
   --background: #2a2a2a !important;
@@ -1821,6 +1853,33 @@ ion-segment-button.segment-button-checked {
   border: 1px solid rgba(126, 252, 106, 0.2);
 }
 
+/* Small phones (e.g., 360px wide): avoid cramped 4-column bars */
+@media (max-width: 420px) {
+  .daily-summary-bar {
+    grid-template-columns: repeat(2, 1fr);
+    padding: 10px;
+  }
+
+  .summary-item {
+    padding: 8px 6px;
+  }
+
+  .summary-value {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 360px) {
+  .daily-view-compact {
+    padding: 12px 10px;
+    gap: 12px;
+  }
+
+  .summary-label {
+    font-size: 10px;
+  }
+}
+
 .summary-item {
   text-align: center;
   padding: 8px;
@@ -1913,6 +1972,33 @@ ion-segment-button.segment-button-checked {
   gap: 8px;
   margin-bottom: 12px;
   font-size: 12px;
+}
+
+@media (max-width: 420px) {
+  .daily-meal-macros {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .daily-meal-macros span {
+    padding: 6px;
+    font-size: 11px;
+  }
+
+  .daily-meal-title {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 360px) {
+  /* Buttons stack to avoid text truncation */
+  .daily-meal-actions {
+    flex-direction: column;
+  }
+
+  .daily-meal-actions ion-button {
+    width: 100%;
+  }
 }
 
 .daily-meal-macros span {
