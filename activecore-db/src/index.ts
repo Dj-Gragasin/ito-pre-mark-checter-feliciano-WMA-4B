@@ -647,6 +647,104 @@ async function enhanceAIWeekPlanWithDetails(parsedWeekPlan: any[], dishes: any[]
   });
 }
 
+const DEFAULT_RECIPE_TEXT = "1. Gather and measure all ingredients before cooking.\n2. Heat pan/pot over medium heat and start with aromatics.\n3. Add main protein and cook until done, then add liquids/seasonings.\n4. Simmer until flavors develop and texture is correct.\n5. Taste, adjust seasoning, and serve hot.";
+
+const INGREDIENT_MEASUREMENT_REGEX = /\b\d+(?:\.\d+)?\s?(?:kg|g|mg|l|ml|tbsp|tsp|cup|cups|pc|pcs|piece|pieces|clove|cloves|slice|slices)\b/i;
+
+function hasMeasurement(ingredient: string): boolean {
+  return INGREDIENT_MEASUREMENT_REGEX.test(String(ingredient || '').toLowerCase());
+}
+
+function hasSpecificProteinType(ingredient: string): boolean {
+  const s = String(ingredient || '').toLowerCase();
+  return /pork|chicken|beef|milkfish|bangus|tilapia|tuna|shrimp|fish|egg|duck|tofu|monggo|mung/i.test(s);
+}
+
+function isVagueIngredient(ingredient: string): boolean {
+  const s = String(ingredient || '').toLowerCase().trim();
+  if (!s) return true;
+  if (/^(meat|fish|oil|vegetables?|seasoning|spices?)$/.test(s)) return true;
+  if (/\btocino\b/.test(s) && !/pork|chicken|beef/.test(s)) return true;
+  if (/\boil\b/.test(s) && !/canola|vegetable|olive|coconut|corn/.test(s)) return true;
+  return false;
+}
+
+function inferProteinFromMeal(mealName: string): string {
+  const m = String(mealName || '').toLowerCase();
+  if (m.includes('bangus')) return 'milkfish (bangus)';
+  if (m.includes('chicken') || m.includes('manok') || m.includes('tinola')) return 'chicken';
+  if (m.includes('beef') || m.includes('tapa') || m.includes('bulalo')) return 'beef';
+  if (m.includes('pork') || m.includes('baboy') || m.includes('adobo') || m.includes('tocino')) return 'pork';
+  return 'pork';
+}
+
+function makeSpecificMeasuredIngredient(ingredient: string, mealName: string): string {
+  const raw = String(ingredient || '').trim();
+  if (!raw) return '5 g iodized salt';
+  const s = raw.toLowerCase();
+
+  if (hasMeasurement(raw) && (!isVagueIngredient(raw) || hasSpecificProteinType(raw))) return raw;
+
+  if (s === 'tocino' || s.includes('tocino')) {
+    const protein = inferProteinFromMeal(mealName);
+    return `120 g ${protein} tocino`;
+  }
+  if (s.includes('garlic fried rice or steamed rice')) return '150 g cooked garlic fried rice';
+  if (s === 'oil' || s === 'cooking oil' || /\boil\b/.test(s)) return '10 ml canola oil';
+  if (s === 'water' || s === 'broth') return s === 'broth' ? '240 ml low-sodium chicken broth' : '240 ml water';
+  if (s === 'egg' || s === 'eggs') return '1 large chicken egg (50 g)';
+  if (s.includes('rice')) return '150 g cooked white rice';
+  if (s.includes('soy sauce') || s === 'toyo') return '15 ml low-sodium soy sauce';
+  if (s.includes('vinegar')) return '15 ml cane vinegar';
+  if (s.includes('garlic')) return '10 g garlic (2 cloves), minced';
+  if (s.includes('onion')) return '50 g onion, sliced';
+  if (s.includes('ginger')) return '10 g ginger, sliced';
+  if (s === 'meat' || s.includes('meat')) return `120 g lean ${inferProteinFromMeal(mealName)}`;
+  if (s === 'fish') return '120 g milkfish (bangus) fillet';
+  if (s === 'vegetables' || s === 'veggies') return '120 g mixed vegetables (pechay, carrots, sitaw)';
+  if (s === 'salt') return '2 g iodized salt';
+  if (s === 'pepper' || s.includes('black pepper')) return '1 g ground black pepper';
+
+  if (hasSpecificProteinType(s)) return `120 g ${raw}`;
+  return `30 g ${raw}`;
+}
+
+function normalizeDetailedIngredients(ingredients: string[], mealName: string): string[] {
+  const list = Array.isArray(ingredients) ? ingredients : [];
+  const normalized = list
+    .map((item) => makeSpecificMeasuredIngredient(String(item || '').trim(), mealName))
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const deduped = Array.from(new Set(normalized));
+  if (deduped.length > 0) return deduped;
+
+  const protein = inferProteinFromMeal(mealName);
+  return [
+    `120 g lean ${protein}`,
+    '10 ml canola oil',
+    '50 g onion, sliced',
+    '10 g garlic (2 cloves), minced',
+    '240 ml water',
+  ];
+}
+
+function ingredientsNeedUpgrade(ingredients: string[]): boolean {
+  if (!Array.isArray(ingredients) || ingredients.length === 0) return true;
+  return ingredients.some((ing) => {
+    const text = String(ing || '').trim();
+    return !text || isVagueIngredient(text) || !hasMeasurement(text);
+  });
+}
+
+function recipeNeedsUpgrade(recipe: string): boolean {
+  const r = String(recipe || '').trim();
+  if (!r) return true;
+  if (r.includes('traditional Filipino method')) return true;
+  const steps = r.split(/\n+/).filter((line) => /^\s*\d+[.)]\s+/.test(line)).length;
+  return steps < 4;
+}
+
 function createMealObject(meal: any) {
   let ingredients: any = meal?.ingredients ?? meal?.ingredient ?? [];
   if (typeof ingredients === 'string') {
@@ -668,21 +766,109 @@ function createMealObject(meal: any) {
   }
   if (!Array.isArray(ingredients)) ingredients = [];
 
+  const mealName = meal.name || "Unnamed Meal";
+  const normalizedIngredients = normalizeDetailedIngredients(ingredients, mealName);
+
   return {
-    name: meal.name || "Unnamed Meal",
-    ingredients,
+    name: mealName,
+    ingredients: normalizedIngredients,
     portionSize: meal.portionSize || "1 serving",
     calories: Number(meal.calories ?? meal.cal ?? 0),
     protein: Number(meal.protein ?? meal.pro ?? 0),
     carbs: Number(meal.carbs ?? meal.carb ?? 0),
     fats: Number(meal.fats ?? meal.fat ?? 0),
     fiber: Number(meal.fiber ?? 0),
-    recipe: meal.recipe || "1. Prepare all ingredients\n2. Cook according to traditional Filipino method\n3. Season to taste\n4. Serve hot",
+    recipe: meal.recipe || DEFAULT_RECIPE_TEXT,
   };
 }
 
+type ParsedIngredientQuantity = {
+  amount: number;
+  unit: string;
+  ingredientName: string;
+};
+
+function normalizeQuantityUnit(unit: string): { unit: string; multiplier: number } {
+  const u = String(unit || '').toLowerCase().trim();
+  if (u === 'kg') return { unit: 'g', multiplier: 1000 };
+  if (u === 'mg') return { unit: 'g', multiplier: 0.001 };
+  if (u === 'l') return { unit: 'ml', multiplier: 1000 };
+  if (u === 'pcs' || u === 'piece' || u === 'pieces') return { unit: 'pc', multiplier: 1 };
+  if (u === 'cloves') return { unit: 'clove', multiplier: 1 };
+  if (u === 'slices') return { unit: 'slice', multiplier: 1 };
+  if (u === 'cups') return { unit: 'cup', multiplier: 1 };
+  return { unit: u, multiplier: 1 };
+}
+
+function parseIngredientQuantity(input: string): ParsedIngredientQuantity | null {
+  const text = String(input || '').trim();
+  if (!text) return null;
+
+  const measuredMatch = text.match(/^\s*(\d+(?:\.\d+)?)\s*(kg|g|mg|l|ml|tbsp|tsp|cup|cups|pc|pcs|piece|pieces|clove|cloves|slice|slices)\b\s*(.+)$/i);
+  if (measuredMatch) {
+    const amountRaw = Number(measuredMatch[1]);
+    const { unit, multiplier } = normalizeQuantityUnit(measuredMatch[2]);
+    const ingredientName = String(measuredMatch[3] || '').trim();
+    if (!Number.isFinite(amountRaw) || amountRaw <= 0 || !ingredientName) return null;
+    return {
+      amount: amountRaw * multiplier,
+      unit,
+      ingredientName,
+    };
+  }
+
+  return null;
+}
+
+function normalizeIngredientNameForShoppingList(input: string): string {
+  return String(input || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function backfillSeedDishData(source: any[]) {
+  if (!Array.isArray(source)) return;
+
+  source.forEach((dish: any) => {
+    if (!dish || typeof dish !== 'object') return;
+    const mealName = String(dish.name || 'Meal').trim() || 'Meal';
+
+    let ingredients: string[] = [];
+    if (Array.isArray(dish.ingredients)) {
+      ingredients = dish.ingredients.map(String);
+    } else if (typeof dish.ingredients === 'string') {
+      const raw = dish.ingredients.trim();
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            ingredients = parsed.map(String);
+          } else {
+            ingredients = raw.split(/[\r\n,;]+/).map((s: string) => s.trim()).filter(Boolean);
+          }
+        } catch {
+          ingredients = raw.split(/[\r\n,;]+/).map((s: string) => s.trim()).filter(Boolean);
+        }
+      }
+    }
+
+    dish.ingredients = normalizeDetailedIngredients(ingredients, mealName);
+    if (recipeNeedsUpgrade(String(dish.recipe || ''))) {
+      dish.recipe = DEFAULT_RECIPE_TEXT;
+    }
+  });
+}
+
+function backfillAllSeedDishes() {
+  backfillSeedDishData(trustedFilipinoMealsDetailed);
+  backfillSeedDishData(filipinoSnacks);
+}
+
+backfillAllSeedDishes();
+
 function generateShoppingList(weekPlan: any[]) {
-  const ingredientCounts: Record<string, number> = {};
+  const ingredientTotals: Record<string, { byUnit: Record<string, number>; unparsedCount: number }> = {};
 
   if (!Array.isArray(weekPlan)) return [];
 
@@ -690,19 +876,46 @@ function generateShoppingList(weekPlan: any[]) {
     Object.values(day.meals).forEach((meal: any) => {
       if (meal && Array.isArray(meal.ingredients)) {
         meal.ingredients.forEach((ing: string) => {
-          const normalized = ing.trim().toLowerCase();
-          ingredientCounts[normalized] = (ingredientCounts[normalized] || 0) + 1;
+          const raw = String(ing || '').trim();
+          if (!raw) return;
+
+          const parsed = parseIngredientQuantity(raw);
+          if (parsed) {
+            const key = normalizeIngredientNameForShoppingList(parsed.ingredientName);
+            if (!ingredientTotals[key]) {
+              ingredientTotals[key] = { byUnit: {}, unparsedCount: 0 };
+            }
+            ingredientTotals[key].byUnit[parsed.unit] = (ingredientTotals[key].byUnit[parsed.unit] || 0) + parsed.amount;
+            return;
+          }
+
+          const fallbackKey = normalizeIngredientNameForShoppingList(raw);
+          if (!ingredientTotals[fallbackKey]) {
+            ingredientTotals[fallbackKey] = { byUnit: {}, unparsedCount: 0 };
+          }
+          ingredientTotals[fallbackKey].unparsedCount += 1;
         });
       }
     });
   });
 
-  const shoppingList = Object.entries(ingredientCounts).map(([ingredient, count]) => ({
-    ingredient,
-    estimate: `${count} portion(s)`,
-  }));
+  const shoppingList = Object.entries(ingredientTotals).map(([ingredient, totals]) => {
+    const unitParts = Object.entries(totals.byUnit).map(([unit, amount]) => {
+      const rounded = unit === 'g' || unit === 'ml' ? Math.round(amount) : Math.round(amount * 10) / 10;
+      return `${rounded} ${unit}`;
+    });
 
-  shoppingList.sort((a: any, b: any) => (b.estimate.length - a.estimate.length));
+    if (totals.unparsedCount > 0) {
+      unitParts.push(`${totals.unparsedCount} item(s)`);
+    }
+
+    return {
+      ingredient,
+      estimate: unitParts.join(' + ') || '1 item(s)',
+    };
+  });
+
+  shoppingList.sort((a: any, b: any) => a.ingredient.localeCompare(b.ingredient));
   return shoppingList;
 }
 
@@ -1133,36 +1346,54 @@ function isoDateString(input?: Date | string | null): string {
 // INPUT VALIDATION HELPERS
 // ============================================
 
-// Generate recipe instructions using OpenAI
-async function generateRecipeInstructions(mealName: string, ingredients: string[]): Promise<string> {
+// Generate detailed ingredients + recipe instructions using OpenAI
+async function generateRecipePackage(mealName: string, ingredients: string[]): Promise<{ ingredients: string[]; recipe: string }> {
+  const normalizedIngredients = normalizeDetailedIngredients(ingredients || [], mealName || 'Meal');
+  const fallback = { ingredients: normalizedIngredients, recipe: DEFAULT_RECIPE_TEXT };
+
   if (!openai || !openaiAvailable) {
-    // Return basic instructions if OpenAI not available
-    return `1. Prepare all ingredients\n2. Cook according to traditional Filipino method\n3. Season to taste\n4. Serve hot`;
+    return fallback;
   }
-  
+
   try {
-    const ingredientsList = ingredients.join(", ");
     const completion = await safeOpenAICompletionsCreate({
       model: OPENAI_MODEL,
       messages: [
         {
           role: "system",
-          content: "You are a Filipino cuisine expert. Provide concise, numbered cooking instructions (3-5 steps max) for traditional Filipino dishes. Keep each step brief and practical."
+          content: "You are a Filipino meal-planning and culinary expert. Output STRICT JSON only. Every ingredient must include exact amount + unit and specific type/variant (e.g., pork tocino, chicken tocino, canola oil). Prefer metric units (g, ml) and keep portions practical for one serving. Steps must be numbered, specific, and mention cooking times/heat when relevant."
         },
         {
           role: "user",
-          content: `Generate simple cooking instructions for "${mealName}" using these ingredients: ${ingredientsList}. Return only the numbered steps, no extra text.`
+          content: `Meal: ${mealName}\nBase ingredients: ${normalizedIngredients.join(', ')}\nReturn JSON only in this shape: {"ingredients":["..."],"recipe":"1. ...\\n2. ..."}`
         }
       ],
-      temperature: 0.7,
-      max_tokens: 300
-    });
+      temperature: 0.4,
+      max_tokens: 700
+    }, 10000);
 
-    const recipeText = (completion?.choices?.[0]?.message?.content || "").trim();
-    return recipeText || `1. Prepare all ingredients\n2. Cook according to traditional Filipino method\n3. Season to taste\n4. Serve hot`;
-  } catch (err: any) {
-    return `1. Prepare all ingredients\n2. Cook according to traditional Filipino method\n3. Season to taste\n4. Serve hot`;
+    const raw = String(completion?.choices?.[0]?.message?.content || '').trim();
+    const jsonText = (raw.match(/\{[\s\S]*\}/)?.[0] || raw).trim();
+    const parsed = JSON.parse(jsonText || '{}');
+
+    const aiIngredients = normalizeDetailedIngredients(
+      Array.isArray(parsed?.ingredients) ? parsed.ingredients.map(String) : normalizedIngredients,
+      mealName
+    );
+    const recipe = String(parsed?.recipe || '').trim();
+
+    return {
+      ingredients: aiIngredients,
+      recipe: recipe || DEFAULT_RECIPE_TEXT,
+    };
+  } catch {
+    return fallback;
   }
+}
+
+async function generateRecipeInstructions(mealName: string, ingredients: string[]): Promise<string> {
+  const pkg = await generateRecipePackage(mealName, ingredients);
+  return pkg.recipe || DEFAULT_RECIPE_TEXT;
 }
 
 // Enrich week plan meals with recipes
@@ -1180,12 +1411,22 @@ async function enrichWeekPlanWithRecipes(weekPlan: any[]): Promise<any[]> {
       }
       
       const mealObj = meal as any;
-      // Only generate recipe if it's empty and we have ingredients
-      if ((!mealObj.recipe || mealObj.recipe.trim() === '') && mealObj.ingredients && Array.isArray(mealObj.ingredients) && mealObj.ingredients.length > 0) {
-        const recipe = await generateRecipeInstructions(mealObj.name || "Meal", mealObj.ingredients);
-        enrichedMeals[mealType] = { ...mealObj, recipe };
+      const existingIngredients = Array.isArray(mealObj.ingredients) ? mealObj.ingredients.map(String) : [];
+      const mustUpgradeIngredients = ingredientsNeedUpgrade(existingIngredients);
+      const mustUpgradeRecipe = recipeNeedsUpgrade(String(mealObj.recipe || ''));
+
+      if (mustUpgradeIngredients || mustUpgradeRecipe) {
+        const pkg = await generateRecipePackage(mealObj.name || "Meal", existingIngredients);
+        enrichedMeals[mealType] = {
+          ...mealObj,
+          ingredients: pkg.ingredients,
+          recipe: pkg.recipe || mealObj.recipe || DEFAULT_RECIPE_TEXT,
+        };
       } else {
-        enrichedMeals[mealType] = mealObj;
+        enrichedMeals[mealType] = {
+          ...mealObj,
+          ingredients: normalizeDetailedIngredients(existingIngredients, mealObj.name || 'Meal'),
+        };
       }
     }
     
@@ -2354,6 +2595,8 @@ Rules:
 - Only use dishes that appear in the list (no new dishes).${dietRules}
 - IMPORTANT: For lunch and dinner, include a rice/carb side dish (like "Sinangag na Kanin" or "Fried Rice") to make it a complete Filipino meal.
 - Randomize meals across days and avoid repeating the same meal on consecutive days.
+- Every meal object must include complete ingredients with specific variants and exact measurements (e.g., "120 g pork tocino", "10 ml canola oil", "1 large chicken egg (50 g)", "240 ml water"). Avoid vague terms like "oil", "meat", "fish", or plain "tocino".
+- Cooking instructions must be detailed and practical (4-7 numbered steps) with clear actions and approximate time/heat when relevant.
 - Return exactly JSON with "weekPlan": an array of 7 objects with structure:
   { "day":"Monday", "meals": { "breakfast": "Tapsilog"|{name:..., calories:..., ingredients:[]...}, "lunch": {name: "main dish with rice side"}, ... }, "totalCalories": number, "totalProtein": number, "totalCarbs": number, "totalFats": number }
 `;
@@ -2597,8 +2840,8 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
 
       const fallbackDish = fallbackSource[Math.floor(Math.random() * fallbackSource.length)];
       const mealObj = createMealObject(fallbackDish);
-      const recipe = await generateRecipeInstructions(mealObj.name, mealObj.ingredients);
-      return res.json({ success: true, newMeal: { ...mealObj, recipe }, source: 'fallback' });
+      const pkg = await generateRecipePackage(mealObj.name, mealObj.ingredients);
+      return res.json({ success: true, newMeal: { ...mealObj, ingredients: pkg.ingredients, recipe: pkg.recipe }, source: 'fallback' });
     }
 
     // Apply best-effort filtering for fallback picks
@@ -2627,6 +2870,8 @@ Aim for around ${desiredMealCalories} kcal for THIS regenerated ${isSnack ? 'sna
 ${excludeText}
 List: ${dishListJson}
 Return JSON: { "newMeal": { "name":"...", "ingredients":[...], "calories":..., "protein":..., "carbs":..., "fats":..., "recipe":"..." } }
+Ingredient rules: include exact metric amounts and specific ingredient variants (e.g., pork/chicken/beef tocino, canola/vegetable oil). No vague ingredients.
+Instruction rules: 4-7 numbered steps with actionable details and approximate times.
 `;
 
     // Try OpenAI for regeneration
@@ -2659,8 +2904,8 @@ Return JSON: { "newMeal": { "name":"...", "ingredients":[...], "calories":..., "
             let mealObj: any = createMealObject(picked);
             mealObj = addRiceSideToSingleMealIfMissing(mealObj);
             mealObj = scaleMealToDesiredCalories(mealObj);
-            const recipe = await generateRecipeInstructions(mealObj.name, mealObj.ingredients);
-            return res.json({ success: true, newMeal: { ...mealObj, recipe }, source: 'fallback-excluded' });
+            const pkg = await generateRecipePackage(mealObj.name, mealObj.ingredients);
+            return res.json({ success: true, newMeal: { ...mealObj, ingredients: pkg.ingredients, recipe: pkg.recipe }, source: 'fallback-excluded' });
           }
           // If DB contains this dish, use DB result for accurate macros
           const found = dishes.find(d => String(d.name || '').toLowerCase().trim() === nameLower);
@@ -2668,14 +2913,14 @@ Return JSON: { "newMeal": { "name":"...", "ingredients":[...], "calories":..., "
             let mealObj: any = createMealObject(found);
             mealObj = addRiceSideToSingleMealIfMissing(mealObj);
             mealObj = scaleMealToDesiredCalories(mealObj);
-            const recipe = await generateRecipeInstructions(mealObj.name, mealObj.ingredients);
-            return res.json({ success: true, newMeal: { ...mealObj, recipe }, source: 'ai' });
+            const pkg = await generateRecipePackage(mealObj.name, mealObj.ingredients);
+            return res.json({ success: true, newMeal: { ...mealObj, ingredients: pkg.ingredients, recipe: pkg.recipe }, source: 'ai' });
           }
           let mealObj: any = createMealObject(parsed.newMeal);
           mealObj = addRiceSideToSingleMealIfMissing(mealObj);
           mealObj = scaleMealToDesiredCalories(mealObj);
-          const recipe = await generateRecipeInstructions(mealObj.name, mealObj.ingredients);
-          return res.json({ success: true, newMeal: { ...mealObj, recipe }, source: 'ai' });
+          const pkg = await generateRecipePackage(mealObj.name, mealObj.ingredients);
+          return res.json({ success: true, newMeal: { ...mealObj, ingredients: pkg.ingredients, recipe: pkg.recipe }, source: 'ai' });
         }
       } catch (err: any) {
       }
@@ -2704,8 +2949,8 @@ Return JSON: { "newMeal": { "name":"...", "ingredients":[...], "calories":..., "
     let mealObj: any = createMealObject(picked);
     mealObj = addRiceSideToSingleMealIfMissing(mealObj);
     mealObj = scaleMealToDesiredCalories(mealObj);
-    const recipe = await generateRecipeInstructions(mealObj.name, mealObj.ingredients);
-    return res.json({ success: true, newMeal: { ...mealObj, recipe }, source: 'fallback' });
+    const pkg = await generateRecipePackage(mealObj.name, mealObj.ingredients);
+    return res.json({ success: true, newMeal: { ...mealObj, ingredients: pkg.ingredients, recipe: pkg.recipe }, source: 'fallback' });
 
   } catch (err: any) {
     return res.status(500).json({ success: false, message: 'Regenerate failed', error: getErrorMessage(err) });

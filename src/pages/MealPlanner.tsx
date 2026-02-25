@@ -337,7 +337,7 @@ const MealPlanner: React.FC = () => {
     try {
       console.log('Starting mealplanner call: preparing request…');
 
-      const token = localStorage.getItem('token') || '';
+      const token = (await ensureToken()) || '';
       if (!token) {
         presentToast({ message: '⚠️ Please log in before generating a meal plan.', duration: 2500, color: 'warning' });
         setLoading(false);
@@ -451,6 +451,16 @@ const MealPlanner: React.FC = () => {
       others: raw.others || raw.others || [],
       flat: []
     };
+  };
+
+  const formatShoppingItemLabel = (item: any) => {
+    const ingredient = String(item?.ingredient ?? item?.name ?? item ?? '').trim();
+    const estimateRaw = item?.estimate ?? item?.count ?? '';
+    const estimate = String(estimateRaw ?? '').trim();
+
+    if (!ingredient) return 'Unknown ingredient';
+    if (!estimate) return ingredient;
+    return `${ingredient} — ${estimate}`;
   };
 
   // Update loadSavedPlans to handle rows with/without updatedAt
@@ -1561,7 +1571,7 @@ const MealPlanner: React.FC = () => {
                               {(mealPlan.shoppingList as any).flat.map((item: any, idx: number) => (
                                 <li key={idx}>
                                   <IonIcon icon={checkmarkCircle} className="check-icon" />
-                                  <span>{item?.ingredient ?? item?.name ?? String(item)}</span>
+                                  <span>{formatShoppingItemLabel(item)}</span>
                                 </li>
                               ))}
                             </ul>
@@ -1616,7 +1626,7 @@ const MealPlanner: React.FC = () => {
                         <h4><IonIcon icon={cart} /> Ingredients</h4>
                         <ul className="shopping-items">
                           {mealPlan.shoppingList.map((item: any, idx: number) => (
-                            <li key={idx}><IonIcon icon={checkmarkCircle} className="check-icon" /><span>{item.ingredient ?? item}</span></li>
+                            <li key={idx}><IonIcon icon={checkmarkCircle} className="check-icon" /><span>{formatShoppingItemLabel(item)}</span></li>
                           ))}
                         </ul>
                       </div>

@@ -79,6 +79,29 @@ export const getToken = (): string | null => {
   return localStorage.getItem('token');
 };
 
+const clearAuthState = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  localStorage.removeItem('currentUser');
+  notifyAuthChanged();
+};
+
+const isTokenValid = async (token: string): Promise<boolean> => {
+  try {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/user/profile`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (response.ok) return true;
+    if (response.status === 401 || response.status === 403) return false;
+
+    return true;
+  } catch {
+    return true;
+  }
+};
+
 /**
  * ensureToken() - verifies a token; in dev it can auto-create a token for a test user.
  * - If token exists, returns it.
@@ -86,7 +109,11 @@ export const getToken = (): string | null => {
  */
 export const ensureToken = async (options?: { devEmail?: string }): Promise<string | null> => {
   const existing = getToken();
-  if (existing) return existing;
+  if (existing) {
+    const valid = await isTokenValid(existing);
+    if (valid) return existing;
+    clearAuthState();
+  }
 
   if (process.env.NODE_ENV !== 'development') return null;
 
@@ -105,6 +132,7 @@ export const ensureToken = async (options?: { devEmail?: string }): Promise<stri
 
     localStorage.setItem('token', json.token);
     if (json.user) localStorage.setItem('user', JSON.stringify(json.user));
+    notifyAuthChanged();
     return json.token;
   } catch (err: any) {
     return null;
