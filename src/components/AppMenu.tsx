@@ -122,6 +122,12 @@ const AppMenu: React.FC = () => {
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
+  useEffect(() => {
+    const onAuthChanged = () => forceRender((n) => n + 1);
+    window.addEventListener('auth-changed', onAuthChanged as EventListener);
+    return () => window.removeEventListener('auth-changed', onAuthChanged as EventListener);
+  }, []);
+
   const isAuthenticated = !!localStorage.getItem('token');
   const role = getRole();
   const displayName = getDisplayName();

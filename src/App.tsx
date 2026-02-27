@@ -70,6 +70,7 @@ function readAuthState() {
 
 const App: React.FC = () => {
   const [authState, setAuthState] = useState(readAuthState());
+  const [authInitialized, setAuthInitialized] = useState(false);
 
   useEffect(() => {
     const onStorage = () => setAuthState(readAuthState());
@@ -89,17 +90,27 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Optional dev autologin. Disabled by default to avoid showing the menu on /home.
-    if (process.env.NODE_ENV === "development" && process.env.REACT_APP_DEV_AUTOLOGIN === 'true') {
-      (async () => {
-        try {
-          await ensureToken(); // uses default dev email
-        } catch (err) {
-          console.warn("Dev ensureToken failed", err);
-        }
-      })();
-    }
+    let active = true;
+    (async () => {
+      try {
+        await ensureToken();
+      } catch (err) {
+        console.warn("ensureToken failed", err);
+      } finally {
+        if (!active) return;
+        setAuthState(readAuthState());
+        setAuthInitialized(true);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
   }, []);
+
+  if (!authInitialized) {
+    return <IonApp />;
+  }
 
   return (
     <IonApp>
