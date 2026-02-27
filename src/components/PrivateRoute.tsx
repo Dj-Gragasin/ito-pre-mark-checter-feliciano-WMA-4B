@@ -1,6 +1,7 @@
 // src/components/PrivateRoute.tsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Route, Redirect, RouteProps } from 'react-router-dom';
+import { ensureToken } from '../services/auth.service';
 
 interface PrivateRouteProps extends RouteProps {
   role?: 'admin' | 'member';
@@ -22,13 +23,49 @@ function readRole(): 'admin' | 'member' | undefined {
 }
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ role, component: Component, ...rest }) => {
-  const isAuthenticated = !!localStorage.getItem('token');
-  const currentRole = readRole();
+  const [isChecking, setIsChecking] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
+  const [currentRole, setCurrentRole] = useState<'admin' | 'member' | undefined>(readRole());
+
+  useEffect(() => {
+    let active = true;
+
+    const hydrateAuth = async () => {
+      try {
+        await ensureToken();
+      } catch {
+        // ignore, auth state will be inferred from storage after ensureToken attempt
+      } finally {
+        if (!active) return;
+        setIsAuthenticated(!!localStorage.getItem('token'));
+        setCurrentRole(readRole());
+        setIsChecking(false);
+      }
+    };
+
+    hydrateAuth();
+
+    const onAuthChanged = () => {
+      if (!active) return;
+      setIsAuthenticated(!!localStorage.getItem('token'));
+      setCurrentRole(readRole());
+    };
+
+    window.addEventListener('auth-changed', onAuthChanged as EventListener);
+    return () => {
+      active = false;
+      window.removeEventListener('auth-changed', onAuthChanged as EventListener);
+    };
+  }, []);
 
   return (
     <Route
       {...rest}
       render={props => {
+        if (isChecking) {
+          return null;
+        }
+
         if (!isAuthenticated) {
           return <Redirect to="/home" />;
         }

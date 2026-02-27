@@ -458,6 +458,28 @@ async function ensureAbsenceReminderSettingsTable() {
 
 // ===== HELPER FUNCTIONS =====
 
+function calculateCaloriesFromMacros(protein: any, carbs: any, fats: any, fallbackCalories = 0): number {
+  const p = Number(protein ?? 0);
+  const c = Number(carbs ?? 0);
+  const f = Number(fats ?? 0);
+  const hasMacroData = Number.isFinite(p) || Number.isFinite(c) || Number.isFinite(f);
+  if (!hasMacroData) return Number(fallbackCalories || 0);
+
+  const proteinSafe = Number.isFinite(p) ? Math.max(0, p) : 0;
+  const carbsSafe = Number.isFinite(c) ? Math.max(0, c) : 0;
+  const fatsSafe = Number.isFinite(f) ? Math.max(0, f) : 0;
+  return Math.round(proteinSafe * 4 + carbsSafe * 4 + fatsSafe * 9);
+}
+
+function caloriesFromMacrosWithFallback(meal: any): number {
+  return calculateCaloriesFromMacros(
+    meal?.protein ?? meal?.pro,
+    meal?.carbs ?? meal?.carb,
+    meal?.fats ?? meal?.fat,
+    Number(meal?.calories ?? meal?.cal ?? 0)
+  );
+}
+
 // Add rice/carb sides to lunch and dinner meals
 function addRiceSidesToMeals(weekPlan: any[]) {
   const riceSideDishes = [
@@ -475,7 +497,6 @@ function addRiceSidesToMeals(weekPlan: any[]) {
       updatedMeals.lunch = {
         ...updatedMeals.lunch,
         name: `${updatedMeals.lunch.name} with ${randomRice.name}`,
-        calories: (updatedMeals.lunch.calories || 0) + randomRice.calories,
         carbs: (updatedMeals.lunch.carbs || 0) + randomRice.carbs,
         protein: (updatedMeals.lunch.protein || 0) + randomRice.protein,
         fats: (updatedMeals.lunch.fats || 0) + randomRice.fats,
@@ -483,6 +504,7 @@ function addRiceSidesToMeals(weekPlan: any[]) {
           ? [...updatedMeals.lunch.ingredients, 'Garlic Fried Rice or Steamed Rice'] 
           : ['Garlic Fried Rice or Steamed Rice']
       };
+      updatedMeals.lunch.calories = caloriesFromMacrosWithFallback(updatedMeals.lunch);
     }
     
     // Add rice to dinner if not already included
@@ -491,7 +513,6 @@ function addRiceSidesToMeals(weekPlan: any[]) {
       updatedMeals.dinner = {
         ...updatedMeals.dinner,
         name: `${updatedMeals.dinner.name} with ${randomRice.name}`,
-        calories: (updatedMeals.dinner.calories || 0) + randomRice.calories,
         carbs: (updatedMeals.dinner.carbs || 0) + randomRice.carbs,
         protein: (updatedMeals.dinner.protein || 0) + randomRice.protein,
         fats: (updatedMeals.dinner.fats || 0) + randomRice.fats,
@@ -499,6 +520,7 @@ function addRiceSidesToMeals(weekPlan: any[]) {
           ? [...updatedMeals.dinner.ingredients, 'Garlic Fried Rice or Steamed Rice']
           : ['Garlic Fried Rice or Steamed Rice']
       };
+      updatedMeals.dinner.calories = caloriesFromMacrosWithFallback(updatedMeals.dinner);
     }
     
     // Recalculate totals
@@ -525,11 +547,11 @@ function scaleMealPortion(meal: any, factor: number) {
     if (Number.isFinite(v)) (scaled as any)[key] = Math.round(v * f);
   };
 
-  scaleField('calories');
   scaleField('protein');
   scaleField('carbs');
   scaleField('fats');
   scaleField('fiber');
+  scaled.calories = caloriesFromMacrosWithFallback(scaled);
 
   const portion = Math.round(f * 10) / 10;
   const basePortion = String(scaled.portionSize || '1 serving');
@@ -768,15 +790,19 @@ function createMealObject(meal: any) {
 
   const mealName = meal.name || "Unnamed Meal";
   const normalizedIngredients = normalizeDetailedIngredients(ingredients, mealName);
+  const protein = Number(meal.protein ?? meal.pro ?? 0);
+  const carbs = Number(meal.carbs ?? meal.carb ?? 0);
+  const fats = Number(meal.fats ?? meal.fat ?? 0);
+  const fallbackCalories = Number(meal.calories ?? meal.cal ?? 0);
 
   return {
     name: mealName,
     ingredients: normalizedIngredients,
     portionSize: meal.portionSize || "1 serving",
-    calories: Number(meal.calories ?? meal.cal ?? 0),
-    protein: Number(meal.protein ?? meal.pro ?? 0),
-    carbs: Number(meal.carbs ?? meal.carb ?? 0),
-    fats: Number(meal.fats ?? meal.fat ?? 0),
+    calories: calculateCaloriesFromMacros(protein, carbs, fats, fallbackCalories),
+    protein,
+    carbs,
+    fats,
     fiber: Number(meal.fiber ?? 0),
     recipe: meal.recipe || DEFAULT_RECIPE_TEXT,
   };
@@ -984,10 +1010,13 @@ function shuffleArray<T>(arr: T[]) {
 function sumMacros(meals: any[]) {
   const totals = { calories: 0, protein: 0, carbs: 0, fats: 0, fiber: 0 };
   meals.forEach((m: any) => {
-    totals.calories += Number(m.calories || m.cal || 0);
-    totals.protein += Number(m.protein || m.pro || 0);
-    totals.carbs += Number(m.carbs || m.carb || 0);
-    totals.fats += Number(m.fats || m.fat || 0);
+    const protein = Number(m.protein || m.pro || 0);
+    const carbs = Number(m.carbs || m.carb || 0);
+    const fats = Number(m.fats || m.fat || 0);
+    totals.calories += calculateCaloriesFromMacros(protein, carbs, fats, Number(m.calories || m.cal || 0));
+    totals.protein += protein;
+    totals.carbs += carbs;
+    totals.fats += fats;
     totals.fiber += Number(m.fiber || 0);
   });
   return totals;
@@ -1121,7 +1150,12 @@ function generateWeekPlan(
   };
 
   const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
-  const dishCalories = (dish: any) => toFiniteNumber(dish?.calories ?? dish?.cal ?? 0, 0);
+  const dishCalories = (dish: any) => calculateCaloriesFromMacros(
+    dish?.protein ?? dish?.pro,
+    dish?.carbs ?? dish?.carb,
+    dish?.fats ?? dish?.fat,
+    toFiniteNumber(dish?.calories ?? dish?.cal ?? 0, 0)
+  );
 
   const pickUniqueClosestCalories = (
     source: any[],
@@ -2785,7 +2819,6 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
       const updated = {
         ...mealObj,
         name: `${mealObj.name} with ${randomRice.name}`,
-        calories: (mealObj.calories || 0) + randomRice.calories,
         carbs: (mealObj.carbs || 0) + randomRice.carbs,
         protein: (mealObj.protein || 0) + randomRice.protein,
         fats: (mealObj.fats || 0) + randomRice.fats,
@@ -2793,6 +2826,8 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
           ? [...mealObj.ingredients, 'Garlic Fried Rice or Steamed Rice']
           : ['Garlic Fried Rice or Steamed Rice']
       };
+
+      updated.calories = caloriesFromMacrosWithFallback(updated);
 
       return updated;
     };

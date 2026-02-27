@@ -729,6 +729,19 @@ const MealPlanner: React.FC = () => {
     return s.substring(0, 200);
   }
 
+  function calculateCaloriesFromMacros(protein: any, carbs: any, fats: any, fallbackCalories = 0): number {
+    const p = Number(protein ?? 0);
+    const c = Number(carbs ?? 0);
+    const f = Number(fats ?? 0);
+    const hasMacroData = Number.isFinite(p) || Number.isFinite(c) || Number.isFinite(f);
+    if (!hasMacroData) return Number(fallbackCalories || 0);
+
+    const proteinSafe = Number.isFinite(p) ? Math.max(0, p) : 0;
+    const carbsSafe = Number.isFinite(c) ? Math.max(0, c) : 0;
+    const fatsSafe = Number.isFinite(f) ? Math.max(0, f) : 0;
+    return Math.round(proteinSafe * 4 + carbsSafe * 4 + fatsSafe * 9);
+  }
+
   // Normalize single meal values (ensures numeric macros, default portion size, converts string ingredients)
   function normalizeMeal(m: any): Meal {
     if (!m || typeof m !== 'object') {
@@ -744,14 +757,17 @@ const MealPlanner: React.FC = () => {
         instructions: '',
       } as Meal;
     }
+    const protein = Number(m.protein || m.prot || 0) || 0;
+    const carbs = Number(m.carbs || m.carbohydrates || 0) || 0;
+    const fats = Number(m.fats || m.fat || 0) || 0;
     return {
       name: String(m.name || m.title || 'Unknown dish'),
       ingredients: normalizeIngredientsToArray(m.ingredients || m.ings || []),
       portionSize: String(m.portionSize || m.servings || '1 serving'),
-      calories: Number(m.calories || m.cal || 0) || 0,
-      protein: Number(m.protein || m.prot || 0) || 0,
-      carbs: Number(m.carbs || m.carbohydrates || 0) || 0,
-      fats: Number(m.fats || m.fat || 0) || 0,
+      calories: calculateCaloriesFromMacros(protein, carbs, fats, Number(m.calories || m.cal || 0) || 0),
+      protein,
+      carbs,
+      fats,
       recipe: String(m.recipe || m.instructions || ''),
       instructions: String(m.instructions || m.ai_instructions || m.recipe || ''),
     } as Meal;
@@ -761,10 +777,13 @@ const MealPlanner: React.FC = () => {
   function recomputeDayTotals(dayPlan: DayPlan): DayPlan {
     const newTotals = Object.values(dayPlan.meals).reduce(
       (acc, m) => {
-        acc.calories += Number(m.calories || 0);
-        acc.protein += Number(m.protein || 0);
-        acc.carbs += Number(m.carbs || 0);
-        acc.fats += Number(m.fats || 0);
+        const protein = Number(m.protein || 0);
+        const carbs = Number(m.carbs || 0);
+        const fats = Number(m.fats || 0);
+        acc.calories += calculateCaloriesFromMacros(protein, carbs, fats, Number(m.calories || 0));
+        acc.protein += protein;
+        acc.carbs += carbs;
+        acc.fats += fats;
         return acc;
       },
       { calories: 0, protein: 0, carbs: 0, fats: 0 }
