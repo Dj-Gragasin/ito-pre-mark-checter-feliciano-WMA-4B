@@ -729,15 +729,8 @@ function scaleMealPortion(meal: any, factor: number) {
   scaleField('fats');
   scaleField('fiber');
   scaled.calories = caloriesFromMacrosWithFallback(scaled);
-
-  const portion = Math.round(f * 10) / 10;
-  const basePortion = String(scaled.portionSize || '1 serving');
-  // Avoid stacking multiple multipliers if regenerate/generate is called repeatedly.
-  if (!/\bx\s*serving\b/i.test(basePortion) && !/\bservings\b/i.test(basePortion)) {
-    scaled.portionSize = `${portion}x serving`;
-  } else {
-    scaled.portionSize = `${portion}x serving`;
-  }
+  // Keep UI wording simple and consistent.
+  scaled.portionSize = '1 serving';
 
   return scaled;
 }
@@ -1190,13 +1183,57 @@ function sumMacros(meals: any[]) {
     const protein = Number(m.protein || m.pro || 0);
     const carbs = Number(m.carbs || m.carb || 0);
     const fats = Number(m.fats || m.fat || 0);
-    totals.calories += calculateCaloriesFromMacros(protein, carbs, fats, Number(m.calories || m.cal || 0));
     totals.protein += protein;
     totals.carbs += carbs;
     totals.fats += fats;
     totals.fiber += Number(m.fiber || 0);
   });
+  totals.calories = calculateCaloriesFromMacros(totals.protein, totals.carbs, totals.fats, 0);
   return totals;
+}
+
+function recomputeWeekPlanTotals(weekPlan: any[]): any[] {
+  if (!Array.isArray(weekPlan)) return [];
+
+  return weekPlan.map((day: any) => {
+    const rawMeals = day?.meals && typeof day.meals === 'object' ? day.meals : {};
+    const meals = Object.entries(rawMeals).reduce((acc: Record<string, any>, [mealKey, rawMeal]) => {
+      const mealObj = rawMeal && typeof rawMeal === 'object' ? { ...(rawMeal as any) } : { name: String(rawMeal || 'Unnamed Meal') };
+
+      const protein = Number(mealObj?.protein ?? mealObj?.pro ?? 0);
+      const carbs = Number(mealObj?.carbs ?? mealObj?.carb ?? 0);
+      const fats = Number(mealObj?.fats ?? mealObj?.fat ?? 0);
+
+      const proteinSafe = Number.isFinite(protein) ? protein : 0;
+      const carbsSafe = Number.isFinite(carbs) ? carbs : 0;
+      const fatsSafe = Number.isFinite(fats) ? fats : 0;
+
+      acc[mealKey] = {
+        ...mealObj,
+        protein: proteinSafe,
+        carbs: carbsSafe,
+        fats: fatsSafe,
+        calories: calculateCaloriesFromMacros(
+          proteinSafe,
+          carbsSafe,
+          fatsSafe,
+          Number(mealObj?.calories ?? mealObj?.cal ?? 0)
+        ),
+      };
+
+      return acc;
+    }, {});
+
+    const totals = sumMacros(Object.values(meals));
+    return {
+      ...day,
+      meals,
+      totalCalories: totals.calories,
+      totalProtein: totals.protein,
+      totalCarbs: totals.carbs,
+      totalFats: totals.fats,
+    };
+  });
 }
 
 function pickUniqueMeals(source: any[], used: Set<string>, count: number) {
@@ -2919,6 +2956,18 @@ app.post('/api/admin/payments/record-cash', authenticateToken, requireAdmin, asy
       });
     }
 
+    const parsedUserId = Number(userId);
+    const parsedAmount = Number(amount);
+    if (!Number.isFinite(parsedUserId) || parsedUserId <= 0 || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid payment payload',
+      });
+    }
+
+    const normalizedMembershipType = normalizeMembershipPlan(membershipType);
+    const normalizedPaymentMethod = String(paymentMethod || 'cash').toLowerCase();
+
     const transactionId = `CASH-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
     const paymentStatus = 'pending';
 
@@ -2930,10 +2979,10 @@ app.post('/api/admin/payments/record-cash', authenticateToken, requireAdmin, asy
             membership_type, payment_status, transaction_id, notes
           ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
-            userId,
-            amount,
-            paymentMethod || 'cash',
-            membershipType,
+            parsedUserId,
+            parsedAmount,
+            normalizedPaymentMethod,
+            normalizedMembershipType,
             paymentStatus,
             transactionId,
             notes || '',
@@ -2945,10 +2994,10 @@ app.post('/api/admin/payments/record-cash', authenticateToken, requireAdmin, asy
             membership_type, payment_status, transaction_id
           ) VALUES (?, ?, ?, ?, ?, ?)`,
           [
-            userId,
-            amount,
-            paymentMethod || 'cash',
-            membershipType,
+            parsedUserId,
+            parsedAmount,
+            normalizedPaymentMethod,
+            normalizedMembershipType,
             paymentStatus,
             transactionId,
           ]
@@ -3172,38 +3221,58 @@ app.delete('/api/admin/payments/:id', authenticateToken, requireAdmin, async (re
 // ADMIN PAYMENT SUMMARY ROUTE
 app.get('/api/admin/payments/summary', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
-    // Backward compatible status handling:
-    // - legacy rows may have NULL payment_status (treat as paid/completed)
-    // - older flows may use approved/success
-    const paidWhere = `(payment_status IS NULL OR LOWER(COALESCE(payment_status, '')) IN ('paid', 'completed', 'approved', 'success'))`;
-    const pendingWhere = `LOWER(COALESCE(payment_status, '')) IN ('pending', 'pending_approval')`;
+    // Use explicit text casts for PostgreSQL enum compatibility.
+    const statusExpr = `LOWER(TRIM(COALESCE(payment_status::text, ''))) `;
+    const methodExpr = `LOWER(TRIM(COALESCE(payment_method::text, ''))) `;
+    const paidWhere = `(payment_status IS NULL OR ${statusExpr} IN ('paid', 'completed', 'approved', 'success'))`;
+    const pendingWhere = `${statusExpr} IN ('pending', 'pending_approval')`;
+    // Cash records from Members Management use CASH-* transaction IDs.
+    // Include pending cash in total revenue while still requiring approval for account activation.
+    const manualPendingCashWhere = `((${statusExpr} IN ('pending', 'pending_approval')) AND (transaction_id LIKE 'CASH-%' OR ${methodExpr} = 'cash'))`;
+    const revenueWhere = `(${paidWhere} OR ${manualPendingCashWhere})`;
 
-    // Total revenue (sum of all paid payments)
+    // Total revenue (paid + manually recorded pending cash)
     const [revenueRows] = await pool.query<any>(`
-      SELECT SUM(amount) as totalRevenue
+      SELECT SUM(amount) as "totalRevenue"
       FROM payments
-      WHERE ${paidWhere}
+      WHERE ${revenueWhere}
     `);
 
     // Count of pending payments
     const [pendingRows] = await pool.query<any>(`
-      SELECT COUNT(*) as pendingPayments
+      SELECT COUNT(*) as "pendingPayments"
       FROM payments
       WHERE ${pendingWhere}
     `);
 
     // Count of paid payments
     const [paidRows] = await pool.query<any>(`
-      SELECT COUNT(*) as paidPayments
+      SELECT COUNT(*) as "paidPayments"
       FROM payments
       WHERE ${paidWhere}
     `);
 
+    const revenueValue = Number(
+      revenueRows?.[0]?.totalRevenue
+      ?? revenueRows?.[0]?.totalrevenue
+      ?? 0
+    ) || 0;
+    const pendingValue = Number(
+      pendingRows?.[0]?.pendingPayments
+      ?? pendingRows?.[0]?.pendingpayments
+      ?? 0
+    ) || 0;
+    const paidValue = Number(
+      paidRows?.[0]?.paidPayments
+      ?? paidRows?.[0]?.paidpayments
+      ?? 0
+    ) || 0;
+
     res.json({
       success: true,
-      totalRevenue: Number(revenueRows[0]?.totalRevenue) || 0,
-      pendingPayments: Number(pendingRows[0]?.pendingPayments) || 0,
-      paidPayments: Number(paidRows[0]?.paidPayments) || 0,
+      totalRevenue: revenueValue,
+      pendingPayments: pendingValue,
+      paidPayments: paidValue,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, message: 'Failed to get payment summary' });
@@ -3399,6 +3468,7 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
       let weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens, undefined, normalizedDiet);
       weekPlan = addRiceSidesToMeals(weekPlan);
       weekPlan = scaleWeekPlanToCalorieTarget(weekPlan, targets);
+      weekPlan = recomputeWeekPlanTotals(weekPlan);
       return res.status(503).json({
         success: false,
         message: 'Database not connected — returning fallback plan',
@@ -3543,6 +3613,9 @@ Rules:
       weekPlan = await enrichWeekPlanWithRecipes(weekPlan);
     } catch (err: any) {
     }
+
+    // Final consistency pass: make sure day totals always equal summed meal macros.
+    weekPlan = recomputeWeekPlanTotals(weekPlan);
 
     // Save meal plan safely
     try {
@@ -3894,6 +3967,8 @@ app.post('/api/meal-planner/save', authenticateToken, async (req: AuthRequest, r
       return res.status(400).json({ success: false, message: 'Invalid mealPlan payload' });
     }
 
+    const normalizedWeekPlan = recomputeWeekPlanTotals(mealPlan);
+
     // ensure preference exists if needed (unchanged)
     let preferenceId: number | null = null;
     try {
@@ -3913,11 +3988,11 @@ app.post('/api/meal-planner/save', authenticateToken, async (req: AuthRequest, r
       try {
         if (hasUpdatedAt) {
           await pool.query('UPDATE meal_plans SET plan_name = ?, plan_data = ?, updated_at = NOW() WHERE id = ?', [
-            planName || null, JSON.stringify({ weekPlan: mealPlan }), planId
+            planName || null, JSON.stringify({ weekPlan: normalizedWeekPlan }), planId
           ]);
         } else {
           await pool.query('UPDATE meal_plans SET plan_name = ?, plan_data = ? WHERE id = ?', [
-            planName || null, JSON.stringify({ weekPlan: mealPlan }), planId
+            planName || null, JSON.stringify({ weekPlan: normalizedWeekPlan }), planId
           ]);
         }
 
@@ -3936,8 +4011,8 @@ app.post('/api/meal-planner/save', authenticateToken, async (req: AuthRequest, r
         : (hasGeneratedAt ? 'user_id, preference_id, plan_name, plan_data, generated_at' : 'user_id, preference_id, plan_name, plan_data');
 
       const insertValsBase = preferenceId === null
-        ? [userId, planName || null, JSON.stringify({ weekPlan: mealPlan })]
-        : [userId, preferenceId, planName || null, JSON.stringify({ weekPlan: mealPlan })];
+        ? [userId, planName || null, JSON.stringify({ weekPlan: normalizedWeekPlan })]
+        : [userId, preferenceId, planName || null, JSON.stringify({ weekPlan: normalizedWeekPlan })];
 
       const insertVals = hasGeneratedAt ? [...insertValsBase, new Date()] : insertValsBase;
 

@@ -262,9 +262,6 @@ const MealPlanner: React.FC = () => {
   const [diet, setDiet] = useState<string>(""); 
   const [allergies, setAllergies] = useState<string[]>([]);
   const [calorieTarget, setCalorieTarget] = useState<number>(2000);
-  const [proteinTarget, setProteinTarget] = useState<number>(150);
-  const [carbsTarget, setCarbsTarget] = useState<number>(200);
-  const [fatsTarget, setFatsTarget] = useState<number>(60);
 
   // UI State
   const [loading, setLoading] = useState(false);
@@ -323,11 +320,9 @@ const MealPlanner: React.FC = () => {
         // best-effort map it into our known allergy options.
         const prefAllergiesRaw = parseDelimitedSelection(pref.allergies || pref.dietaryRestrictions || '');
         setAllergies(normalizeToKnownValues(prefAllergiesRaw, COMMON_ALLERGIES));
-        if (pref.targets) {
-          setCalorieTarget(pref.targets.calories || 2000);
-          setProteinTarget(pref.targets.protein || 150);
-          setCarbsTarget(pref.targets.carbs || 200);
-          setFatsTarget(pref.targets.fats || 60);
+        const prefCalories = Number(pref?.targets?.calories);
+        if (Number.isFinite(prefCalories) && prefCalories > 0) {
+          setCalorieTarget(prefCalories);
         }
       }
     } catch (error) {
@@ -383,10 +378,7 @@ const MealPlanner: React.FC = () => {
         diet, // NEW: Add diet to the request
         allergies,
         targets: {
-          calories: calorieTarget,
-          protein: proteinTarget,
-          carbs: carbsTarget,
-          fats: fatsTarget,
+          calories: Math.min(5000, Math.max(800, Number(calorieTarget) || 2000)),
         },
       };
 
@@ -661,6 +653,10 @@ const MealPlanner: React.FC = () => {
     return [];
   };
 
+  const normalizePortionSize = (_portion: any): string => {
+    return "1 serving";
+  };
+
   // Update ingredientPreview to coerce inputs
   const ingredientPreview = (ingredients: any = [], max = 3) => {
     const arr = normalizeIngredientsToArray(ingredients);
@@ -672,15 +668,39 @@ const MealPlanner: React.FC = () => {
     return days[new Date().getDay()];
   };
 
+  const getDayMacroTotals = (dayPlan?: DayPlan | null) => {
+    if (!dayPlan?.meals) {
+      return { calories: 0, protein: 0, carbs: 0, fats: 0 };
+    }
+
+    const totals = Object.values(dayPlan.meals).reduce(
+      (acc, meal: any) => {
+        const protein = Number(meal?.protein ?? 0) || 0;
+        const carbs = Number(meal?.carbs ?? 0) || 0;
+        const fats = Number(meal?.fats ?? 0) || 0;
+
+        acc.protein += protein;
+        acc.carbs += carbs;
+        acc.fats += fats;
+        return acc;
+      },
+      { calories: 0, protein: 0, carbs: 0, fats: 0 }
+    );
+
+    totals.calories = calculateCaloriesFromMacros(totals.protein, totals.carbs, totals.fats, 0);
+    return totals;
+  };
+
   // Inline component: Compact Daily Meal Card
   const DailyMealCard = ({ meal, mealType, day }: { meal: any, mealType: string, day: string }) => {
     const mealObj = { ...(meal || {}), ingredients: normalizeIngredientsToArray((meal as any)?.ingredients) };
+    const mealCalories = calculateMealCalories449(mealObj);
     return (
       <IonCard className="daily-meal-card">
         <IonCardContent>
           <h3 className="daily-meal-title">{mealObj.name}</h3>
           <div className="daily-meal-macros">
-            <span>{mealObj.calories ?? 0} cal</span>
+            <span>{mealCalories} cal</span>
             <span>{mealObj.protein ?? 0}g protein</span>
             <span>{mealObj.carbs ?? 0}g carbs</span>
             <span>{mealObj.fats ?? 0}g fats</span>
@@ -690,7 +710,7 @@ const MealPlanner: React.FC = () => {
               <strong>Ingredients:</strong> {ingredientPreview(mealObj.ingredients).join(", ")}
             </p>
           )}
-          <p className="daily-meal-portion"><strong>Portion:</strong> {mealObj.portionSize || "1 serving"}</p>
+          <p className="daily-meal-portion"><strong>Portion:</strong> {normalizePortionSize(mealObj.portionSize)}</p>
           <div className="daily-meal-actions">
             <IonButton size="small" fill="outline" onClick={() => {
               if (mealPlan) {
@@ -716,6 +736,7 @@ const MealPlanner: React.FC = () => {
   };
 
   const todayPlan = mealPlan?.weekPlan?.find(d => d.day === selectedDayName) || mealPlan?.weekPlan?.find(d => d.day === getTodayDayName());
+  const todayPlanTotals = getDayMacroTotals(todayPlan);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const MacroProgress = ({ label, value, target, icon }: { label: string; value: number; target: number; icon: string }) => {
@@ -761,6 +782,13 @@ const MealPlanner: React.FC = () => {
     return Math.round(proteinSafe * 4 + carbsSafe * 4 + fatsSafe * 9);
   }
 
+  function calculateMealCalories449(meal: any): number {
+    const protein = Number(meal?.protein ?? 0) || 0;
+    const carbs = Number(meal?.carbs ?? 0) || 0;
+    const fats = Number(meal?.fats ?? 0) || 0;
+    return calculateCaloriesFromMacros(protein, carbs, fats, Number(meal?.calories ?? 0) || 0);
+  }
+
   // Normalize single meal values (ensures numeric macros, default portion size, converts string ingredients)
   function normalizeMeal(m: any): Meal {
     if (!m || typeof m !== 'object') {
@@ -782,7 +810,7 @@ const MealPlanner: React.FC = () => {
     return {
       name: String(m.name || m.title || 'Unknown dish'),
       ingredients: normalizeIngredientsToArray(m.ingredients || m.ings || []),
-      portionSize: String(m.portionSize || m.servings || '1 serving'),
+      portionSize: normalizePortionSize(m.portionSize || m.servings || '1 serving'),
       calories: calculateCaloriesFromMacros(protein, carbs, fats, Number(m.calories || m.cal || 0) || 0),
       protein,
       carbs,
@@ -799,7 +827,6 @@ const MealPlanner: React.FC = () => {
         const protein = Number(m.protein || 0);
         const carbs = Number(m.carbs || 0);
         const fats = Number(m.fats || 0);
-        acc.calories += calculateCaloriesFromMacros(protein, carbs, fats, Number(m.calories || 0));
         acc.protein += protein;
         acc.carbs += carbs;
         acc.fats += fats;
@@ -807,6 +834,7 @@ const MealPlanner: React.FC = () => {
       },
       { calories: 0, protein: 0, carbs: 0, fats: 0 }
     );
+    newTotals.calories = calculateCaloriesFromMacros(newTotals.protein, newTotals.carbs, newTotals.fats, 0);
     return {
       ...dayPlan,
       totalCalories: newTotals.calories,
@@ -929,7 +957,7 @@ const MealPlanner: React.FC = () => {
       const currentMeal = mealPlan.weekPlan?.[dayIndex]?.meals?.[mealKey];
       const excludeNames = currentMeal?.name ? [String(currentMeal.name).trim()] : [];
 
-      // Payload base - include current preferences & targets for AI context
+      // Payload base - include current preferences for AI context
       const baseBody = {
         dayIndex,
         mealType: mealKey,
@@ -941,10 +969,7 @@ const MealPlanner: React.FC = () => {
         diet,
         allergies,
         targets: {
-          calories: calorieTarget,
-          protein: proteinTarget,
-          carbs: carbsTarget,
-          fats: fatsTarget,
+          calories: Math.min(5000, Math.max(800, Number(calorieTarget) || 2000)),
         },
       };
 
@@ -1202,69 +1227,24 @@ const MealPlanner: React.FC = () => {
                   </div>
                 )}
 
-                <div className="targets-section">
-                  <h3 className="targets-title">
-                    <IonIcon icon={flame} /> Daily Nutritional Targets
-                  </h3>
-                  
-                  <IonGrid className="targets-grid">
-                    <IonRow>
-                      <IonCol size="6" sizeSm="6">
-                        <div className="target-input-group">
-                          <IonItem className="custom-item">
-                            <IonLabel position="stacked">🔥 Calories</IonLabel>
-                            <IonInput
-                              type="number"
-                              value={calorieTarget}
-                              onIonChange={(e) => setCalorieTarget(Number(e.detail.value!))}
-                              className="custom-input"
-                            />
-                          </IonItem>
-                        </div>
-                      </IonCol>
-                      <IonCol size="6" sizeSm="6">
-                        <div className="target-input-group">
-                          <IonItem className="custom-item">
-                            <IonLabel position="stacked">💪 Protein (g)</IonLabel>
-                            <IonInput
-                              type="number"
-                              value={proteinTarget}
-                              onIonChange={(e) => setProteinTarget(Number(e.detail.value!))}
-                              className="custom-input"
-                            />
-                          </IonItem>
-                        </div>
-                      </IonCol>
-                    </IonRow>
-                    <IonRow>
-                      <IonCol size="6" sizeSm="6">
-                        <div className="target-input-group">
-                          <IonItem className="custom-item">
-                            <IonLabel position="stacked">🍚 Carbs (g)</IonLabel>
-                            <IonInput
-                              type="number"
-                              value={carbsTarget}
-                              onIonChange={(e) => setCarbsTarget(Number(e.detail.value!))}
-                              className="custom-input"
-                            />
-                          </IonItem>
-                        </div>
-                      </IonCol>
-                      <IonCol size="6" sizeSm="6">
-                        <div className="target-input-group">
-                          <IonItem className="custom-item">
-                            <IonLabel position="stacked">🥑 Fats (g)</IonLabel>
-                            <IonInput
-                              type="number"
-                              value={fatsTarget}
-                              onIonChange={(e) => setFatsTarget(Number(e.detail.value!))}
-                              className="custom-input"
-                            />
-                          </IonItem>
-                        </div>
-                      </IonCol>
-                    </IonRow>
-                  </IonGrid>
+                <div className="form-group calorie-target-section">
+                  <IonItem className="custom-item">
+                    <IonLabel position="stacked">
+                      <IonIcon icon={flame} /> Daily Calorie Target (kcal)
+                    </IonLabel>
+                    <IonInput
+                      type="number"
+                      value={calorieTarget}
+                      onIonInput={(e) => {
+                        const parsed = Number(e.detail.value);
+                        if (Number.isFinite(parsed)) {
+                          setCalorieTarget(parsed);
+                        }
+                      }}
+                      className="custom-input"
+                      placeholder="2000"
+                    />
+                  </IonItem>
                 </div>
 
                 <div className="button-group">
@@ -1410,19 +1390,19 @@ const MealPlanner: React.FC = () => {
                 <div className="daily-summary-bar">
                   <div className="summary-item">
                     <div className="summary-label">Calories</div>
-                    <div className="summary-value">{todayPlan.totalCalories}</div>
+                    <div className="summary-value">{todayPlanTotals.calories}</div>
                   </div>
                   <div className="summary-item">
                     <div className="summary-label">Protein</div>
-                    <div className="summary-value">{todayPlan.totalProtein}g</div>
+                    <div className="summary-value">{todayPlanTotals.protein}g</div>
                   </div>
                   <div className="summary-item">
                     <div className="summary-label">Carbs</div>
-                    <div className="summary-value">{((todayPlan.meals.breakfast?.carbs ?? 0) + (todayPlan.meals.lunch?.carbs ?? 0) + (todayPlan.meals.dinner?.carbs ?? 0) + (todayPlan.meals.snack1?.carbs ?? 0) + (todayPlan.meals.snack2?.carbs ?? 0))}g</div>
+                    <div className="summary-value">{todayPlanTotals.carbs}g</div>
                   </div>
                   <div className="summary-item">
                     <div className="summary-label">Fats</div>
-                    <div className="summary-value">{((todayPlan.meals.breakfast?.fats ?? 0) + (todayPlan.meals.lunch?.fats ?? 0) + (todayPlan.meals.dinner?.fats ?? 0) + (todayPlan.meals.snack1?.fats ?? 0) + (todayPlan.meals.snack2?.fats ?? 0))}g</div>
+                    <div className="summary-value">{todayPlanTotals.fats}g</div>
                   </div>
                 </div>
 
@@ -1510,7 +1490,7 @@ const MealPlanner: React.FC = () => {
                             {meal ? (
                               <div className="meal-grid-item">
                                 <div className="meal-grid-name">{meal.name}</div>
-                                <div className="meal-grid-calories">{meal.calories ?? 0} cal</div>
+                                <div className="meal-grid-calories">{calculateMealCalories449(meal)} cal</div>
                               </div>
                             ) : (
                               <div className="meal-grid-empty">-</div>
@@ -1711,7 +1691,7 @@ const MealPlanner: React.FC = () => {
                   Regenerating: <strong>{mealPlan?.weekPlan[editingMeal.dayIndex]?.day} - {editingMeal.mealType}</strong>
                 </p>
                 <p className="modal-description">
-                  This will generate a DIFFERENT Filipino dish while keeping the same nutritional targets.
+                  This will generate a DIFFERENT Filipino dish while keeping the same preferences and constraints.
                 </p>
               </div>
             )}
@@ -1770,7 +1750,7 @@ const MealPlanner: React.FC = () => {
                 <div className="recipe-macros">
                   <div className="macro-card">
                     <span className="macro-icon">🔥</span>
-                    <span className="macro-value">{selectedMeal.meal.calories} cal</span>
+                    <span className="macro-value">{calculateMealCalories449(selectedMeal.meal)} cal</span>
                   </div>
                   <div className="macro-card">
                     <span className="macro-icon">💪</span>
@@ -1788,7 +1768,7 @@ const MealPlanner: React.FC = () => {
 
                 <div className="recipe-section">
                   <h4 className="section-heading">📍 Portion Size</h4>
-                  <p className="recipe-text">{selectedMeal.meal.portionSize || "1 serving"}</p>
+                  <p className="recipe-text">{normalizePortionSize(selectedMeal.meal.portionSize)}</p>
                 </div>
 
                 <div className="recipe-section">

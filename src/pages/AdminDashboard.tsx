@@ -215,7 +215,7 @@ const AdminDashboard: React.FC = () => {
                     <IonIcon icon={cash} className="card-icon" />
                     <h3 className="card-title">Total Revenue</h3>
                     <p className="card-stat">₱{totalRevenue.toLocaleString()}</p>
-                    <p className="card-description">All-time revenue from paid payments</p>
+                    <p className="card-description">All-time recorded revenue</p>
                   </IonCardContent>
                 </IonCard>
               </IonCol>

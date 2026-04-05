@@ -84,6 +84,51 @@
   padding: 2rem;
 }
 
+.preferences-section {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 0 1rem;
+}
+
+.preferences-section .config-card ion-card-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.preferences-section .section-title,
+.preferences-section .form-group,
+.preferences-section .button-group {
+  width: 100%;
+  max-width: 680px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.preferences-section .form-group {
+  margin-bottom: 0.9rem;
+}
+
+.preferences-section .form-group ion-item.custom-item {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 0;
+}
+
+.preferences-section .button-group {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.calorie-target-section ion-input.custom-input::part(native) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Center the title */
 .config-card h2 {
   color: #00e676;
@@ -1375,6 +1420,12 @@ ion-segment-button.segment-button-checked {
   font-size: 13px;
   font-weight: 600;
   animation: slideUp 0.4s ease-out;
+}
+
+.preferences-section .restriction-chip {
+  display: inline-flex;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* Modal Content */
