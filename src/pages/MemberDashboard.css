@@ -506,6 +506,24 @@ body {
   position: relative;
 }
 
+.renew-subscription-row {
+  justify-content: center;
+  margin-top: 1.25rem;
+}
+
+.renew-subscription-col {
+  display: flex;
+  justify-content: center;
+}
+
+.renew-subscription-btn {
+  width: min(100%, 440px);
+  margin: 0 auto;
+  height: 52px;
+  --border-radius: 12px;
+  font-weight: 700;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

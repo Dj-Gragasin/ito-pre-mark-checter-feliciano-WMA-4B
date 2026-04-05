@@ -117,43 +117,43 @@ const PaymentSuccess: React.FC = () => {
       </IonHeader>
 
       <IonContent className="member-payment-content">
-        <div className="payment-container" style={{ paddingTop: '4rem', textAlign: 'center' }}>
-          <IonCard style={{ marginTop: '2rem' }}>
+        <div className="payment-container payment-status-container">
+          <IonCard className="payment-status-card">
             <IonCardContent>
               {isVerifying ? (
-                <div style={{ padding: '2rem', textAlign: 'center' }}>
-                  <IonSpinner name="crescent" style={{ fontSize: '3rem', color: '#00e676' }} />
-                  <h2 style={{ color: '#fff', marginTop: '1rem' }}>Verifying Payment...</h2>
-                  <p style={{ color: '#b0b0b0' }}>Please wait while we confirm your PayPal payment</p>
+                <div className="payment-status-content">
+                  <IonSpinner name="crescent" className="payment-status-spinner" />
+                  <h2 className="payment-status-title">Verifying Payment...</h2>
+                  <p className="payment-status-text">Please wait while we confirm your PayPal payment</p>
                 </div>
               ) : verificationStatus === 'success' ? (
-                <div style={{ padding: '2rem', textAlign: 'center' }}>
+                <div className="payment-status-content">
                   <IonIcon
                     icon={checkmarkCircle}
-                    style={{ fontSize: '4rem', color: '#00e676', marginBottom: '1rem' }}
+                    className="payment-status-icon success"
                   />
-                  <h2 style={{ color: '#00e676', marginTop: '1rem' }}>✅ Payment Successful!</h2>
-                  <p style={{ color: '#b0b0b0', marginTop: '1rem' }}>
+                  <h2 className="payment-status-title success">✅ Payment Successful!</h2>
+                  <p className="payment-status-text">
                     Your subscription has been renewed and is now active.
                   </p>
-                  <p style={{ color: '#888', fontSize: '0.9rem', marginTop: '2rem' }}>
+                  <p className="payment-status-subtext">
                     Redirecting to your dashboard...
                   </p>
                 </div>
               ) : (
-                <div style={{ padding: '2rem', textAlign: 'center' }}>
+                <div className="payment-status-content">
                   <IonIcon
                     icon={checkmarkCircle}
-                    style={{ fontSize: '4rem', color: '#00e676', marginBottom: '1rem' }}
+                    className="payment-status-icon success"
                   />
-                  <h2 style={{ color: '#00e676', marginTop: '1rem' }}>✅ Payment Received</h2>
-                  <p style={{ color: '#b0b0b0', marginTop: '1rem' }}>
+                  <h2 className="payment-status-title success">✅ Payment Received</h2>
+                  <p className="payment-status-text">
                     Your payment has been received and is being processed.
                   </p>
-                  <p style={{ color: '#888', fontSize: '0.9rem', marginTop: '1rem' }}>
+                  <p className="payment-status-subtext" style={{ marginTop: '1rem' }}>
                     Your subscription will be updated shortly. You'll receive a confirmation email.
                   </p>
-                  <p style={{ color: '#888', fontSize: '0.9rem', marginTop: '2rem' }}>
+                  <p className="payment-status-subtext">
                     Redirecting to your dashboard...
                   </p>
                 </div>
@@ -163,7 +163,7 @@ const PaymentSuccess: React.FC = () => {
 
           <IonButton
             expand="block"
-            style={{ marginTop: '2rem', maxWidth: '300px', marginLeft: 'auto', marginRight: 'auto' }}
+            className="payment-status-action"
             onClick={() => router.push('/member', 'back')}
           >
             Back to Dashboard

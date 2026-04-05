@@ -38,7 +38,7 @@ interface FormData {
   card: string;
   expiry: string;
   cvc: string;
-  paymentMethod: 'card' | 'gcash' | 'bank';
+  paymentMethod: 'card' | 'paypal' | 'bank';
 }
 
 interface PaymentResponse {
@@ -66,9 +66,9 @@ const Payment: React.FC = () => {
   const [alertMessage, setAlertMessage] = useState('');
 
   const planPrices = {
-    'Monthly - ₱500': 500,
-    'Quarterly - ₱1,200': 1200,
-    'Yearly - ₱4,000': 4000,
+    'Monthly - ₱100': 100,
+    'Quarterly - ₱200': 200,
+    'Yearly - ₱300': 300,
   };
 
   const setField = <K extends keyof FormData>(key: K, value: FormData[K]) => {
@@ -205,18 +205,18 @@ const Payment: React.FC = () => {
     }
   };
 
-  async function payWithGcash(amount: number, plan: string) {
+  async function payWithPayPal(amount: number, plan: string) {
     const token = localStorage.getItem('token') || '';
-    const res = await fetch(`${API_CONFIG.BASE_URL}/payments/paymongo/create-source`, {
+    const res = await fetch(`${API_CONFIG.BASE_URL}/payments/paypal/create-order`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({ amount, plan })
     });
     const json = await res.json();
-    if (res.ok && json.checkoutUrl) {
-      window.location.href = json.checkoutUrl;
+    if (res.ok && json.approvalLink) {
+      window.location.href = json.approvalLink;
     } else {
-      throw new Error(json.message || 'Failed to create PayMongo source');
+      throw new Error(json.message || 'Failed to create PayPal order');
     }
   }
 
@@ -247,9 +247,9 @@ const Payment: React.FC = () => {
         return;
       }
 
-      if (formData.paymentMethod === 'gcash') {
-        // For GCash payments
-        await payWithGcash(planPrices[formData.plan as keyof typeof planPrices], formData.plan);
+      if (formData.paymentMethod === 'paypal') {
+        // For PayPal payments
+        await payWithPayPal(planPrices[formData.plan as keyof typeof planPrices], formData.plan);
         return;
       }
 
@@ -258,7 +258,7 @@ const Payment: React.FC = () => {
 
       if (paymentResult.success) {
         if (paymentResult.redirectUrl) {
-          // For GCash or bank payments that require redirect
+          // For PayPal or bank payments that require redirect
           window.location.href = paymentResult.redirectUrl;
           return;
         }
@@ -409,8 +409,8 @@ const Payment: React.FC = () => {
                                 <IonRadio slot="end" value="card" />
                               </IonItem>
                               <IonItem className="payment-radio-item" lines="full">
-                                <IonLabel>GCash</IonLabel>
-                                <IonRadio slot="end" value="gcash" />
+                                <IonLabel>PayPal</IonLabel>
+                                <IonRadio slot="end" value="paypal" />
                               </IonItem>
                               <IonItem className="payment-radio-item" lines="full">
                                 <IonLabel>Online Banking</IonLabel>
@@ -497,11 +497,11 @@ const Payment: React.FC = () => {
                           </>
                         )}
 
-                        {(formData.paymentMethod === 'gcash' || formData.paymentMethod === 'bank') && (
+                        {(formData.paymentMethod === 'paypal' || formData.paymentMethod === 'bank') && (
                           <IonCol size="12">
                             <IonText color="medium">
-                              {formData.paymentMethod === 'gcash'
-                                ? 'You will be redirected to GCash to complete your payment.'
+                              {formData.paymentMethod === 'paypal'
+                                ? 'You will be redirected to PayPal to complete your payment.'
                                 : "You will be redirected to your bank's secure payment portal."}
                             </IonText>
                           </IonCol>

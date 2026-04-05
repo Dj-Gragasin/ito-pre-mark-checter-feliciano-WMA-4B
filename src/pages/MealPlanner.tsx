@@ -67,6 +67,24 @@ const COMMON_ALLERGIES: Array<{ value: string; label: string }> = [
   { value: 'sesame', label: 'Sesame' },
 ];
 
+const PH_COMMON_DIETS: Array<{ value: string; label: string }> = [
+  { value: '', label: '🍽️ No Specific Diet' },
+  { value: 'high_protein', label: '💪 High Protein' },
+  { value: 'low_carb', label: '🥗 Low Carb' },
+  { value: 'low_fat', label: '🐔 Low Fat' },
+  { value: 'low_sodium', label: '🧂 Low Sodium' },
+  { value: 'vegetarian', label: '🥬 Vegetarian' },
+];
+
+const normalizeDietValue = (raw: any): string => {
+  const value = String(raw || '').trim().toLowerCase();
+  if (!value || value === 'none' || value === 'no_specific_diet') return '';
+
+  const canonical = value.replace(/[\s-]+/g, '_');
+  const allowed = new Set(PH_COMMON_DIETS.map((d) => d.value));
+  return allowed.has(canonical) ? canonical : '';
+};
+
 const parseDelimitedSelection = (input: any): string[] => {
   if (!input) return [];
   if (Array.isArray(input)) return input.map(String).map(s => s.trim()).filter(Boolean);
@@ -300,6 +318,7 @@ const MealPlanner: React.FC = () => {
         setLifestyle(pref.lifestyle);
         setMealType(pref.mealType);
         setGoal(pref.goal);
+        setDiet(normalizeDietValue(pref.diet));
         // Backward compatible: if older prefs stored a free-text restrictions field,
         // best-effort map it into our known allergy options.
         const prefAllergiesRaw = parseDelimitedSelection(pref.allergies || pref.dietaryRestrictions || '');
@@ -1144,15 +1163,11 @@ const MealPlanner: React.FC = () => {
                       <IonIcon icon={restaurant} /> Diet Type (Optional)
                     </IonLabel>
                     <IonSelect value={diet} onIonChange={(e) => setDiet(e.detail.value!)}>
-                      <IonSelectOption value="">🍽️ No Specific Diet</IonSelectOption>
-                      <IonSelectOption value="low_carb">🥗 Low Carb</IonSelectOption>
-                      <IonSelectOption value="low_fat">🐔 Low Fat</IonSelectOption>
-                      <IonSelectOption value="vegetarian">🥬 Vegetarian</IonSelectOption>
-                      <IonSelectOption value="vegan">🌱 Vegan</IonSelectOption>
-                      <IonSelectOption value="keto">🥑 Keto</IonSelectOption>
-                      <IonSelectOption value="paleo">🍖 Paleo</IonSelectOption>
-                      <IonSelectOption value="low_sodium">🧂 Low Sodium</IonSelectOption>
-                      <IonSelectOption value="high_protein">💪 High Protein</IonSelectOption>
+                      {PH_COMMON_DIETS.map((opt) => (
+                        <IonSelectOption key={opt.value || 'none'} value={opt.value}>
+                          {opt.label}
+                        </IonSelectOption>
+                      ))}
                     </IonSelect>
                   </IonItem>
                 </div>

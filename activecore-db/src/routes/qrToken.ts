@@ -54,11 +54,25 @@ router.post('/generate', authenticateToken, async (req: AuthRequest, res: Respon
       });
     }
 
+    const role = String(req.user.role || '').toLowerCase();
+    if (role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
     const now = new Date();
     const expiresInHoursRaw = (req.body?.expiresInHours ?? 24) as any;
-    const expiresInHours = Number.isFinite(Number(expiresInHoursRaw)) && Number(expiresInHoursRaw) > 0
-      ? Number(expiresInHoursRaw)
-      : 24;
+    const parsedHours = Number(expiresInHoursRaw);
+    if (!Number.isFinite(parsedHours) || parsedHours <= 0 || parsedHours > 168) {
+      return res.status(400).json({
+        success: false,
+        message: 'expiresInHours must be a number between 1 and 168'
+      });
+    }
+
+    const expiresInHours = parsedHours;
 
     const expiresAt = new Date(now.getTime() + expiresInHours * 60 * 60 * 1000);
 

@@ -302,7 +302,7 @@ const QrAttendance: React.FC = () => {
         </IonToolbar>
       </IonHeader>
 
-      <IonContent className="qrattendance-container" fullscreen>
+      <IonContent className="qrattendance-container">
         <IonLoading
           isOpen={loading}
           message="Recording attendance..."

@@ -209,6 +209,14 @@ const Calorie: React.FC = () => {
                     </IonSelect>
                   </IonItem>
 
+                  <div className="pal-help">
+                    <small>
+                      PAL = Physical Activity Level. Choose the value that best matches your typical daily
+                      activity: Sedentary (mostly sitting), Low Active (light activity), Active (regular
+                      exercise), or Very Active (heavy activity/manual work).
+                    </small>
+                  </div>
+
                   <IonButton expand="block" onClick={calculateCalories}>
                     Calculate
                   </IonButton>

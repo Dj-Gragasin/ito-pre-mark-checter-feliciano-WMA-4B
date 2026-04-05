@@ -24,6 +24,7 @@ import {
   home,
   logOut,
   people,
+  personCircle,
   qrCode,
   restaurant,
   statsChart,
@@ -46,6 +47,7 @@ const ADMIN_ITEMS: MenuItem[] = [
   { title: 'Pending Payments', path: '/admin/payments/pending', icon: card },
   { title: 'Attendance', path: '/admin-attendance', icon: calendar },
   { title: 'Equipment', path: '/equipment-management', icon: barbell },
+  { title: 'Account Settings', path: '/account-settings', icon: personCircle },
 ];
 
 const MEMBER_ITEMS: MenuItem[] = [
@@ -57,6 +59,7 @@ const MEMBER_ITEMS: MenuItem[] = [
   { title: 'Progress Tracker', path: '/member/progress', icon: trendingUp },
   { title: 'Muscle Gain', path: '/member/muscle-gain', icon: barbell },
   { title: 'Payment', path: '/member/payment', icon: cash },
+  { title: 'Account Settings', path: '/account-settings', icon: personCircle },
 ];
 
 const readUserFromStorage = (): any => {
@@ -155,8 +158,15 @@ const AppMenu: React.FC = () => {
       <IonContent>
         {isAuthenticated && role ? (
           <>
-            <IonList inset>
-              <IonItem lines="none">
+            <IonList>
+              <IonMenuToggle autoHide={false}>
+                <IonItem
+                  lines="none"
+                  button
+                  detail
+                  routerLink="/account-settings"
+                  routerDirection="forward"
+                >
                 <IonAvatar slot="start">
                   <div
                     style={{
@@ -177,7 +187,8 @@ const AppMenu: React.FC = () => {
                   <div style={{ fontWeight: 700 }}>{displayName || 'User'}</div>
                   <IonNote>{role === 'admin' ? 'Administrator' : 'Member'}</IonNote>
                 </IonLabel>
-              </IonItem>
+                </IonItem>
+              </IonMenuToggle>
             </IonList>
 
             <IonList>
