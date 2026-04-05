@@ -58,28 +58,18 @@ const AdminDashboard: React.FC = () => {
     loadDashboardStats();
 
     const onPaymentUpdate = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      console.log('\n🔔 ===== PAYMENT UPDATE RECEIVED IN DASHBOARD =====');
-      console.log('Event type:', customEvent.detail?.type);
-      console.log('Member:', customEvent.detail?.memberName);
-      console.log('Amount:', `₱${customEvent.detail?.amount?.toLocaleString()}`);
-      console.log('New Total Revenue:', `₱${customEvent.detail?.totalRevenue?.toLocaleString()}`);
-      
-      console.log('🔄 Refreshing dashboard stats immediately...');
+      void e;
       loadDashboardStats();
     };
 
     const onEquipmentUpdate = () => {
-      console.log('🔄 Equipment updated; refreshing dashboard stats...');
       loadDashboardStats();
     };
 
     window.addEventListener('payments:updated', onPaymentUpdate);
     window.addEventListener('equipment:updated', onEquipmentUpdate);
-    console.log('👂 Admin Dashboard listening for payment events');
 
     const interval = setInterval(() => {
-      console.log('🔄 Auto-refresh dashboard (30s)...');
       loadDashboardStats();
     }, 30000);
 
@@ -93,7 +83,6 @@ const AdminDashboard: React.FC = () => {
   const loadDashboardStats = async () => {
     try {
       const token = localStorage.getItem('token');
-      console.log('\n📊 ===== LOADING DASHBOARD STATS =====');
 
       const membersRes = await fetch(`${API_URL}/members`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -103,46 +92,21 @@ const AdminDashboard: React.FC = () => {
         const membersData = await membersRes.json();
         setTotalMembers(membersData.length);
         setActiveMembers(membersData.filter((m: any) => m.status === 'active').length);
-        console.log(`👥 Members: ${membersData.length} total, ${membersData.filter((m: any) => m.status === 'active').length} active`);
       }
 
-      console.log('💰 Fetching payment summary...');
       const summaryRes = await fetch(`${API_URL}/admin/payments/summary`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      console.log(`📡 Summary response status: ${summaryRes.status}`);
-      
       if (summaryRes.ok) {
         const summary = await summaryRes.json();
-        console.log('📊 Summary response:', summary);
         
         if (summary.success) {
           const revenue = Number(summary.totalRevenue) || 0;
           const pending = Number(summary.pendingPayments) || 0;
-          const paid = Number(summary.paidPayments) || 0;
-          
-          console.log(`💰 Total Revenue: ₱${revenue.toLocaleString()}`);
-          console.log(`✅ Paid Payments: ${paid}`);
-          console.log(`⏳ Pending Payments: ${pending}`);
           
           setTotalRevenue(revenue);
           setPendingPayments(pending);
-          
-          if (revenue === 0 && paid === 0) {
-            console.log('⚠️ No revenue found, checking database directly...');
-            const debugRes = await fetch(`${API_URL}/admin/payments/all`, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            
-            if (debugRes.ok) {
-              const allPayments = await debugRes.json();
-              console.log(`🔍 Debug: Total payments in DB: ${allPayments.length}`);
-              allPayments.forEach((p: any, i: number) => {
-                console.log(`  ${i+1}. ID: ${p.id}, Amount: ₱${p.amount}, Status: ${p.payment_status}, Date: ${p.payment_date}`);
-              });
-            }
-          }
         } else {
           console.error('❌ Payment summary failed:', summary.message);
         }
@@ -152,14 +116,12 @@ const AdminDashboard: React.FC = () => {
       }
 
       // Replace /api/admin/reports/today with /api/admin/attendance/today
-      console.log('📡 Fetching today attendance (admin) ...');
       const attendanceRes = await fetch(`${API_URL}/admin/attendance/today`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
       if (attendanceRes.ok) {
         const attendanceData = await attendanceRes.json();
-        console.log('📊 Admin attendance response:', attendanceData);
         if (attendanceData.success && Array.isArray(attendanceData.present)) {
           setTodayAttendance(attendanceData.present.length || 0);
         } else {
@@ -186,8 +148,6 @@ const AdminDashboard: React.FC = () => {
         setTotalEquipment(0);
       }
 
-      console.log('===== DASHBOARD STATS LOADED =====\n');
-
     } catch (error) {
       console.error('❌ Error loading dashboard stats:', error);
     }
@@ -199,7 +159,6 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleNavigation = (path: string) => {
-    console.log(`Navigating to: ${path}`);
     router.push(path, "forward", "push");
   };
 

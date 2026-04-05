@@ -22,7 +22,7 @@ import {
   IonCardContent,
   useIonRouter
 } from '@ionic/react';
-import { logIn, informationCircle } from 'ionicons/icons';
+import { logIn, informationCircle, peopleCircleOutline, qrCodeOutline, barChartOutline, nutritionOutline } from 'ionicons/icons';
 import { loginUser } from '../services/auth.service';
 import './Home.css';
 
@@ -79,7 +79,7 @@ const Home: React.FC = () => {
               <IonCol size="12">
                 <h1>Welcome to ActiveCore</h1>
                 <p>
-                  <strong>ActiveCore</strong> is your all-in-one fitness companion. Track your progress, manage your gym attendance, access personalized meal plans, and unlock rewards as you achieve your goals. Join our community and transform your fitness journey today!
+                  <strong>ActiveCore</strong> is an internal gym management system built for one fitness facility. The platform prioritizes AI-assisted meal planning while also supporting attendance, subscriptions, and daily gym operations.
                 </p>
               </IonCol>
             </IonRow>
@@ -94,7 +94,7 @@ const Home: React.FC = () => {
                   onClick={() => setShowLearnMore(true)}
                 >
                   <IonIcon icon={informationCircle} slot="start" />
-                  Learn More
+                  System Overview
                 </IonButton>
               </IonCol>
               <IonCol size="12" sizeMd="6" sizeLg="3">
@@ -118,36 +118,36 @@ const Home: React.FC = () => {
               <IonCol size="12" sizeMd="6" sizeLg="3">
                 <IonCard className="stat-card">
                   <IonCardContent>
-                    <h2>5,000+</h2>
-                    <p>Active Members</p>
-                    <span>Growing daily</span>
+                    <h2>AI Meal Planner</h2>
+                    <p>Nutritional Support</p>
+                    <span>Main feature for personalized meal guidance</span>
                   </IonCardContent>
                 </IonCard>
               </IonCol>
               <IonCol size="12" sizeMd="6" sizeLg="3">
                 <IonCard className="stat-card">
                   <IonCardContent>
-                    <h2>500+</h2>
-                    <p>Classes Weekly</p>
-                    <span>Various disciplines</span>
+                    <h2>QR Attendance</h2>
+                    <p>Daily Check-ins</p>
+                    <span>Faster front-desk validation</span>
                   </IonCardContent>
                 </IonCard>
               </IonCol>
               <IonCol size="12" sizeMd="6" sizeLg="3">
                 <IonCard className="stat-card">
                   <IonCardContent>
-                    <h2>50+</h2>
-                    <p>Expert Trainers</p>
-                    <span>Certified professionals</span>
+                    <h2>Billing Workflow</h2>
+                    <p>Payments & Renewals</p>
+                    <span>Track pending and approved entries</span>
                   </IonCardContent>
                 </IonCard>
               </IonCol>
               <IonCol size="12" sizeMd="6" sizeLg="3">
                 <IonCard className="stat-card">
                   <IonCardContent>
-                    <h2>95%</h2>
-                    <p>Success Rate</p>
-                    <span>Member satisfaction</span>
+                    <h2>1 Gym</h2>
+                    <p>Single-Facility Focus</p>
+                    <span>Built for your daily operations</span>
                   </IonCardContent>
                 </IonCard>
               </IonCol>
@@ -159,35 +159,44 @@ const Home: React.FC = () => {
           <IonGrid fixed>
             <IonRow>
               <IonCol size="12">
-                <h2>Why Choose ActiveCore?</h2>
+                <h2>Core Management Modules</h2>
               </IonCol>
             </IonRow>
 
             <IonRow>
-              <IonCol size="12" sizeMd="6" sizeLg="4">
+              <IonCol size="12" sizeMd="6" sizeLg="3">
                 <IonCard className="feature-card">
                   <IonCardContent>
-                    <img src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&auto=format" alt="Gym Equipment" />
-                    <h3>State-of-the-art Equipment</h3>
-                    <p>Access to premium fitness equipment</p>
+                    <IonIcon icon={nutritionOutline} className="feature-symbol" />
+                    <h3>AI Nutritional Meal Planner</h3>
+                    <p>Generate diet-aware meal plans and regenerate meals based on goals, preferences, and restrictions.</p>
                   </IonCardContent>
                 </IonCard>
               </IonCol>
-              <IonCol size="12" sizeMd="6" sizeLg="4">
+              <IonCol size="12" sizeMd="6" sizeLg="3">
                 <IonCard className="feature-card">
                   <IonCardContent>
-                    <img src="https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=500&auto=format" alt="Personal Training" />
-                    <h3>Expert Training</h3>
-                    <p>Work with certified trainers</p>
+                    <IonIcon icon={peopleCircleOutline} className="feature-symbol" />
+                    <h3>Member Profiles & Plans</h3>
+                    <p>Maintain member details, subscription periods, and account status in one place.</p>
                   </IonCardContent>
                 </IonCard>
               </IonCol>
-              <IonCol size="12" sizeMd="6" sizeLg="4">
+              <IonCol size="12" sizeMd="6" sizeLg="3">
                 <IonCard className="feature-card">
                   <IonCardContent>
-                    <img src="https://images.unsplash.com/photo-1540497077202-7c8a3999166f?w=500&auto=format" alt="Gym Facilities" />
-                    <h3>Modern Facilities</h3>
-                    <p>Clean and spacious environment</p>
+                    <IonIcon icon={qrCodeOutline} className="feature-symbol" />
+                    <h3>QR Attendance Tracking</h3>
+                    <p>Generate secure QR tokens and monitor daily member attendance instantly.</p>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+              <IonCol size="12" sizeMd="6" sizeLg="3">
+                <IonCard className="feature-card">
+                  <IonCardContent>
+                    <IonIcon icon={barChartOutline} className="feature-symbol" />
+                    <h3>Payments, Approvals, and Reports</h3>
+                    <p>Record payments, approve transactions, and review key gym operations in one dashboard.</p>
                   </IonCardContent>
                 </IonCard>
               </IonCol>
@@ -208,17 +217,18 @@ const Home: React.FC = () => {
           <IonContent className="ion-padding">
             <h2 style={{ color: '#00e676', marginTop: '1rem' }}>What is ActiveCore?</h2>
             <p>
-              <strong>ActiveCore</strong> is a modern gym management and fitness tracking platform designed to help you achieve your health and wellness goals. With ActiveCore, you can:
+              <strong>ActiveCore</strong> is an internal management platform for a specific gym. It is designed for gym admins, staff, and registered members to handle daily operations efficiently.
             </p>
             <ul>
-              <li>Track your gym attendance and progress</li>
-              <li>Access personalized meal and workout plans</li>
-              <li>Earn rewards for consistent attendance</li>
-              <li>Connect with expert trainers and a supportive community</li>
-              <li>Monitor your achievements and stay motivated</li>
+              <li>Deliver AI-powered nutritional support through the Meal Planner module</li>
+              <li>Manage member accounts, plans, and subscription dates</li>
+              <li>Track attendance using secure QR check-ins</li>
+              <li>Handle payment renewals and admin approval workflows</li>
+              <li>Provide member tools like meal planning and progress tracking</li>
+              <li>View operational reports for attendance and payments</li>
             </ul>
             <p>
-              Whether you're a beginner or a fitness enthusiast, ActiveCore provides the tools and support you need to succeed. Join us and start your transformation today!
+              This project is not a public gym marketplace. It is built to support the day-to-day management needs of one gym business.
             </p>
           </IonContent>
         </IonModal>

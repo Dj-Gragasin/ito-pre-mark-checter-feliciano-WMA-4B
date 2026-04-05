@@ -3172,25 +3172,31 @@ app.delete('/api/admin/payments/:id', authenticateToken, requireAdmin, async (re
 // ADMIN PAYMENT SUMMARY ROUTE
 app.get('/api/admin/payments/summary', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
+    // Backward compatible status handling:
+    // - legacy rows may have NULL payment_status (treat as paid/completed)
+    // - older flows may use approved/success
+    const paidWhere = `(payment_status IS NULL OR LOWER(COALESCE(payment_status, '')) IN ('paid', 'completed', 'approved', 'success'))`;
+    const pendingWhere = `LOWER(COALESCE(payment_status, '')) IN ('pending', 'pending_approval')`;
+
     // Total revenue (sum of all paid payments)
     const [revenueRows] = await pool.query<any>(`
       SELECT SUM(amount) as totalRevenue
       FROM payments
-      WHERE payment_status IN ('paid', 'completed')
+      WHERE ${paidWhere}
     `);
 
     // Count of pending payments
     const [pendingRows] = await pool.query<any>(`
       SELECT COUNT(*) as pendingPayments
       FROM payments
-      WHERE payment_status = 'pending'
+      WHERE ${pendingWhere}
     `);
 
     // Count of paid payments
     const [paidRows] = await pool.query<any>(`
       SELECT COUNT(*) as paidPayments
       FROM payments
-      WHERE payment_status IN ('paid', 'completed')
+      WHERE ${paidWhere}
     `);
 
     res.json({
