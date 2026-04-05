@@ -42,6 +42,7 @@ import AdminPayments from "./pages/AdminPayments";
 import PaymentReturn from "./pages/PaymentReturn";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentFailed from "./pages/PaymentFailed";
+import AccountSettings from "./pages/AccountSettings";
 
 import AppMenu from "./components/AppMenu";
 
@@ -205,6 +206,12 @@ const App: React.FC = () => {
             path="/member/payment"
             component={MemberPayment}
             role="member"
+          />
+
+          <PrivateRoute
+            exact
+            path="/account-settings"
+            component={AccountSettings}
           />
 
           {/* Payment Routes */}

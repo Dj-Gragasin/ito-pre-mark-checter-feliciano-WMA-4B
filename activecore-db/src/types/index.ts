@@ -67,7 +67,7 @@ export interface Payment {
   membershipType: 'Monthly' | 'Quarterly' | 'Yearly';
   amount: number;
   status: 'pending' | 'approved' | 'failed' | 'cancelled';
-  paymentMethod: 'card' | 'gcash' | 'bank' | 'cash';
+  paymentMethod: 'card' | 'paypal' | 'gcash' | 'bank' | 'cash';
   paymentGateway?: string;
   transactionId?: string;
   createdAt?: string;

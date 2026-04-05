@@ -43,35 +43,35 @@ const PaymentFailed: React.FC = () => {
       </IonHeader>
 
       <IonContent className="member-payment-content">
-        <div className="payment-container" style={{ paddingTop: '4rem', textAlign: 'center' }}>
-          <IonCard style={{ marginTop: '2rem' }}>
+        <div className="payment-container payment-status-container">
+          <IonCard className="payment-status-card">
             <IonCardContent>
-              <div style={{ padding: '2rem', textAlign: 'center' }}>
+              <div className="payment-status-content">
                 <IonIcon
                   icon={closeCircle}
-                  style={{ fontSize: '4rem', color: '#ff4961', marginBottom: '1rem' }}
+                  className="payment-status-icon error"
                 />
-                <h2 style={{ color: '#ff4961', marginTop: '1rem' }}>❌ Payment Failed</h2>
-                <p style={{ color: '#b0b0b0', marginTop: '1rem' }}>
+                <h2 className="payment-status-title error">❌ Payment Failed</h2>
+                <p className="payment-status-text">
                   Your payment could not be processed. This could be due to:
                 </p>
-                <ul style={{ color: '#888', fontSize: '0.95rem', marginTop: '1rem', textAlign: 'left', maxWidth: '400px', margin: '1rem auto' }}>
-                  <li>Insufficient GCash balance</li>
+                <ul className="payment-status-list">
+                  <li>Insufficient PayPal balance</li>
                   <li>Cancelled by you</li>
                   <li>Network error</li>
                   <li>Account verification issue</li>
                 </ul>
-                <p style={{ color: '#b0b0b0', marginTop: '2rem' }}>
+                <p className="payment-status-text" style={{ marginTop: '2rem' }}>
                   Please try again or contact support for help.
                 </p>
               </div>
             </IonCardContent>
           </IonCard>
 
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '2rem', flexWrap: 'wrap' }}>
+          <div className="payment-status-actions">
             <IonButton
               expand="block"
-              style={{ maxWidth: '300px' }}
+              className="payment-status-action"
               onClick={() => router.push('/member/payment', 'back')}
             >
               Try Again
@@ -79,7 +79,7 @@ const PaymentFailed: React.FC = () => {
             <IonButton
               expand="block"
               fill="outline"
-              style={{ maxWidth: '300px' }}
+              className="payment-status-action"
               onClick={() => router.push('/member', 'back')}
             >
               Back to Dashboard

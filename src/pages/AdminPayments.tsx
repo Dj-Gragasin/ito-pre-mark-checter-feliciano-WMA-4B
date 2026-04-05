@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   IonPage,
   IonHeader,
@@ -58,6 +58,7 @@ const AdminPayments: React.FC = () => {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<number | null>(null);
   const [presentToast] = useIonToast();
+  const deleteInFlightRef = useRef(false);
 
   const loadPayments = useCallback(async () => {
     try {
@@ -155,21 +156,30 @@ const AdminPayments: React.FC = () => {
   };
 
   const confirmDeletePayment = async () => {
-    if (!paymentToDelete) return;
+    if (!paymentToDelete || deleteInFlightRef.current) return;
+
+    deleteInFlightRef.current = true;
+    const deletingPaymentId = paymentToDelete;
 
     try {
-      const response = await fetch(`${API_URL}/admin/payments/${paymentToDelete}`, {
+      const response = await fetch(`${API_URL}/admin/payments/${deletingPaymentId}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
       });
 
-      const result = await response.json();
+      const result = await response.json().catch(() => ({} as any));
+      const isAlreadyDeleted =
+        response.status === 404 &&
+        typeof result?.message === 'string' &&
+        result.message.toLowerCase() === 'payment not found';
 
-      if (response.ok && result.success) {
+      if ((response.ok && result.success) || isAlreadyDeleted) {
         presentToast({
-          message: '✅ Payment record deleted successfully',
+          message: isAlreadyDeleted
+            ? '✅ Payment record was already deleted'
+            : '✅ Payment record deleted successfully',
           duration: 2000,
           color: 'success',
         });
@@ -187,6 +197,7 @@ const AdminPayments: React.FC = () => {
       });
     } finally {
       setPaymentToDelete(null);
+      deleteInFlightRef.current = false;
     }
   };
 
@@ -227,11 +238,11 @@ const AdminPayments: React.FC = () => {
             <IonRow>
               <IonCol size="12">
                 {/* Info Banner */}
-                <IonCard style={{ background: 'rgba(0, 230, 118, 0.1)', border: '1px solid #00e676' }}>
+                <IonCard className="payments-info-card">
                   <IonCardContent>
-                    <p style={{ margin: 0, color: '#00e676', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <p className="payments-info-note">
                       <IonIcon icon={informationCircle} />
-                      All payments are shown here. GCash payments are auto-approved.
+                      All payments are shown here. PayPal payments are auto-approved.
                       Cash payments are recorded by admin. You can delete old records for cleanup.
                     </p>
                   </IonCardContent>
@@ -243,9 +254,9 @@ const AdminPayments: React.FC = () => {
               <IonCol size="12" sizeMd="8" sizeLg="4">
                 {/* Statistics - Only All Transactions */}
                 <div className="stat-card">
-                  <IonIcon icon={person} style={{ fontSize: '3rem' }} />
-                  <h3 style={{ fontSize: '3rem', margin: '1rem 0' }}>{payments.length}</h3>
-                  <p style={{ fontSize: '1.2rem' }}>All Transactions</p>
+                  <IonIcon icon={person} className="payments-total-icon" />
+                  <h3 className="payments-total-value">{payments.length}</h3>
+                  <p className="payments-total-label">All Transactions</p>
                 </div>
               </IonCol>
             </IonRow>
@@ -308,7 +319,11 @@ const AdminPayments: React.FC = () => {
                             <span>Method:</span>
                             <strong
                               style={{
-                                color: payment.payment_method?.toLowerCase().includes('gcash') ? '#00e676' : '#fff',
+                                color:
+                                  payment.payment_method?.toLowerCase().includes('paypal') ||
+                                  payment.payment_method?.toLowerCase().includes('gcash')
+                                    ? '#00e676'
+                                    : '#fff',
                               }}
                             >
                               {payment.payment_method?.toUpperCase() || 'CASH'}
@@ -343,7 +358,8 @@ const AdminPayments: React.FC = () => {
                           )}
                         </div>
 
-                        {payment.payment_method?.toLowerCase().includes('gcash') && (
+                        {(payment.payment_method?.toLowerCase().includes('paypal') ||
+                          payment.payment_method?.toLowerCase().includes('gcash')) && (
                           <div
                             style={{
                               marginTop: '1rem',

@@ -44,6 +44,13 @@ import crypto from 'crypto';
 import qrTokenRouter from './routes/qrToken';
 
 const app = express();
+const isProduction = process.env.NODE_ENV === 'production';
+
+const debugLog = (...args: any[]) => {
+  if (!isProduction) {
+    console.log(...args);
+  }
+};
 
 const parsePositiveInt = (value: string | undefined, fallback: number): number => {
   const n = Number.parseInt((value ?? '').trim(), 10);
@@ -108,9 +115,13 @@ const generalLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Dev CORS: allow all in development for quick debugging
-app.use(cors({ origin: true, credentials: true }));
-app.options('*', cors({ origin: true, credentials: true }));
+const paymentLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: parsePositiveInt(process.env.PAYMENT_RATE_LIMIT_MAX, 30),
+  message: 'Too many payment attempts. Please wait and try again.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Sentry request handler - DISABLED for debugging
 // app.use(sentryRequestHandler);
@@ -142,10 +153,11 @@ if (process.env.NODE_ENV === 'development') {
       if (!origin) return callback(null, true);
       
       const originNormalized = origin.replace(/\/$/, '');
+      const allowLocalhostOrigins = process.env.ALLOW_LOCALHOST === 'true';
+      const isLocalhostOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(originNormalized);
       const isAllowed = 
         allowedOrigins.includes(originNormalized) ||
-        originNormalized.includes('localhost') ||
-        originNormalized.includes('127.0.0.1') ||
+        (allowLocalhostOrigins && isLocalhostOrigin) ||
         (process.env.ALLOW_NGROK === 'true' && originNormalized.includes('ngrok.io'));
       
       if (isAllowed) {
@@ -166,13 +178,122 @@ if (process.env.NODE_ENV === 'development') {
 // PayPal API configuration
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID || '';
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET || '';
-const PAYPAL_MODE = process.env.PAYPAL_MODE || 'sandbox'; // 'sandbox' or 'live'
+const normalizedPayPalMode = (process.env.PAYPAL_MODE || '').trim().toLowerCase();
+const PAYPAL_MODE =
+  normalizedPayPalMode === 'live' ||
+  (normalizedPayPalMode !== 'sandbox' && process.env.NODE_ENV === 'production')
+    ? 'live'
+    : 'sandbox';
 const PAYPAL_API_URL = PAYPAL_MODE === 'live' 
   ? 'https://api.paypal.com/v2'
   : 'https://api.sandbox.paypal.com/v2';
 
 // use env-driven model name so it's easy to switch
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o';
+
+const PROJECT_ROOT_PATH = path.resolve(__dirname, '..', '..');
+const FNRI_GUIDELINES_PATH = path.resolve(PROJECT_ROOT_PATH, 'fnri_guidelines.json');
+const PDRI_REFERENCE_PATH = path.resolve(PROJECT_ROOT_PATH, 'PDRI-2018.fullllll.followdis.csv');
+
+type PDRIQuickFacts = {
+  adultAmdr: string;
+  adultEnergyRef: string;
+  sugarLimit: string;
+  sodiumLimit: string;
+  potassiumRecommendation: string;
+};
+
+function readJsonFileSafe(filePath: string): any | null {
+  try {
+    if (!fs.existsSync(filePath)) return null;
+    const raw = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function readTextFileSafe(filePath: string): string {
+  try {
+    if (!fs.existsSync(filePath)) return '';
+    return fs.readFileSync(filePath, 'utf8');
+  } catch {
+    return '';
+  }
+}
+
+function extractPdriQuickFacts(raw: string): PDRIQuickFacts {
+  const defaults: PDRIQuickFacts = {
+    adultAmdr: 'Adults (>=19): Protein 10-15%, Fat 15-30%, Carbohydrates 55-75%',
+    adultEnergyRef: 'Adults 19-29 reference: Male ~2530 kcal/day, Female ~1930 kcal/day',
+    sugarLimit: 'Free sugars: less than 10% of total energy',
+    sodiumLimit: 'Sodium: less than 2 g/day (adults)',
+    potassiumRecommendation: 'Potassium: around 3510 mg/day (adults)',
+  };
+
+  if (!raw) return defaults;
+
+  const normalizeRange = (value: string) => value.replace(/-/g, '–').trim();
+
+  const amdrMatch = raw.match(/≥\s*19\s+(\d+[\-–]\d+)\s+(\d+[\-–]\d+)\s+(\d+[\-–]\d+)/);
+  const maleFemaleEnergyMatch = raw.match(/19[\-–]29\s+60\.5\s+52\.5\s+([0-9,]+)\s+([0-9,]+)/);
+  const sugarMatch = raw.match(/Free sugars[^\n]*<\s*10%[^\n]*/i);
+  const sodiumMatch = raw.match(/Sodium[^\n]*<\s*2\s*g[^\n]*/i);
+  const potassiumMatch = raw.match(/Potassium[^\n]*3,?510\s*mg[^\n]*/i);
+
+  return {
+    adultAmdr: amdrMatch
+      ? `Adults (>=19): Protein ${normalizeRange(amdrMatch[1])}, Fat ${normalizeRange(amdrMatch[2])}, Carbohydrates ${normalizeRange(amdrMatch[3])}`
+      : defaults.adultAmdr,
+    adultEnergyRef: maleFemaleEnergyMatch
+      ? `Adults 19-29 reference: Male ~${maleFemaleEnergyMatch[1]} kcal/day, Female ~${maleFemaleEnergyMatch[2]} kcal/day`
+      : defaults.adultEnergyRef,
+    sugarLimit: sugarMatch ? sugarMatch[0].trim() : defaults.sugarLimit,
+    sodiumLimit: sodiumMatch ? sodiumMatch[0].trim() : defaults.sodiumLimit,
+    potassiumRecommendation: potassiumMatch ? potassiumMatch[0].trim() : defaults.potassiumRecommendation,
+  };
+}
+
+const fnriGuidelines = readJsonFileSafe(FNRI_GUIDELINES_PATH) || {};
+const pdriQuickFacts = extractPdriQuickFacts(readTextFileSafe(PDRI_REFERENCE_PATH));
+
+function listToCsv(values: any, fallback = 'none specified'): string {
+  if (!Array.isArray(values) || values.length === 0) return fallback;
+  return values.map((v) => String(v || '').trim()).filter(Boolean).join(', ');
+}
+
+function buildNationalNutritionStandardsBlock(targets: any): string {
+  const plateDistribution = fnriGuidelines?.diet_framework?.plate_distribution || {};
+  const foodGroups = fnriGuidelines?.diet_framework?.food_groups || {};
+  const mealRequirements = fnriGuidelines?.meal_structure?.each_meal_requirements || [];
+  const coreGuidelines = fnriGuidelines?.core_guidelines || [];
+  const priorityRules = fnriGuidelines?.nutritional_rules?.priority || [];
+  const limitRules = fnriGuidelines?.nutritional_rules?.limit || [];
+  const localFoods = fnriGuidelines?.local_food_preference || {};
+
+  const localCarbs = listToCsv(localFoods.carbs, 'rice, corn, root crops');
+  const localProteins = listToCsv(localFoods.protein, 'fish, chicken, egg, legumes');
+  const localVegetables = listToCsv(localFoods.vegetables, 'leafy and local vegetables');
+  const localFruits = listToCsv(localFoods.fruits, 'local seasonal fruits');
+
+  return `
+National Standards to follow (FNRI-DOST Philippines + PDRI):
+- Follow Pinggang Pinoy meal balance target per plate: vegetables ${plateDistribution.vegetables || '30%'}, fruits ${plateDistribution.fruits || '20%'}, protein ${plateDistribution.protein || '25%'}, carbohydrates ${plateDistribution.carbohydrates || '25%'}.
+- Use Go/Grow/Glow principle in practical meal composition:
+  Go = ${foodGroups.Go || 'carbohydrate source'}
+  Grow = ${foodGroups.Grow || 'protein source'}
+  Glow = ${foodGroups.Glow || 'fruit/vegetable source'}
+- Each main meal should contain: ${listToCsv(mealRequirements, 'vegetable + protein + carbohydrate source')}.
+- Prefer local Filipino whole-food choices: carbs (${localCarbs}); proteins (${localProteins}); vegetables (${localVegetables}); fruits (${localFruits}).
+- PDRI macronutrient range reference: ${pdriQuickFacts.adultAmdr}
+- PDRI adult energy reference: ${pdriQuickFacts.adultEnergyRef}
+- Public health limits: ${pdriQuickFacts.sugarLimit}; ${pdriQuickFacts.sodiumLimit}; ${pdriQuickFacts.potassiumRecommendation}
+- Nutrition priorities: ${listToCsv(priorityRules, 'balanced macros and fiber')}
+- Nutrition limits: ${listToCsv(limitRules, 'avoid excess sugar/sodium/saturated fat')}
+- Ensure generated meals remain aligned with user targets (${targets?.calories ?? 2000} kcal, ${targets?.protein ?? 150}g protein, ${targets?.carbs ?? 250}g carbs, ${targets?.fats ?? 70}g fats) while respecting FNRI/PDRI constraints.
+- Core FNRI reminders: ${listToCsv(coreGuidelines, 'eat variety, emphasize vegetables/fruits, hydrate safely')}
+`;
+}
 
 // Trusted Filipino meals (USDA/DOST-PH)
 const trustedFilipinoMeals = [
@@ -265,7 +386,7 @@ function getJwtSecret(): string {
   throw new Error('JWT_SECRET is not configured');
 }
 
-const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
+const authenticateToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -279,7 +400,63 @@ const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) 
 
   try {
     const decoded = jwt.verify(token, getJwtSecret()) as any;
+    // Attach decoded data first
     req.user = decoded;
+
+    try {
+      // Fetch latest user status from DB to enforce inactive/disabled states
+      const [rows] = await pool.query<any>(`SELECT id, status, payment_status, subscription_end, grace_until FROM users WHERE id = ? LIMIT 1`, [decoded.id]);
+      const dbUser = rows?.[0];
+      if (dbUser) {
+        const role = String(decoded?.role || req.user?.role || '').toLowerCase();
+        if (role === 'member') {
+          const toDateOnly = (value: any): Date | null => {
+            if (!value) return null;
+            const d = new Date(value);
+            if (Number.isNaN(d.getTime())) return null;
+            d.setHours(0, 0, 0, 0);
+            return d;
+          };
+
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const graceUntil = toDateOnly(dbUser.grace_until);
+          const subscriptionEnd = toDateOnly(dbUser.subscription_end);
+          const expiryBoundary = graceUntil || subscriptionEnd;
+          const isPastDue = !!expiryBoundary && expiryBoundary.getTime() < today.getTime();
+
+          if (isPastDue && String(dbUser.status || '').toLowerCase() !== 'inactive') {
+            await pool.query(
+              `UPDATE users SET status = 'inactive', payment_status = 'expired' WHERE id = ?`,
+              [decoded.id]
+            );
+            dbUser.status = 'inactive';
+            dbUser.payment_status = 'expired';
+          }
+        }
+
+        req.user.status = dbUser.status;
+        req.user.paymentStatus = dbUser.payment_status;
+        req.user.subscriptionEnd = dbUser.subscription_end;
+        req.user.graceUntil = dbUser.grace_until;
+
+        // If the account is inactive/disabled, allow only payment-related endpoints
+        const isInactive = String(dbUser.status || '').toLowerCase() === 'inactive';
+        const isDisabled = String(dbUser.status || '').toLowerCase() === 'disabled';
+        if ((isInactive || isDisabled)) {
+          const path = req.path || req.originalUrl || '';
+          const allowIfContains = ['payments', 'payment', '/member/payment', '/payment/success', '/payment/failed'];
+          const allowed = allowIfContains.some(s => path.includes(s));
+          if (!allowed) {
+            return res.status(403).json({ success: false, message: 'Account inactive. Please renew to regain access.' });
+          }
+        }
+      }
+    } catch (dbErr: any) {
+      // If DB check fails, log and continue (do not block token validation)
+      console.error('Auth DB check error:', (dbErr as any)?.message || dbErr);
+    }
+
     next();
   } catch (err: any) {
     return res.status(403).json({ 
@@ -1100,6 +1277,365 @@ function filterDishesByTokens<T extends any>(source: T[], tokens: string[]): T[]
   return filtered.length > 0 ? filtered : source;
 }
 
+function normalizeDietType(input: any): string {
+  const raw = String(input || '').trim().toLowerCase();
+  if (!raw) return '';
+
+  const canonical = raw.replace(/[\s-]+/g, '_');
+  const aliases: Record<string, string> = {
+    none: '',
+    no_specific_diet: '',
+    no_diet: '',
+  };
+
+  if (aliases.hasOwnProperty(canonical)) {
+    return aliases[canonical];
+  }
+  return canonical;
+}
+
+function humanizeDietType(input: any): string {
+  const normalized = normalizeDietType(input);
+  if (!normalized) return 'None';
+  return normalized
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function getDietPromptRule(input: any): string {
+  switch (normalizeDietType(input)) {
+    case 'vegan':
+      return 'STRICTLY VEGAN: Exclude all meat, poultry, seafood, eggs, dairy, and animal products. Only plant-based dishes.';
+    case 'vegetarian':
+      return 'VEGETARIAN: Exclude meat, poultry, and seafood. Eggs and dairy are allowed.';
+    case 'low_carb':
+      return 'LOW CARB: Prioritize dishes with lower carbohydrates and limit rice, noodles, and starchy sides.';
+    case 'low_fat':
+      return 'LOW FAT: Prioritize lean proteins and low-oil cooking methods. Minimize fried dishes.';
+    case 'keto':
+      return 'KETO: Keep carbohydrates very low and prioritize fats plus protein. Exclude rice, bread, noodles, and sugary items.';
+    case 'paleo':
+      return 'PALEO: Exclude grains, legumes, dairy, and highly processed ingredients.';
+    case 'low_sodium':
+      return 'LOW SODIUM: Minimize salty condiments and preserved ingredients. Favor fresh herbs, citrus, and natural flavors.';
+    case 'high_protein':
+      return 'HIGH PROTEIN: Prioritize high-protein dishes and snacks while keeping calories within target.';
+    default:
+      return '';
+  }
+}
+
+function filterDishesByDiet<T extends any>(source: T[], dietInput: any): T[] {
+  if (!Array.isArray(source) || source.length === 0) return source;
+  const diet = normalizeDietType(dietInput);
+  if (!diet) return source;
+
+  const hasAnyKeyword = (text: string, keywords: string[]) => keywords.some((k) => text.includes(k));
+
+  const animalKeywords = [
+    'pork', 'beef', 'chicken', 'baboy', 'manok', 'tapa', 'longganisa', 'tocino', 'ham', 'bacon',
+    'fish', 'bangus', 'tilapia', 'tuna', 'galunggong', 'sardines', 'shrimp', 'hipon', 'prawn',
+    'crab', 'lobster', 'seafood', 'alamang', 'bagoong',
+  ];
+  const dairyKeywords = ['milk', 'cheese', 'butter', 'cream', 'yogurt', 'gatas', 'keso'];
+  const eggKeywords = ['egg', 'itlog'];
+  const highCarbKeywords = ['rice', 'kanin', 'noodle', 'pasta', 'bread', 'tinapay', 'bihon', 'misua', 'sotanghon', 'pancit', 'sugar', 'sweet'];
+  const highFatKeywords = ['fried', 'crispy', 'lechon', 'bagnet', 'chicharon', 'deep fry', 'oil'];
+  const highSodiumKeywords = ['soy sauce', 'toyo', 'patis', 'fish sauce', 'bagoong', 'salted', 'processed'];
+  const paleoExcludedKeywords = [
+    'rice', 'noodle', 'pasta', 'bread', 'flour', 'wheat', 'corn',
+    'beans', 'monggo', 'mung', 'lentil', 'soy', 'tofu',
+    'milk', 'cheese', 'butter', 'cream', 'yogurt',
+  ];
+
+  const filtered = source.filter((dish: any) => {
+    const hay = dishTextForFilter(dish);
+    const protein = Number(dish?.protein ?? dish?.pro ?? 0);
+    const carbs = Number(dish?.carbs ?? dish?.carb ?? 0);
+    const fats = Number(dish?.fats ?? dish?.fat ?? 0);
+    const hasProtein = Number.isFinite(protein) && protein > 0;
+    const hasCarbs = Number.isFinite(carbs) && carbs > 0;
+    const hasFats = Number.isFinite(fats) && fats > 0;
+
+    switch (diet) {
+      case 'vegan':
+        return !hasAnyKeyword(hay, [...animalKeywords, ...dairyKeywords, ...eggKeywords]);
+      case 'vegetarian':
+        return !hasAnyKeyword(hay, animalKeywords);
+      case 'low_carb': {
+        if (hasAnyKeyword(hay, highCarbKeywords)) return false;
+        if (hasCarbs && carbs > 28) return false;
+        return true;
+      }
+      case 'low_fat': {
+        if (hasAnyKeyword(hay, highFatKeywords)) return false;
+        if (hasFats && fats > 14) return false;
+        return true;
+      }
+      case 'low_sodium':
+        return !hasAnyKeyword(hay, highSodiumKeywords);
+      case 'high_protein': {
+        if (hasProtein) return protein >= 15;
+        return hasAnyKeyword(hay, ['chicken', 'beef', 'pork', 'fish', 'bangus', 'tilapia', 'tuna', 'egg', 'itlog', 'tofu', 'monggo']);
+      }
+      case 'keto': {
+        if (hasAnyKeyword(hay, highCarbKeywords)) return false;
+        if (hasCarbs && carbs > 12) return false;
+        return !hasAnyKeyword(hay, ['sugar', 'sweet']);
+      }
+      case 'paleo':
+        return !hasAnyKeyword(hay, paleoExcludedKeywords);
+      default:
+        return true;
+    }
+  });
+
+  return filtered;
+}
+
+function assessDietPoolSufficiency(dishes: any[]): { isInsufficient: boolean; reason: string } {
+  if (!Array.isArray(dishes) || dishes.length === 0) {
+    return { isInsufficient: true, reason: 'No compatible dishes available after diet filtering' };
+  }
+
+  const mains = dishes.filter((d: any) => normalizeDishCategory(d?.category) !== 'snacks');
+  const snacks = dishes.filter((d: any) => normalizeDishCategory(d?.category) === 'snacks');
+  const breakfast = dishes.filter((d: any) => normalizeDishCategory(d?.category) === 'breakfast');
+  const lunch = dishes.filter((d: any) => normalizeDishCategory(d?.category) === 'lunch');
+  const dinner = dishes.filter((d: any) => normalizeDishCategory(d?.category) === 'dinner');
+  const hasExplicitCategories = dishes.some((d: any) => ['breakfast', 'lunch', 'dinner', 'snacks'].includes(normalizeDishCategory(d?.category)));
+
+  const reasons: string[] = [];
+  if (mains.length < 5) reasons.push('limited main dishes');
+  if (snacks.length < 2) reasons.push('limited snacks');
+  if (dishes.length < 8) reasons.push('overall dish pool too small');
+  if (hasExplicitCategories) {
+    if (breakfast.length === 0) reasons.push('no breakfast dishes');
+    if (lunch.length === 0) reasons.push('no lunch dishes');
+    if (dinner.length === 0) reasons.push('no dinner dishes');
+  }
+
+  return {
+    isInsufficient: reasons.length > 0,
+    reason: reasons.length > 0 ? reasons.join(', ') : 'sufficient',
+  };
+}
+
+function buildDietFallbackMeal(
+  mealSlot: string,
+  dietInput: any,
+  desiredCalories: number,
+  restrictionTokens: string[] = []
+) {
+  const diet = normalizeDietType(dietInput);
+  const slotRaw = String(mealSlot || '').toLowerCase().trim();
+  const slot = slotRaw === 'snack1' || slotRaw === 'snack2' || slotRaw === 'snacks' ? 'snacks' : slotRaw;
+
+  const templatesByDiet: Record<string, { mains: any[]; snacks: any[] }> = {
+    high_protein: {
+      mains: [
+        {
+          name: 'High-Protein Chicken Tinola Bowl',
+          ingredients: ['180 g chicken breast, skinless', '120 g sayote, sliced', '60 g malunggay leaves', '8 g garlic, minced', '12 g ginger, sliced', '400 ml water'],
+          protein: 44,
+          carbs: 16,
+          fats: 10,
+          recipe: '1. Saute garlic and ginger for 1 minute.\n2. Add chicken breast and cook for 3 to 4 minutes.\n3. Pour water and simmer until chicken is tender.\n4. Add sayote and cook for 6 minutes.\n5. Add malunggay, cook 1 minute, then serve warm.'
+        },
+        {
+          name: 'Lean Beef and Vegetable Stir-Fry',
+          ingredients: ['160 g lean beef strips', '120 g broccoli florets', '80 g bell peppers', '8 g garlic, minced', '10 ml canola oil', '10 ml calamansi juice'],
+          protein: 40,
+          carbs: 14,
+          fats: 13,
+          recipe: '1. Heat oil and saute garlic for 30 seconds.\n2. Add lean beef and sear for 3 to 4 minutes.\n3. Add broccoli and bell peppers with a splash of water.\n4. Cook until vegetables are tender-crisp.\n5. Finish with calamansi juice and serve.'
+        }
+      ],
+      snacks: [
+        {
+          name: 'Egg and Papaya Protein Snack',
+          ingredients: ['2 large hard-boiled eggs (100 g)', '120 g ripe papaya cubes'],
+          protein: 14,
+          carbs: 16,
+          fats: 10,
+          recipe: '1. Boil eggs for 10 minutes then peel.\n2. Slice eggs and papaya into bite-sized pieces.\n3. Serve immediately as a quick snack.'
+        }
+      ]
+    },
+    low_carb: {
+      mains: [
+        {
+          name: 'Grilled Chicken with Ensaladang Pipino',
+          ingredients: ['170 g chicken thigh, skinless', '140 g cucumber, sliced', '60 g tomato, chopped', '20 g onion, sliced', '10 ml calamansi juice', '8 ml olive oil'],
+          protein: 36,
+          carbs: 12,
+          fats: 14,
+          recipe: '1. Season chicken and grill over medium heat until cooked through.\n2. Mix cucumber, tomato, onion, and calamansi juice.\n3. Drizzle olive oil over the salad.\n4. Serve grilled chicken with fresh salad.'
+        },
+        {
+          name: 'Pechay and Tofu Garlic Saute',
+          ingredients: ['150 g firm tofu, cubed', '180 g pechay', '10 g garlic, minced', '10 ml canola oil', '30 ml water', '5 ml calamansi juice'],
+          protein: 22,
+          carbs: 13,
+          fats: 12,
+          recipe: '1. Pan-sear tofu in half the oil until lightly golden.\n2. Saute garlic in remaining oil.\n3. Add pechay and water, then cook for 2 to 3 minutes.\n4. Add tofu back and finish with calamansi juice.'
+        }
+      ],
+      snacks: [
+        {
+          name: 'Cucumber and Egg Low-Carb Snack',
+          ingredients: ['1 large hard-boiled egg (50 g)', '150 g cucumber sticks'],
+          protein: 8,
+          carbs: 5,
+          fats: 5,
+          recipe: '1. Slice hard-boiled egg and cucumber sticks.\n2. Serve chilled for a light low-carb snack.'
+        }
+      ]
+    },
+    low_fat: {
+      mains: [
+        {
+          name: 'Poached Fish with Steamed Vegetables',
+          ingredients: ['170 g tilapia fillet', '120 g carrots, sliced', '120 g cabbage, chopped', '8 g garlic, minced', '420 ml water', '8 ml calamansi juice'],
+          protein: 34,
+          carbs: 18,
+          fats: 7,
+          recipe: '1. Bring water and garlic to a gentle simmer.\n2. Add fish and poach for 8 minutes.\n3. Steam carrots and cabbage until tender.\n4. Serve fish with vegetables and calamansi juice.'
+        },
+        {
+          name: 'Chicken and Sayote Light Guisado',
+          ingredients: ['150 g chicken breast, sliced', '180 g sayote, sliced', '60 g onion', '8 g garlic', '6 ml canola oil', '200 ml water'],
+          protein: 33,
+          carbs: 17,
+          fats: 8,
+          recipe: '1. Saute garlic and onion in minimal oil.\n2. Add chicken breast and cook until lightly browned.\n3. Add sayote and water, then simmer 6 to 8 minutes.\n4. Serve warm.'
+        }
+      ],
+      snacks: [
+        {
+          name: 'Banana and Kamote Light Snack',
+          ingredients: ['90 g boiled sweet potato', '100 g banana slices'],
+          protein: 2,
+          carbs: 38,
+          fats: 1,
+          recipe: '1. Boil sweet potato until fork-tender and slice.\n2. Serve with fresh banana slices.'
+        }
+      ]
+    },
+    low_sodium: {
+      mains: [
+        {
+          name: 'Herb Chicken with Kalabasa and Sitaw',
+          ingredients: ['170 g chicken breast, skinless', '140 g kalabasa cubes', '100 g sitaw', '10 g garlic', '12 g onion', '6 ml olive oil'],
+          protein: 38,
+          carbs: 20,
+          fats: 9,
+          recipe: '1. Saute garlic and onion in olive oil.\n2. Add chicken and cook for 4 minutes.\n3. Add kalabasa and sitaw with a splash of water.\n4. Simmer until vegetables are tender and chicken is done.\n5. Season with herbs and calamansi instead of salty condiments.'
+        },
+        {
+          name: 'Fresh Tuna and Tomato Guisado',
+          ingredients: ['160 g fresh tuna cubes', '140 g tomatoes, chopped', '80 g pechay', '10 g garlic', '8 ml canola oil', '10 ml calamansi juice'],
+          protein: 36,
+          carbs: 12,
+          fats: 10,
+          recipe: '1. Saute garlic in oil for 30 seconds.\n2. Add fresh tuna and cook for 3 minutes.\n3. Add tomatoes and pechay, then cook until soft.\n4. Finish with calamansi juice and serve.'
+        }
+      ],
+      snacks: [
+        {
+          name: 'Papaya and Oats Low-Sodium Cup',
+          ingredients: ['120 g papaya cubes', '35 g rolled oats', '180 ml water', '2 g cinnamon powder'],
+          protein: 5,
+          carbs: 30,
+          fats: 3,
+          recipe: '1. Cook oats in water over low heat for 5 minutes.\n2. Top with papaya cubes and cinnamon.\n3. Serve warm.'
+        }
+      ]
+    },
+    vegetarian: {
+      mains: [
+        {
+          name: 'Ginisang Monggo with Malunggay',
+          ingredients: ['140 g cooked mung beans', '60 g malunggay leaves', '80 g tomatoes', '10 g garlic', '60 g onion', '8 ml canola oil'],
+          protein: 20,
+          carbs: 34,
+          fats: 9,
+          recipe: '1. Saute garlic and onion in oil until fragrant.\n2. Add tomatoes and cook until soft.\n3. Add cooked mung beans and simmer for 4 minutes.\n4. Stir in malunggay and cook for 1 minute before serving.'
+        },
+        {
+          name: 'Tofu and Mixed Vegetable Stir-Fry',
+          ingredients: ['170 g firm tofu, cubed', '80 g carrots, sliced', '90 g cabbage, chopped', '70 g bell peppers', '10 g garlic', '8 ml canola oil'],
+          protein: 24,
+          carbs: 20,
+          fats: 11,
+          recipe: '1. Pan-sear tofu until lightly golden.\n2. Saute garlic and add vegetables.\n3. Return tofu to pan and stir-fry for 2 to 3 minutes.\n4. Serve hot.'
+        }
+      ],
+      snacks: [
+        {
+          name: 'Kamote and Banana Vegetarian Snack',
+          ingredients: ['120 g boiled sweet potato', '100 g banana slices'],
+          protein: 2,
+          carbs: 42,
+          fats: 1,
+          recipe: '1. Boil sweet potato until tender and slice.\n2. Pair with banana slices and serve.'
+        }
+      ]
+    },
+    default: {
+      mains: [
+        {
+          name: 'Balanced Chicken Adobo Bowl',
+          ingredients: ['160 g chicken thigh, skinless', '110 g cooked rice', '80 g carrots', '60 g pechay', '8 g garlic', '8 ml canola oil'],
+          protein: 34,
+          carbs: 30,
+          fats: 11,
+          recipe: '1. Saute garlic in oil and add chicken.\n2. Cook chicken until lightly browned.\n3. Add vegetables and a little water, then simmer until tender.\n4. Serve with cooked rice.'
+        }
+      ],
+      snacks: [
+        {
+          name: 'Fruit and Oat Snack Cup',
+          ingredients: ['35 g rolled oats', '180 ml water', '100 g banana slices', '80 g papaya cubes'],
+          protein: 5,
+          carbs: 36,
+          fats: 3,
+          recipe: '1. Cook oats in water over low heat for 5 minutes.\n2. Top with banana and papaya.\n3. Serve warm.'
+        }
+      ]
+    }
+  };
+
+  const selected = templatesByDiet[diet] || templatesByDiet.default;
+  const sourceTemplates = slot === 'snacks' ? selected.snacks : selected.mains;
+
+  let candidateTemplates = filterDishesByTokens(sourceTemplates, restrictionTokens);
+  candidateTemplates = filterDishesByDiet(candidateTemplates, diet);
+  if (!Array.isArray(candidateTemplates) || candidateTemplates.length === 0) {
+    candidateTemplates = sourceTemplates;
+  }
+
+  const indexSeed = slot === 'breakfast' ? 0 : slot === 'lunch' ? 1 : slot === 'dinner' ? 2 : 3;
+  const picked = candidateTemplates[indexSeed % candidateTemplates.length] || sourceTemplates[0];
+
+  const fallbackTarget = Number.isFinite(Number(desiredCalories)) && Number(desiredCalories) > 0
+    ? Number(desiredCalories)
+    : (slot === 'snacks' ? 220 : 420);
+  const currentCalories = calculateCaloriesFromMacros(picked.protein, picked.carbs, picked.fats, 0);
+  const ratioRaw = currentCalories > 0 ? (fallbackTarget / currentCalories) : 1;
+  const ratio = Math.min(1.8, Math.max(0.7, ratioRaw));
+
+  return createMealObject({
+    ...picked,
+    protein: Math.round(Number(picked.protein || 0) * ratio),
+    carbs: Math.round(Number(picked.carbs || 0) * ratio),
+    fats: Math.round(Number(picked.fats || 0) * ratio),
+    calories: Math.round(Number(currentCalories || fallbackTarget) * ratio),
+    portionSize: '1 serving',
+  });
+}
+
 function humanizeTokens(tokens: string[]): string {
   const map: Record<string, string> = {
     dairy: 'Dairy',
@@ -1142,7 +1678,8 @@ function generateWeekPlan(
   targets: any,
   goal: string,
   restrictionTokens: string[] = [],
-  dishesSource?: any[]
+  dishesSource?: any[],
+  dietType: string = ''
 ) {
   const toFiniteNumber = (value: any, fallback: number) => {
     const n = Number(value);
@@ -1198,8 +1735,11 @@ function generateWeekPlan(
 
   // Best-effort filtering for fallback generation based on allergies/restriction tokens.
   // If DB dishes exist, prefer them (this makes prod behavior clearly DB-driven even without OpenAI).
+  const normalizedDietType = normalizeDietType(dietType);
   const mainSourceRaw = hasDbSource ? (dishesSource as any[]) : trustedFilipinoMealsDetailed;
-  const mainSourceFiltered = filterDishesByTokens(mainSourceRaw, restrictionTokens);
+  const mainSourceFilteredByTokens = filterDishesByTokens(mainSourceRaw, restrictionTokens);
+  const mainSourceFilteredByDiet = filterDishesByDiet(mainSourceFilteredByTokens, normalizedDietType);
+  const mainSourceFiltered = normalizedDietType ? mainSourceFilteredByDiet : mainSourceFilteredByTokens;
 
   const breakfastPool = mainSourceFiltered.filter((d: any) => normalizeDishCategory(d?.category) === 'breakfast');
   const lunchPool = mainSourceFiltered.filter((d: any) => normalizeDishCategory(d?.category) === 'lunch');
@@ -1213,7 +1753,9 @@ function generateWeekPlan(
     ? mainSourceFiltered.filter((d: any) => normalizeDishCategory(d?.category) === 'snacks')
     : [];
   const snacksSourceRaw = dbSnackPool.length > 0 ? dbSnackPool : filipinoSnacks;
-  const snacksPool = filterDishesByTokens(snacksSourceRaw, restrictionTokens);
+  const snacksPoolByTokens = filterDishesByTokens(snacksSourceRaw, restrictionTokens);
+  const snacksPoolByDiet = filterDishesByDiet(snacksPoolByTokens, normalizedDietType);
+  const snacksPool = normalizedDietType ? snacksPoolByDiet : snacksPoolByTokens;
 
   if (aiDay && aiDay.meals) {
     Object.values(aiDay.meals).forEach((m: any) => {
@@ -1255,21 +1797,21 @@ function generateWeekPlan(
         breakfastPool.length > 0 ? breakfastPool : allMainPool,
         used,
         breakfastCaloriesTarget
-      ) || (allMainPool[Math.floor(Math.random() * allMainPool.length)] || { name: 'Breakfast' });
+      ) || (allMainPool[Math.floor(Math.random() * allMainPool.length)] || buildDietFallbackMeal('breakfast', normalizedDietType, breakfastCaloriesTarget, restrictionTokens));
 
     const lunchPick =
       pickUniqueClosestCalories(
         lunchPool.length > 0 ? lunchPool : allMainPool,
         used,
         lunchCaloriesTargetBase
-      ) || (allMainPool[Math.floor(Math.random() * allMainPool.length)] || { name: 'Lunch' });
+      ) || (allMainPool[Math.floor(Math.random() * allMainPool.length)] || buildDietFallbackMeal('lunch', normalizedDietType, lunchCaloriesTargetBase, restrictionTokens));
 
     const dinnerPick =
       pickUniqueClosestCalories(
         dinnerPool.length > 0 ? dinnerPool : allMainPool,
         used,
         dinnerCaloriesTargetBase
-      ) || (allMainPool[Math.floor(Math.random() * allMainPool.length)] || { name: 'Dinner' });
+      ) || (allMainPool[Math.floor(Math.random() * allMainPool.length)] || buildDietFallbackMeal('dinner', normalizedDietType, dinnerCaloriesTargetBase, restrictionTokens));
 
     // Pick 2 snacks, aiming to fill remaining calories for the day.
     const mainsCalories = dishCalories(breakfastPick) + dishCalories(lunchPick) + dishCalories(dinnerPick);
@@ -1278,12 +1820,14 @@ function generateWeekPlan(
 
     const snack1 =
       pickUniqueClosestCalories(snacksPool, usedSnacks, snack1Target) ||
-      pickUniqueMeals(snacksPool, usedSnacks, 1)[0];
+      pickUniqueMeals(snacksPool, usedSnacks, 1)[0] ||
+      buildDietFallbackMeal('snack1', normalizedDietType, snack1Target, restrictionTokens);
 
     const snack2Target = Math.max(0, snacksTotalTarget - dishCalories(snack1));
     const snack2 =
       pickUniqueClosestCalories(snacksPool, usedSnacks, snack2Target) ||
-      pickUniqueMeals(snacksPool, usedSnacks, 1)[0];
+      pickUniqueMeals(snacksPool, usedSnacks, 1)[0] ||
+      buildDietFallbackMeal('snack2', normalizedDietType, snack2Target, restrictionTokens);
 
     const mealsObj: any = {
       breakfast: createMealObject(breakfastPick),
@@ -1798,7 +2342,7 @@ app.post('/api/register', registerLimiter, async (req: Request, res: Response) =
         gender || 'male',
         dateOfBirth || null,
         membershipType || 'monthly',
-        membershipPrice || 1500,
+        membershipPrice || 100,
         isoDateString(req.body?.joinDate || joinDate), // safe access — prefer req.body.joinDate if present
         isoDateString(subscriptionStart), // was subscriptionStart.toISOString().split('T')[0]
         isoDateString(subscriptionEnd), // was subscriptionEnd.toISOString().split('T')[0]
@@ -1825,7 +2369,7 @@ app.post('/api/register', registerLimiter, async (req: Request, res: Response) =
 });
 
 // ===== MEMBER MANAGEMENT ROUTES =====
-app.get('/api/members', async (req, res) => {
+app.get('/api/members', authenticateToken, requireAdmin, async (req, res) => {
   try {
     
     // PostgreSQL-safe: avoid GROUP BY across many selected columns.
@@ -1834,21 +2378,61 @@ app.get('/api/members', async (req, res) => {
       `SELECT
         u.id,
         u.email,
-        u.first_name as firstName,
-        u.last_name as lastName,
+        u.first_name as "firstName",
+        u.last_name as "lastName",
         u.phone,
         u.gender,
-        u.date_of_birth as dateOfBirth,
-        u.membership_type as membershipType,
-        u.membership_price as membershipPrice,
-        u.join_date as joinDate,
+        u.date_of_birth as "dateOfBirth",
+        u.membership_type as "membershipType",
+        u.membership_price as "membershipPrice",
+        u.join_date as "joinDate",
         u.status,
-        u.payment_status as paymentStatus,
-        u.subscription_start as subscriptionStart,
-        u.subscription_end as subscriptionEnd,
-        u.emergency_contact as emergencyContact,
+        u.payment_status as "paymentStatus",
+        u.subscription_start as "subscriptionStart",
+        u.subscription_end as "subscriptionEnd",
+        u.emergency_contact as "emergencyContact",
         u.address,
-        (SELECT COUNT(*) FROM payments p WHERE p.user_id = u.id) as totalPayments
+        (
+          SELECT p.payment_status
+          FROM payments p
+          WHERE p.user_id = u.id
+            AND COALESCE(p.payment_status, '') IN ('paid', 'completed')
+          ORDER BY COALESCE(p.payment_date, p.created_at) DESC
+          LIMIT 1
+        ) as "latestPaidStatus",
+        (
+          SELECT p.membership_type
+          FROM payments p
+          WHERE p.user_id = u.id
+            AND COALESCE(p.payment_status, '') IN ('paid', 'completed')
+          ORDER BY COALESCE(p.payment_date, p.created_at) DESC
+          LIMIT 1
+        ) as "latestPaidMembershipType",
+        (
+          SELECT p.amount
+          FROM payments p
+          WHERE p.user_id = u.id
+            AND COALESCE(p.payment_status, '') IN ('paid', 'completed')
+          ORDER BY COALESCE(p.payment_date, p.created_at) DESC
+          LIMIT 1
+        ) as "latestPaidAmount",
+        (
+          SELECT p.subscription_start
+          FROM payments p
+          WHERE p.user_id = u.id
+            AND COALESCE(p.payment_status, '') IN ('paid', 'completed')
+          ORDER BY COALESCE(p.payment_date, p.created_at) DESC
+          LIMIT 1
+        ) as "latestPaidSubscriptionStart",
+        (
+          SELECT p.subscription_end
+          FROM payments p
+          WHERE p.user_id = u.id
+            AND COALESCE(p.payment_status, '') IN ('paid', 'completed')
+          ORDER BY COALESCE(p.payment_date, p.created_at) DESC
+          LIMIT 1
+        ) as "latestPaidSubscriptionEnd",
+        (SELECT COUNT(*) FROM payments p WHERE p.user_id = u.id) as "totalPayments"
       FROM users u
       WHERE u.role = 'member'`
     );
@@ -1859,25 +2443,43 @@ app.get('/api/members', async (req, res) => {
       return s === 'active' ? 'active' : 'inactive';
     };
 
-    const transformedMembers = members.map((member: any) => ({
-      id: member.id,
-      firstName: member.firstName || '',
-      lastName: member.lastName || '',
-      email: member.email,
-      phone: member.phone || '',
-      gender: member.gender || 'male',
-      dateOfBirth: member.dateOfBirth ? new Date(member.dateOfBirth).toISOString().split('T')[0] : '',
-      membershipType: member.membershipType || 'monthly',
-      membershipPrice: parseFloat(member.membershipPrice) || 1500,
-      joinDate: member.joinDate ? new Date(member.joinDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      status: normalizeMemberStatus(member.status),
-      paymentStatus: member.paymentStatus || 'pending',
-      subscriptionStart: member.subscriptionStart ? new Date(member.subscriptionStart).toISOString().split('T')[0] : null,
-      subscriptionEnd: member.subscriptionEnd ? new Date(member.subscriptionEnd).toISOString().split('T')[0] : null,
-      emergencyContact: member.emergencyContact || '',
-      address: member.address || '',
-      totalPayments: member.totalPayments || 0,
-    }));
+    const transformedMembers = members.map((member: any) => {
+      const latestPaidStatus = String(member.latestPaidStatus || '').toLowerCase();
+      const userPaymentStatus = String(member.paymentStatus || '').toLowerCase();
+      const hasPaidEvidence = latestPaidStatus === 'paid' || latestPaidStatus === 'completed';
+      const normalizedPaymentStatus = hasPaidEvidence
+        ? 'paid'
+        : userPaymentStatus === 'completed'
+          ? 'paid'
+          : ['paid', 'pending', 'expired', 'cancelled'].includes(userPaymentStatus)
+            ? userPaymentStatus
+            : 'pending';
+
+      const membershipType = member.latestPaidMembershipType || member.membershipType || 'monthly';
+      const membershipPrice = Number(member.latestPaidAmount) || parseFloat(member.membershipPrice) || 100;
+      const subscriptionStart = member.latestPaidSubscriptionStart || member.subscriptionStart;
+      const subscriptionEnd = member.latestPaidSubscriptionEnd || member.subscriptionEnd;
+
+      return {
+        id: member.id,
+        firstName: member.firstName || '',
+        lastName: member.lastName || '',
+        email: member.email,
+        phone: member.phone || '',
+        gender: member.gender || 'male',
+        dateOfBirth: member.dateOfBirth ? new Date(member.dateOfBirth).toISOString().split('T')[0] : '',
+        membershipType,
+        membershipPrice,
+        joinDate: member.joinDate ? new Date(member.joinDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        status: hasPaidEvidence ? 'active' : normalizeMemberStatus(member.status),
+        paymentStatus: normalizedPaymentStatus,
+        subscriptionStart: subscriptionStart ? new Date(subscriptionStart).toISOString().split('T')[0] : null,
+        subscriptionEnd: subscriptionEnd ? new Date(subscriptionEnd).toISOString().split('T')[0] : null,
+        emergencyContact: member.emergencyContact || '',
+        address: member.address || '',
+        totalPayments: member.totalPayments || 0,
+      };
+    });
 
     res.json(transformedMembers);
   } catch (error: any) {
@@ -1885,7 +2487,7 @@ app.get('/api/members', async (req, res) => {
   }
 });
 
-app.post('/api/members', authenticateToken, async (req: AuthRequest, res: Response) => {
+app.post('/api/members', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { 
       firstName, 
@@ -1955,7 +2557,7 @@ app.post('/api/members', authenticateToken, async (req: AuthRequest, res: Respon
         dateOfBirth || null,
         status || 'active',
         membershipType || 'monthly',
-        membershipPrice || 1500,
+        membershipPrice || 100,
         joinDate || isoDateString(new Date()), // in the insert values: use isoDateString for joinDate default
         isoDateString(subscriptionStart), // was subscriptionStart.toISOString().split('T')[0]
         isoDateString(subscriptionEnd),   // was subscriptionEnd.toISOString().split('T')[0]
@@ -1977,7 +2579,7 @@ app.post('/api/members', authenticateToken, async (req: AuthRequest, res: Respon
   }
 });
 
-app.put('/api/members/:id', authenticateToken, async (req: AuthRequest, res: Response) => {
+app.put('/api/members/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const memberId = req.params.id;
     const {
@@ -2078,7 +2680,7 @@ app.put('/api/members/:id', authenticateToken, async (req: AuthRequest, res: Res
   }
 });
 
-app.delete('/api/members/:id', async (req, res) => {
+app.delete('/api/members/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -2102,6 +2704,33 @@ app.get('/api/member/subscription', authenticateToken, async (req: AuthRequest, 
   try {
     const userId = req.user!.id;
 
+    const normalizePlan = (raw: any): 'monthly' | 'quarterly' | 'annual' => {
+      const v = String(raw || '').trim().toLowerCase();
+      if (v === 'quarterly') return 'quarterly';
+      if (v === 'annual') return 'annual';
+      return 'monthly';
+    };
+
+    const parseDateSafe = (value: any): Date | null => {
+      if (!value) return null;
+      const d = new Date(value);
+      return Number.isNaN(d.getTime()) ? null : d;
+    };
+
+    const computeEndDate = (start: Date, plan: 'monthly' | 'quarterly' | 'annual'): Date => {
+      const end = new Date(start);
+      if (plan === 'quarterly') end.setMonth(end.getMonth() + 3);
+      else if (plan === 'annual') end.setFullYear(end.getFullYear() + 1);
+      else end.setMonth(end.getMonth() + 1);
+      return end;
+    };
+
+    const defaultPriceByPlan = (plan: 'monthly' | 'quarterly' | 'annual') => {
+      if (plan === 'quarterly') return 200;
+      if (plan === 'annual') return 300;
+      return 100;
+    };
+
     const [member] = await pool.query<any>(
       `SELECT 
         id, email, first_name as firstName, last_name as lastName,
@@ -2116,13 +2745,85 @@ app.get('/api/member/subscription', authenticateToken, async (req: AuthRequest, 
       return res.status(404).json({ message: 'Member not found' });
     }
 
-    res.json(member[0]);
+    const row = member[0] as any;
+    const userEnd = parseDateSafe(row.subscriptionEnd);
+    const userPlan = String(row.membershipType || '').trim().toLowerCase();
+    const userPaid = String(row.paymentStatus || '').toLowerCase() === 'paid';
+
+    // Self-heal legacy/inconsistent user subscription fields from latest paid payment record.
+    const needsRepair = !userEnd || !userPlan || !userPaid;
+    if (needsRepair) {
+      const [latestRows] = await pool.query<any>(
+        `SELECT 
+           membership_type as membershipType,
+           amount,
+           subscription_start as subscriptionStart,
+           subscription_end as subscriptionEnd,
+           payment_status as paymentStatus,
+           payment_date as paymentDate,
+           created_at as createdAt
+         FROM payments
+         WHERE user_id = ? AND COALESCE(payment_status, '') IN ('paid', 'completed')
+         ORDER BY COALESCE(payment_date, created_at) DESC
+         LIMIT 1`,
+        [userId]
+      );
+
+      if (Array.isArray(latestRows) && latestRows.length > 0) {
+        const latest = latestRows[0] as any;
+        const plan = normalizePlan(latest.membershipType || row.membershipType);
+        const start = parseDateSafe(latest.subscriptionStart)
+          || parseDateSafe(latest.paymentDate)
+          || parseDateSafe(latest.createdAt)
+          || new Date();
+        const end = parseDateSafe(latest.subscriptionEnd) || computeEndDate(start, plan);
+        const price = Number(latest.amount) || Number(row.membershipPrice) || defaultPriceByPlan(plan);
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const isActive = end.getTime() >= today.getTime();
+        const paymentStatus = isActive ? 'paid' : 'expired';
+        const status = isActive ? 'active' : (row.status || 'inactive');
+
+        await pool.query(
+          `UPDATE users
+             SET membership_type = ?,
+                 membership_price = ?,
+                 subscription_start = ?,
+                 subscription_end = ?,
+                 payment_status = ?,
+                 status = ?
+           WHERE id = ?`,
+          [
+            plan,
+            price,
+            isoDateString(start),
+            isoDateString(end),
+            paymentStatus,
+            status,
+            userId,
+          ]
+        );
+
+        return res.json({
+          ...row,
+          membershipType: plan,
+          membershipPrice: price,
+          subscriptionStart: isoDateString(start),
+          subscriptionEnd: isoDateString(end),
+          paymentStatus,
+          status,
+        });
+      }
+    }
+
+    res.json(row);
   } catch (error: any) {
     res.status(500).json({ message: 'Server error', error: getErrorMessage(error) });
   }
 });
 
-app.post('/api/member/payment/gcash', authenticateToken, async (req: AuthRequest, res: Response) => {
+app.post(['/api/member/payment/paypal', '/api/member/payment/gcash'], authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { userId: bodyUserId, membershipType, amount, paymentMethod } = req.body;
     // Use userId from token if not provided in body (for renewal cases)
@@ -2136,22 +2837,17 @@ app.post('/api/member/payment/gcash', authenticateToken, async (req: AuthRequest
       });
     }
 
-    const transactionId = `GCASH-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    const transactionId = `PAYPAL-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    const normalizedPaymentMethod =
+      String(paymentMethod || 'paypal').toLowerCase() === 'gcash'
+        ? 'paypal'
+        : String(paymentMethod || 'paypal').toLowerCase();
 
-    const subscriptionStart = new Date();
-    const subscriptionEnd = new Date();
-    
-    switch (membershipType) {
-      case 'monthly':
-        subscriptionEnd.setMonth(subscriptionEnd.getMonth() + 1);
-        break;
-      case 'quarterly':
-        subscriptionEnd.setMonth(subscriptionEnd.getMonth() + 3);
-        break;
-      case 'annual':
-        subscriptionEnd.setFullYear(subscriptionEnd.getFullYear() + 1);
-        break;
-    }
+    const normalizedMembershipType = normalizeMembershipPlan(membershipType);
+    const { subscriptionStart, subscriptionEnd } = await resolveSubscriptionWindow(
+      Number(userId),
+      normalizedMembershipType
+    );
 
     const paymentStatus = 'paid';
 
@@ -2164,8 +2860,8 @@ app.post('/api/member/payment/gcash', authenticateToken, async (req: AuthRequest
       [
         userId, 
         amount, 
-        paymentMethod || 'gcash', 
-        membershipType, 
+        normalizedPaymentMethod,
+        normalizedMembershipType,
         paymentStatus, 
         transactionId,
         isoDateString(subscriptionStart), // was subscriptionStart.toISOString().split('T')[0]
@@ -2179,13 +2875,14 @@ app.post('/api/member/payment/gcash', authenticateToken, async (req: AuthRequest
            payment_status = 'paid',
            subscription_start = ?,
            subscription_end = ?,
+           grace_until = NULL,
            membership_type = ?,
            membership_price = ?
        WHERE id = ?`,
       [
         isoDateString(subscriptionStart), // was subscriptionStart.toISOString().split('T')[0]
         isoDateString(subscriptionEnd),   // was subscriptionEnd.toISOString().split('T')[0]
-        membershipType,
+        normalizedMembershipType,
         amount,
         userId
       ]
@@ -2201,7 +2898,7 @@ app.post('/api/member/payment/gcash', authenticateToken, async (req: AuthRequest
       subscription: {
         start: subscriptionStart.toISOString().split('T')[0],
         end: subscriptionEnd.toISOString().split('T')[0],
-        type: membershipType,
+        type: normalizedMembershipType,
         amount: amount
       }
     });
@@ -2211,7 +2908,7 @@ app.post('/api/member/payment/gcash', authenticateToken, async (req: AuthRequest
   }
 });
 
-app.post('/api/admin/payments/record-cash', authenticateToken, async (req: AuthRequest, res: Response) => {
+app.post('/api/admin/payments/record-cash', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { userId, membershipType, amount, paymentMethod, notes } = req.body;
 
@@ -2223,73 +2920,46 @@ app.post('/api/admin/payments/record-cash', authenticateToken, async (req: AuthR
     }
 
     const transactionId = `CASH-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    const paymentStatus = 'pending';
 
-    const subscriptionStart = new Date();
-    const subscriptionEnd = new Date();
-    
-    switch (membershipType) {
-      case 'monthly':
-        subscriptionEnd.setMonth(subscriptionEnd.getMonth() + 1);
-        break;
-      case 'quarterly':
-        subscriptionEnd.setMonth(subscriptionEnd.getMonth() + 3);
-        break;
-      case 'annual':
-        subscriptionEnd.setFullYear(subscriptionEnd.getFullYear() + 1);
-        break;
-    }
-
-    const paymentStatus = 'paid';
-
-    const [result] = await pool.query(
-      `INSERT INTO payments (
-        user_id, amount, payment_date, payment_method,
-        membership_type, payment_status, transaction_id,
-        subscription_start, subscription_end, notes
-      ) VALUES (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        userId, 
-        amount, 
-        paymentMethod || 'cash', 
-        membershipType, 
-        paymentStatus, 
-        transactionId,
-        isoDateString(subscriptionStart),
-        isoDateString(subscriptionEnd),
-        notes || ''
-      ]
-    );
-
-    await pool.query(
-      `UPDATE users 
-       SET status = 'active',
-           payment_status = 'paid',
-           subscription_start = ?,
-           subscription_end = ?,
-           membership_type = ?,
-           membership_price = ?
-       WHERE id = ?`,
-      [
-        isoDateString(subscriptionStart),
-        isoDateString(subscriptionEnd),
-        membershipType,
-        amount,
-        userId
-      ]
-    );
+    const hasPaymentNotes = await dbColumnExists('payments', 'notes');
+    const [result] = hasPaymentNotes
+      ? await pool.query(
+          `INSERT INTO payments (
+            user_id, amount, payment_method,
+            membership_type, payment_status, transaction_id, notes
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            userId,
+            amount,
+            paymentMethod || 'cash',
+            membershipType,
+            paymentStatus,
+            transactionId,
+            notes || '',
+          ]
+        )
+      : await pool.query(
+          `INSERT INTO payments (
+            user_id, amount, payment_method,
+            membership_type, payment_status, transaction_id
+          ) VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            userId,
+            amount,
+            paymentMethod || 'cash',
+            membershipType,
+            paymentStatus,
+            transactionId,
+          ]
+        );
 
     res.status(201).json({
       success: true,
-      message: '✅ Payment recorded! Member subscription is now active.',
+      message: 'Payment recorded and queued for admin approval.',
       paymentId: (result as any).insertId,
       transactionId,
-      paymentStatus: 'paid',
-      subscription: {
-        start: subscriptionStart.toISOString().split('T')[0],
-        end: subscriptionEnd.toISOString().split('T')[0],
-        type: membershipType,
-        amount: amount
-      }
+      paymentStatus: 'pending',
     });
 
   } catch (error: any) {
@@ -2298,7 +2968,7 @@ app.post('/api/admin/payments/record-cash', authenticateToken, async (req: AuthR
 });
 
 // GET ALL PAYMENTS FOR ADMIN DASHBOARD (ADMIN)
-app.get('/api/admin/payments/all', authenticateToken, async (req: AuthRequest, res: Response) => {
+app.get('/api/admin/payments/all', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const [payments] = await pool.query<any>(`
       SELECT 
@@ -2312,8 +2982,8 @@ app.get('/api/admin/payments/all', authenticateToken, async (req: AuthRequest, r
         p.transaction_id,
         p.subscription_start,
         p.subscription_end,
-        u.first_name as firstName,
-        u.last_name as lastName,
+        u.first_name as "firstName",
+        u.last_name as "lastName",
         u.email
       FROM payments p
       INNER JOIN users u ON p.user_id = u.id
@@ -2326,14 +2996,187 @@ app.get('/api/admin/payments/all', authenticateToken, async (req: AuthRequest, r
   }
 });
 
+// GET PENDING PAYMENTS FOR ADMIN REVIEW
+app.get('/api/admin/payments/pending', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const hasPaymentNotes = await dbColumnExists('payments', 'notes');
+    const notesExpr = hasPaymentNotes ? `COALESCE(p.notes, '')` : `''`;
+
+    const [payments] = await pool.query<any>(`
+      SELECT
+        p.id,
+        p.user_id,
+        p.amount,
+        p.payment_method,
+        p.membership_type,
+        COALESCE(p.payment_status, 'pending') as payment_status,
+        p.payment_date,
+        p.transaction_id,
+        ${notesExpr} as notes,
+        u.first_name as "firstName",
+        u.last_name as "lastName",
+        u.email
+      FROM payments p
+      INNER JOIN users u ON p.user_id = u.id
+      WHERE COALESCE(p.payment_status, 'pending') = 'pending'
+      ORDER BY COALESCE(p.payment_date, p.created_at) DESC
+    `);
+
+    return res.json(payments);
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: getErrorMessage(error) || 'Failed to load pending payments' });
+  }
+});
+
+// APPROVE A PENDING PAYMENT (ADMIN)
+app.post('/api/admin/payments/:id/approve', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const paymentId = Number(req.params.id);
+    if (!Number.isFinite(paymentId)) {
+      return res.status(400).json({ success: false, message: 'Invalid payment id' });
+    }
+
+    const [rows] = await pool.query<any>(
+      `SELECT id, user_id, amount, membership_type, payment_status
+       FROM payments
+       WHERE id = ?
+       LIMIT 1`,
+      [paymentId]
+    );
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Payment not found' });
+    }
+
+    const payment = rows[0] as any;
+    const currentStatus = String(payment.payment_status || '').toLowerCase();
+    if (currentStatus === 'paid' || currentStatus === 'completed') {
+      return res.status(400).json({ success: false, message: 'Payment already approved' });
+    }
+
+    const membershipType = normalizeMembershipPlan(payment.membership_type || 'monthly');
+    const amount = Number(payment.amount) || 0;
+
+    const { subscriptionStart, subscriptionEnd } = await resolveSubscriptionWindow(
+      Number(payment.user_id),
+      membershipType
+    );
+
+    await pool.query(
+      `UPDATE payments
+       SET payment_status = 'paid', payment_date = NOW(),
+           subscription_start = ?, subscription_end = ?
+       WHERE id = ?`,
+      [
+        isoDateString(subscriptionStart),
+        isoDateString(subscriptionEnd),
+        paymentId,
+      ]
+    );
+
+    await pool.query(
+      `UPDATE users
+       SET status = 'active',
+           payment_status = 'paid',
+           subscription_start = ?,
+           subscription_end = ?,
+           grace_until = NULL,
+           membership_type = ?,
+           membership_price = ?
+       WHERE id = ?`,
+      [
+        isoDateString(subscriptionStart),
+        isoDateString(subscriptionEnd),
+        membershipType,
+        amount,
+        payment.user_id,
+      ]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Payment approved successfully',
+      subscription: {
+        start: isoDateString(subscriptionStart),
+        end: isoDateString(subscriptionEnd),
+        type: membershipType,
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: getErrorMessage(error) || 'Failed to approve payment' });
+  }
+});
+
+// REJECT A PENDING PAYMENT (ADMIN)
+app.post('/api/admin/payments/:id/reject', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const paymentId = Number(req.params.id);
+    const reason = String(req.body?.reason || '').trim();
+    if (!Number.isFinite(paymentId)) {
+      return res.status(400).json({ success: false, message: 'Invalid payment id' });
+    }
+
+    const hasPaymentNotes = await dbColumnExists('payments', 'notes');
+
+    const [result] = hasPaymentNotes
+      ? await pool.query<any>(
+          `UPDATE payments
+           SET payment_status = 'rejected',
+               notes = CASE
+                 WHEN COALESCE(notes, '') = '' THEN ?
+                 ELSE CONCAT(notes, ' | Rejected: ', ?)
+               END
+           WHERE id = ?`,
+          [reason || 'Rejected by admin', reason || 'Rejected by admin', paymentId]
+        )
+      : await pool.query<any>(
+          `UPDATE payments
+           SET payment_status = 'rejected'
+           WHERE id = ?`,
+          [paymentId]
+        );
+
+    if (!(result as any)?.affectedRows) {
+      return res.status(404).json({ success: false, message: 'Payment not found' });
+    }
+
+    return res.json({ success: true, message: 'Payment rejected successfully' });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: getErrorMessage(error) || 'Failed to reject payment' });
+  }
+});
+
+// DELETE PAYMENT RECORD (ADMIN)
+app.delete('/api/admin/payments/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const paymentId = Number(req.params.id);
+    if (!Number.isFinite(paymentId)) {
+      return res.status(400).json({ success: false, message: 'Invalid payment id' });
+    }
+
+    const [result] = await pool.query<any>(
+      `DELETE FROM payments WHERE id = ?`,
+      [paymentId]
+    );
+
+    if (!(result as any)?.affectedRows) {
+      return res.status(404).json({ success: false, message: 'Payment not found' });
+    }
+
+    return res.json({ success: true, message: 'Payment deleted successfully' });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: getErrorMessage(error) || 'Failed to delete payment' });
+  }
+});
+
 // ADMIN PAYMENT SUMMARY ROUTE
-app.get('/api/admin/payments/summary', authenticateToken, async (req: AuthRequest, res: Response) => {
+app.get('/api/admin/payments/summary', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     // Total revenue (sum of all paid payments)
     const [revenueRows] = await pool.query<any>(`
       SELECT SUM(amount) as totalRevenue
       FROM payments
-      WHERE payment_status = 'paid'
+      WHERE payment_status IN ('paid', 'completed')
     `);
 
     // Count of pending payments
@@ -2347,7 +3190,7 @@ app.get('/api/admin/payments/summary', authenticateToken, async (req: AuthReques
     const [paidRows] = await pool.query<any>(`
       SELECT COUNT(*) as paidPayments
       FROM payments
-      WHERE payment_status = 'paid'
+      WHERE payment_status IN ('paid', 'completed')
     `);
 
     res.json({
@@ -2528,6 +3371,7 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
     const allergyTokens = normalizeSelectionList(allergies);
     const deprecatedRestrictionTokens = normalizeSelectionList(dietaryRestrictions);
     const allRestrictionTokens = Array.from(new Set([...allergyTokens, ...deprecatedRestrictionTokens]));
+    const normalizedDiet = normalizeDietType(diet);
 
     // Best-effort persist preferences for later reload in the UI.
     try {
@@ -2535,7 +3379,7 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
         lifestyle,
         mealType,
         goal,
-        diet,
+        diet: normalizedDiet,
         allergies: allergyTokens,
         // keep deprecated field for older schemas/clients
         dietaryRestrictions: deprecatedRestrictionTokens,
@@ -2546,7 +3390,7 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
     }
 
     if (!dbConnected) {
-      let weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens);
+      let weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens, undefined, normalizedDiet);
       weekPlan = addRiceSidesToMeals(weekPlan);
       weekPlan = scaleWeekPlanToCalorieTarget(weekPlan, targets);
       return res.status(503).json({
@@ -2564,8 +3408,13 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
 
     const [dbDishes] = await pool.query<any>('SELECT * FROM filipino_dishes ORDER BY name ASC');
 
-  // Apply best-effort filtering so restricted dishes aren't even offered to the AI.
-  const filteredDbDishes = filterDishesByTokens(dbDishes || [], allRestrictionTokens);
+    // Apply best-effort filtering so restricted dishes are not offered to the AI.
+    const tokenFilteredDbDishes = filterDishesByTokens(dbDishes || [], allRestrictionTokens);
+    const dietFilteredDbDishes = filterDishesByDiet(tokenFilteredDbDishes, normalizedDiet);
+    const filteredDbDishes = normalizedDiet ? dietFilteredDbDishes : tokenFilteredDbDishes;
+
+    const poolAssessment = assessDietPoolSufficiency(filteredDbDishes);
+    const allowAIFillInMeals = !!normalizedDiet && poolAssessment.isInsufficient;
 
     const dishesForPrompt = filteredDbDishes.map((d: any) => ({
       name: d.name,
@@ -2578,41 +3427,15 @@ app.post('/api/meal-planner/generate', authenticateToken, async (req: AuthReques
     }));
     const dishesJson = JSON.stringify(dishesForPrompt);
 
-    // Build diet constraint text with explicit filtering rules
-    let dietConstraint = '';
-    let dietRules = '';
-    
-    if (diet && diet !== '') {
-      dietConstraint = `\n- Diet Type: ${diet}`;
-      
-      // Add explicit filtering rules based on diet type
-      switch(diet.toLowerCase()) {
-        case 'vegan':
-          dietRules = '\n- STRICTLY VEGAN: Exclude ALL meat, poultry, seafood, eggs, dairy, and animal products. Only plant-based dishes.';
-          break;
-        case 'vegetarian':
-          dietRules = '\n- VEGETARIAN: Exclude meat, poultry, and seafood. Eggs and dairy are allowed.';
-          break;
-        case 'low carb':
-          dietRules = '\n- LOW CARB: Prioritize dishes with low carbohydrate content. Minimize rice and starchy foods.';
-          break;
-        case 'low fat':
-          dietRules = '\n- LOW FAT: Prioritize lean proteins and minimize oil/fat in dishes.';
-          break;
-        case 'keto':
-          dietRules = '\n- KETO: Very low carbs (under 20g per meal), high fat and protein. Exclude rice, bread, sugary items.';
-          break;
-        case 'paleo':
-          dietRules = '\n- PALEO: Exclude grains, legumes, and dairy. Focus on meat, seafood, vegetables, and fruits.';
-          break;
-        case 'low sodium':
-          dietRules = '\n- LOW SODIUM: Minimize salt and salty condiments. Focus on fresh, unsalted preparations.';
-          break;
-        case 'high protein':
-          dietRules = '\n- HIGH PROTEIN: Prioritize high-protein dishes with lean meats, seafood, and legumes.';
-          break;
-      }
-    }
+    const dietConstraint = normalizedDiet ? `\n- Diet Type: ${humanizeDietType(normalizedDiet)}` : '';
+    const dietRuleText = getDietPromptRule(normalizedDiet);
+    const dietRules = dietRuleText ? `\n- ${dietRuleText}` : '';
+    const dietPoolNote = allowAIFillInMeals
+      ? `\n- Diet-filtered DB pool is limited (${poolAssessment.reason}); AI may add compliant meals to complete all slots.`
+      : '';
+    const dishUsageRule = allowAIFillInMeals
+      ? '- Prioritize dishes from the list. If list options are insufficient to complete all 7 days under the selected diet, you may add Filipino meals not in the list only for missing slots. Every added meal must include full macros, measured ingredients, and detailed steps.'
+      : '- Only use dishes that appear in the list (no new dishes).';
 
     const prompt = `
 You are a professional Filipino nutritionist and meal planner. The user preferences:
@@ -2621,12 +3444,15 @@ You are a professional Filipino nutritionist and meal planner. The user preferen
 - Goal: ${goal}${dietConstraint}
 - Allergies / Avoid: ${humanizeTokens(allRestrictionTokens)}
 - Targets: ${targets?.calories ?? 2000} kcal, ${targets?.protein ?? 150}g protein, ${targets?.carbs ?? 250}g carbs, ${targets?.fats ?? 70}g fats
+${dietPoolNote}
 
-Only use meals from the provided DB list (JSON) below:
+  ${buildNationalNutritionStandardsBlock(targets)}
+
+Diet-compatible meals from the DB list (JSON):
 ${dishesJson}
 
 Rules:
-- Only use dishes that appear in the list (no new dishes).${dietRules}
+- ${dishUsageRule}${dietRules}
 - IMPORTANT: For lunch and dinner, include a rice/carb side dish (like "Sinangag na Kanin" or "Fried Rice") to make it a complete Filipino meal.
 - Randomize meals across days and avoid repeating the same meal on consecutive days.
 - Every meal object must include complete ingredients with specific variants and exact measurements (e.g., "120 g pork tocino", "10 ml canola oil", "1 large chicken egg (50 g)", "240 ml water"). Avoid vague terms like "oil", "meat", "fish", or plain "tocino".
@@ -2657,7 +3483,12 @@ Rules:
         const completion: any = await safeOpenAICompletionsCreate({
           model: OPENAI_MODEL,
           messages: [
-            { role: 'system', content: 'You are a nutritionist and only use the provided list.' },
+            {
+              role: 'system',
+              content: allowAIFillInMeals
+                ? 'You are a Filipino nutritionist. Prefer the provided list, but if it is insufficient for the selected diet, add compliant meals only to fill missing slots.'
+                : 'You are a nutritionist and only use the provided list.'
+            },
             { role: 'user', content: prompt }
           ],
           temperature: 0.7,
@@ -2677,17 +3508,17 @@ Rules:
           weekPlan = scaleWeekPlanToCalorieTarget(weekPlan, targets);
         } else {
           const aiDay = parsed && parsed.weekPlan && parsed.weekPlan[0] ? parsed.weekPlan[0] : null;
-          weekPlan = generateWeekPlan(aiDay, targets, goal, allRestrictionTokens, filteredDbDishes);
+          weekPlan = generateWeekPlan(aiDay, targets, goal, allRestrictionTokens, filteredDbDishes, normalizedDiet);
           weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
           weekPlan = scaleWeekPlanToCalorieTarget(weekPlan, targets);
         }
       } catch (aiErr: any) {
-        weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens, filteredDbDishes);
+        weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens, filteredDbDishes, normalizedDiet);
         weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
         weekPlan = scaleWeekPlanToCalorieTarget(weekPlan, targets);
       }
     } else {
-      weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens, filteredDbDishes);
+      weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens, filteredDbDishes, normalizedDiet);
       weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
       weekPlan = scaleWeekPlanToCalorieTarget(weekPlan, targets);
     }
@@ -2755,6 +3586,7 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
     const allergyTokens = normalizeSelectionList(allergies);
     const deprecatedRestrictionTokens = normalizeSelectionList(dietaryRestrictions);
     const allRestrictionTokens = Array.from(new Set([...allergyTokens, ...deprecatedRestrictionTokens]));
+    const normalizedDiet = normalizeDietType(diet);
 
     // Determine category for dish selection
     const category = mealTypeKey || mealType || mealKey || null;
@@ -2869,21 +3701,36 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
 
     // Fallback sample if no DB dishes
     if (!Array.isArray(dishes) || dishes.length === 0) {
-      const fallbackSource = isSnack
+      const fallbackSourceByTokens = isSnack
         ? filterDishesByTokens(filipinoSnacks, allRestrictionTokens)
         : filterDishesByTokens(trustedFilipinoMealsDetailed, allRestrictionTokens);
+      const fallbackSourceByDiet = filterDishesByDiet(fallbackSourceByTokens, normalizedDiet);
+      const fallbackSource = normalizedDiet ? fallbackSourceByDiet : fallbackSourceByTokens;
 
-      const fallbackDish = fallbackSource[Math.floor(Math.random() * fallbackSource.length)];
-      const mealObj = createMealObject(fallbackDish);
+      const fallbackDish = Array.isArray(fallbackSource) && fallbackSource.length > 0
+        ? fallbackSource[Math.floor(Math.random() * fallbackSource.length)]
+        : null;
+      const mealObj = fallbackDish
+        ? createMealObject(fallbackDish)
+        : buildDietFallbackMeal(
+            isSnack ? 'snack1' : String(normalizedCategory || 'lunch'),
+            normalizedDiet,
+            desiredMealCalories,
+            allRestrictionTokens
+          );
       const pkg = await generateRecipePackage(mealObj.name, mealObj.ingredients);
       return res.json({ success: true, newMeal: { ...mealObj, ingredients: pkg.ingredients, recipe: pkg.recipe }, source: 'fallback' });
     }
 
     // Apply best-effort filtering for fallback picks
-    const candidateDishes = filterDishesByTokens(dishes, allRestrictionTokens);
+    const candidateByTokens = filterDishesByTokens(dishes, allRestrictionTokens);
+    const candidateByDiet = filterDishesByDiet(candidateByTokens, normalizedDiet);
+    const candidateDishes = normalizedDiet ? candidateByDiet : candidateByTokens;
+    const allowAiFillInMeal = !!normalizedDiet && candidateDishes.length < 2;
 
     // Helper: pick random excluding excludeArr
     function pickRandomExcluding(list: any[], exclude: string[]) {
+      if (!Array.isArray(list) || list.length === 0) return null;
       const pool = list.filter(d => !exclude.includes(String(d.name || '').toLowerCase().trim()));
       if (pool.length === 0) {
         // if nothing left, pick random and label alt
@@ -2896,12 +3743,19 @@ app.post(['/api/meal-planner/regenerate', '/meal-planner/regenerate'], authentic
     // Build prompt for AI if needed
     const dishListJson = JSON.stringify(candidateDishes.map(d => ({ name: d.name, calories: d.calories, protein: d.protein, carbs: d.carbs, fats: d.fats })));
     const excludeText = excludeArr.length > 0 ? `\nDo NOT return these dish names: ${excludeArr.join(', ')}` : '';
+    const dietRuleText = getDietPromptRule(normalizedDiet);
+    const listRule = allowAiFillInMeal
+      ? 'Prefer the list below. If none of them fit the selected diet and constraints, you may create ONE Filipino meal that still follows the diet, targets, and allergies.'
+      : 'Choose only from the list below.';
     const prompt = `
-You are a Filipino nutritionist. Choose a single ${isSnack ? 'snack' : String(category || mealType || 'meal')} best suited for the user from the list below.
+You are a Filipino nutritionist. Choose a single ${isSnack ? 'snack' : String(category || mealType || 'meal')} best suited for the user.
 User targets: ${targets?.calories ?? 2000} kcal, ${targets?.protein ?? 150}g protein, ${targets?.carbs ?? 250}g carbs, ${targets?.fats ?? 70}g fats.
 Aim for around ${desiredMealCalories} kcal for THIS regenerated ${isSnack ? 'snack' : 'meal'} so the whole day stays near the daily target.
-  Diet type: ${diet || 'none'}.
+  Diet type: ${humanizeDietType(normalizedDiet)}.
+  Diet rule: ${dietRuleText || 'No strict diet rule.'}
   Allergies / Avoid: ${humanizeTokens(allRestrictionTokens)}.
+${listRule}
+${buildNationalNutritionStandardsBlock(targets)}
 ${excludeText}
 List: ${dishListJson}
 Return JSON: { "newMeal": { "name":"...", "ingredients":[...], "calories":..., "protein":..., "carbs":..., "fats":..., "recipe":"..." } }
@@ -2915,7 +3769,7 @@ Instruction rules: 4-7 numbered steps with actionable details and approximate ti
         const completion: any = await safeOpenAICompletionsCreate({
           model: OPENAI_MODEL,
           messages: [
-            { role: 'system', content: 'You are a Filipino nutritionist. Use only provided list.' },
+            { role: 'system', content: allowAiFillInMeal ? 'You are a Filipino nutritionist. Prefer provided list; if insufficient, add one compliant meal.' : 'You are a Filipino nutritionist. Use only provided list.' },
             { role: 'user', content: prompt },
           ],
           temperature: 0.7,
@@ -2935,15 +3789,22 @@ Instruction rules: 4-7 numbered steps with actionable details and approximate ti
           const nameLower = String(parsed.newMeal.name).toLowerCase().trim();
           // If AI returns excluded name, fallback
           if (excludeArr.includes(nameLower)) {
-            const picked = pickRandomExcluding(dishes, excludeArr);
-            let mealObj: any = createMealObject(picked);
+            const picked = pickRandomExcluding(candidateDishes, excludeArr);
+            let mealObj: any = picked
+              ? createMealObject(picked)
+              : buildDietFallbackMeal(
+                  isSnack ? 'snack1' : String(normalizedCategory || 'lunch'),
+                  normalizedDiet,
+                  desiredMealCalories,
+                  allRestrictionTokens
+                );
             mealObj = addRiceSideToSingleMealIfMissing(mealObj);
             mealObj = scaleMealToDesiredCalories(mealObj);
             const pkg = await generateRecipePackage(mealObj.name, mealObj.ingredients);
             return res.json({ success: true, newMeal: { ...mealObj, ingredients: pkg.ingredients, recipe: pkg.recipe }, source: 'fallback-excluded' });
           }
           // If DB contains this dish, use DB result for accurate macros
-          const found = dishes.find(d => String(d.name || '').toLowerCase().trim() === nameLower);
+          const found = candidateDishes.find(d => String(d.name || '').toLowerCase().trim() === nameLower);
           if (found) {
             let mealObj: any = createMealObject(found);
             mealObj = addRiceSideToSingleMealIfMissing(mealObj);
@@ -2981,7 +3842,14 @@ Instruction rules: 4-7 numbered steps with actionable details and approximate ti
     };
 
     const picked = pickClosestExcluding(candidateDishes, excludeArr, desiredMealCalories) || pickRandomExcluding(candidateDishes, excludeArr);
-    let mealObj: any = createMealObject(picked);
+    let mealObj: any = picked
+      ? createMealObject(picked)
+      : buildDietFallbackMeal(
+          isSnack ? 'snack1' : String(normalizedCategory || 'lunch'),
+          normalizedDiet,
+          desiredMealCalories,
+          allRestrictionTokens
+        );
     mealObj = addRiceSideToSingleMealIfMissing(mealObj);
     mealObj = scaleMealToDesiredCalories(mealObj);
     const pkg = await generateRecipePackage(mealObj.name, mealObj.ingredients);
@@ -3373,7 +4241,7 @@ app.get('/api/attendance/absence-status', authenticateToken, async (req: AuthReq
 });
 
 // Admin: Who is present today
-app.get('/api/admin/attendance/today', authenticateToken, async (req: AuthRequest, res: Response) => {
+app.get('/api/admin/attendance/today', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
     const [rows] = await pool.query<any>(
@@ -3390,7 +4258,7 @@ app.get('/api/admin/attendance/today', authenticateToken, async (req: AuthReques
   }
 });
 
-app.get('/api/admin/attendance', authenticateToken, async (req: AuthRequest, res: Response) => {
+app.get('/api/admin/attendance', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const PH_TZ = 'Asia/Manila';
     const date = (req.query.date as string) || new Date().toLocaleDateString('en-CA', { timeZone: PH_TZ });
@@ -3567,6 +4435,123 @@ app.get('/api/user/profile', authenticateToken, async (req: AuthRequest, res: Re
     });
   } catch (err: any) {
     res.status(500).json({ success: false, message: 'Failed to fetch user profile.' });
+  }
+});
+
+app.put('/api/user/profile', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const firstNameRaw = req.body?.firstName;
+    const lastNameRaw = req.body?.lastName;
+    const emailRaw = req.body?.email;
+
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (typeof firstNameRaw === 'string') {
+      const firstName = sanitizeInput(firstNameRaw);
+      if (!firstName) {
+        return res.status(400).json({ success: false, message: 'First name cannot be empty.' });
+      }
+      updates.push('first_name = ?');
+      values.push(firstName);
+    }
+
+    if (typeof lastNameRaw === 'string') {
+      const lastName = sanitizeInput(lastNameRaw);
+      if (!lastName) {
+        return res.status(400).json({ success: false, message: 'Last name cannot be empty.' });
+      }
+      updates.push('last_name = ?');
+      values.push(lastName);
+    }
+
+    if (typeof emailRaw === 'string') {
+      const email = sanitizeInput(emailRaw).toLowerCase();
+      if (!isValidEmail(email)) {
+        return res.status(400).json({ success: false, message: 'Invalid email format.' });
+      }
+
+      const [existing] = await pool.query<any>(
+        'SELECT id FROM users WHERE email = ? AND id <> ? LIMIT 1',
+        [email, userId]
+      );
+      if (Array.isArray(existing) && existing.length > 0) {
+        return res.status(409).json({ success: false, message: 'Email is already in use.' });
+      }
+
+      updates.push('email = ?');
+      values.push(email);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ success: false, message: 'No profile fields were provided.' });
+    }
+
+    values.push(userId);
+    await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, values);
+
+    const [users] = await pool.query<any>(
+      'SELECT id, email, first_name, last_name, role FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
+    const user = Array.isArray(users) && users.length > 0 ? users[0] : null;
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Profile updated successfully.',
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        role: user.role,
+      },
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: 'Failed to update profile.' });
+  }
+});
+
+app.post('/api/user/change-password', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const currentPassword = String(req.body?.currentPassword || '');
+    const newPassword = String(req.body?.newPassword || '');
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Current and new password are required.' });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({ success: false, message: 'New password must be different from current password.' });
+    }
+
+    const pwValidation = validatePassword(newPassword);
+    if (!pwValidation.isValid) {
+      return res.status(400).json({ success: false, message: pwValidation.message || 'New password is too weak.' });
+    }
+
+    const [users] = await pool.query<any>('SELECT id, password FROM users WHERE id = ? LIMIT 1', [userId]);
+    if (!Array.isArray(users) || users.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const user = users[0];
+    const validPassword = await bcrypt.compare(currentPassword, user.password);
+    if (!validPassword) {
+      return res.status(401).json({ success: false, message: 'Current password is incorrect.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await pool.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]);
+
+    return res.json({ success: true, message: 'Password updated successfully.' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: 'Failed to update password.' });
   }
 });
 
@@ -3911,6 +4896,14 @@ async function initialize() {
   const portNum = Number(process.env.PORT || PORT || 3002);
   app.listen(portNum, () => {
     console.log(`\n✅ Server running on port ${portNum}`);
+    try {
+      // Start background scheduler (subscription expiry)
+      const { startSubscriptionScheduler } = require('./scripts/subscriptionScheduler');
+      if (startSubscriptionScheduler) startSubscriptionScheduler();
+    } catch (err) {
+      // Non-fatal: scheduler failed to start
+      console.error('Failed to start subscription scheduler:', (err as any)?.message || err);
+    }
   }).on('error', (err: any) => {
     console.error('Server error:', err);
     process.exit(1);
@@ -4059,6 +5052,17 @@ function isValidAmount(amount: any): boolean {
   return !isNaN(num) && num > 0 && num < 999999;
 }
 
+function isValidMembershipPlan(plan: any): plan is 'monthly' | 'quarterly' | 'annual' {
+  const normalized = String(plan || '').trim().toLowerCase();
+  return normalized === 'monthly' || normalized === 'quarterly' || normalized === 'annual';
+}
+
+function expectedAmountForPlan(plan: 'monthly' | 'quarterly' | 'annual'): number {
+  if (plan === 'quarterly') return 200;
+  if (plan === 'annual') return 300;
+  return 100;
+}
+
 function isValidEmail(email?: string) {
   if (!email || typeof email !== 'string') return false;
   // simple regex — avoids outbound errors caused by malformed addresses
@@ -4136,13 +5140,32 @@ async function notifyInactiveMembers(thresholdDays = 3) {
 }
 
 // Admin endpoint: trigger notifications manually
-app.post('/api/admin/attendance/notify-inactive', authenticateToken, async (req: AuthRequest, res: Response) => {
+app.post('/api/admin/attendance/notify-inactive', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { thresholdDays = 3 } = req.body;
     const result = await notifyInactiveMembers(Number(thresholdDays));
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ success: false, message: 'Failed to notify inactive members' });
+  }
+});
+
+// Admin: Reactivate a user's account (manual override)
+app.post('/api/admin/users/:id/reactivate', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ success: false, message: 'Invalid user id' });
+
+    const { markPaid } = req.body || {};
+
+    await pool.query(
+      `UPDATE users SET status = 'active', payment_status = ?, grace_until = NULL WHERE id = ?`,
+      [markPaid ? 'paid' : 'pending', id]
+    );
+
+    res.json({ success: true, message: 'User reactivated' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Failed to reactivate user', error: err.message });
   }
 });
 
@@ -4163,7 +5186,7 @@ setInterval(() => {
 }, DAILY_MS);
 
 // Admin endpoint: test sending email
-app.post('/api/admin/attendance/test-email', authenticateToken, async (req: AuthRequest, res: Response) => {
+app.post('/api/admin/attendance/test-email', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { to } = req.body;
     if (!to) {
@@ -4182,9 +5205,9 @@ app.post('/api/admin/attendance/test-email', authenticateToken, async (req: Auth
 });
 
 // PayPal Test Endpoint
-app.post('/api/test/paypal', async (req: Request, res: Response) => {
+app.post('/api/test/paypal', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
-    const tokenUrl = `${PAYPAL_API_URL}/oauth2/token`;
+    const tokenUrl = `${PAYPAL_API_URL.replace(/\/v2$/, '')}/v1/oauth2/token`;
     
     const axiosConfig = {
       auth: {
@@ -4368,10 +5391,18 @@ const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 // Helper function to get PayPal access token
 async function getPayPalAccessToken(): Promise<string> {
   try {
-    const tokenUrl = `${PAYPAL_API_URL}/oauth2/token`;
+    // PayPal OAuth token endpoint is under v1; keep v2 for other APIs
+    const tokenUrl = `${PAYPAL_API_URL.replace(/\/v2$/, '')}/v1/oauth2/token`;
+    
+    debugLog('🔵 [PayPal Token] URL:', tokenUrl);
+    debugLog('🔵 [PayPal Token] Mode:', PAYPAL_MODE);
+    debugLog('🔵 [PayPal Token] Client ID prefix:', PAYPAL_CLIENT_ID?.substring(0, 10) + '...');
+    debugLog('🔵 [PayPal Token] Secret length:', PAYPAL_CLIENT_SECRET?.length);
     
     // Use Base64 encoding for auth header instead of axios auth
     const credentials = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64');
+    
+    debugLog('🔵 [PayPal Token] Credentials base64 length:', credentials.length);
     
     const response = await axios.post(
       tokenUrl,
@@ -4386,31 +5417,181 @@ async function getPayPalAccessToken(): Promise<string> {
     );
     
     const tokenData = response.data as any;
+    debugLog('🟢 [PayPal Token] Success, token length:', tokenData.access_token?.length);
     return tokenData.access_token;
   } catch (error: any) {
+    if (isProduction) {
+      console.error('🔴 [PayPal Token] Failed:', {
+        message: error.message,
+        status: error.response?.status,
+      });
+    } else {
+      console.error('🔴 [PayPal Token] Complete error:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        errorData: error.response?.data,
+        url: error.config?.url,
+        method: error.config?.method
+      });
+    }
     throw new Error('PayPal authentication failed: ' + (error.response?.data?.error_description || error.message));
   }
 }
 
+function normalizeMembershipPlan(raw: any): 'monthly' | 'quarterly' | 'annual' {
+  const value = String(raw || '').trim().toLowerCase();
+  if (value === 'quarterly') return 'quarterly';
+  if (value === 'annual') return 'annual';
+  return 'monthly';
+}
+
+function computeSubscriptionEndFromStart(start: Date, plan: 'monthly' | 'quarterly' | 'annual'): Date {
+  const end = new Date(start);
+  if (plan === 'annual') end.setFullYear(end.getFullYear() + 1);
+  else if (plan === 'quarterly') end.setMonth(end.getMonth() + 3);
+  else end.setMonth(end.getMonth() + 1);
+  return end;
+}
+
+async function resolveSubscriptionWindow(
+  userId: number,
+  planInput: any
+): Promise<{ subscriptionStart: Date; subscriptionEnd: Date }> {
+  const plan = normalizeMembershipPlan(planInput);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let subscriptionStart = new Date(today);
+
+  const [rows] = await pool.query<any>(
+    `SELECT subscription_end FROM users WHERE id = ? LIMIT 1`,
+    [userId]
+  );
+
+  const currentEndRaw = Array.isArray(rows) && rows.length > 0 ? rows[0]?.subscription_end : null;
+  if (currentEndRaw) {
+    const currentEnd = new Date(currentEndRaw);
+    if (!Number.isNaN(currentEnd.getTime())) {
+      currentEnd.setHours(0, 0, 0, 0);
+      if (currentEnd.getTime() > today.getTime()) {
+        subscriptionStart = currentEnd;
+      }
+    }
+  }
+
+  const subscriptionEnd = computeSubscriptionEndFromStart(subscriptionStart, plan);
+  return { subscriptionStart, subscriptionEnd };
+}
+
+async function applyPayPalSubscriptionActivation(params: {
+  userId: number;
+  orderId: string;
+  captureId?: string;
+  fallbackPlan?: string;
+  fallbackAmount?: number;
+}) {
+  const { userId, orderId, captureId, fallbackPlan, fallbackAmount } = params;
+
+  const [paymentRows] = await pool.query<any>(
+    `SELECT amount, membership_type FROM payments WHERE transaction_id = ? AND user_id = ? LIMIT 1`,
+    [orderId, userId]
+  );
+
+  const dbRow = Array.isArray(paymentRows) && paymentRows.length > 0 ? paymentRows[0] : null;
+  const plan = normalizeMembershipPlan(fallbackPlan || dbRow?.membership_type);
+  const paymentAmount = Number(dbRow?.amount) || Number(fallbackAmount) || 0;
+
+  await pool.query(
+    `UPDATE payments SET payment_status = ?, payment_date = NOW() WHERE transaction_id = ? AND user_id = ?`,
+    ['paid', orderId, userId]
+  );
+
+  const { subscriptionStart, subscriptionEnd } = await resolveSubscriptionWindow(userId, plan);
+
+  const hasNextPayment = await dbColumnExists('users', 'next_payment');
+  const userUpdateFields = [
+    `status = 'active'`,
+    `payment_status = 'paid'`,
+    `subscription_start = ?`,
+    `subscription_end = ?`,
+    `grace_until = NULL`,
+    `membership_type = ?`,
+    `membership_price = ?`,
+  ];
+  const userUpdateValues: any[] = [
+    isoDateString(subscriptionStart),
+    isoDateString(subscriptionEnd),
+    plan,
+    paymentAmount,
+  ];
+
+  if (hasNextPayment) {
+    userUpdateFields.push(`next_payment = ?`);
+    userUpdateValues.push(isoDateString(subscriptionEnd));
+  }
+
+  userUpdateValues.push(userId);
+
+  await pool.query(
+    `UPDATE users SET ${userUpdateFields.join(', ')} WHERE id = ?`,
+    userUpdateValues
+  );
+
+  try {
+    await pool.query(
+      `INSERT INTO payments_history (user_id, payment_id, amount, payment_method, status, created_at)
+         VALUES (?, ?, ?, 'paypal', 'completed', NOW())`,
+      [userId, captureId || orderId, paymentAmount]
+    );
+  } catch (historyErr: any) {
+    console.warn('PayPal capture: payments_history insert skipped:', getErrorMessage(historyErr));
+  }
+
+  return {
+    plan,
+    paymentAmount,
+    subscriptionStart,
+    subscriptionEnd,
+  };
+}
+
 // Create a PayPal order and return redirect URL
-app.post('/api/payments/paypal/create-order', authenticateToken, async (req: AuthRequest, res: Response) => {
+app.post('/api/payments/paypal/create-order', paymentLimiter, authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { amount, plan } = req.body;
+
+    debugLog('🔵 [PayPal] Create order request:', { userId, amount, plan, timestamp: new Date().toISOString() });
 
     // Validate input
     if (!amount || !plan) {
       return res.status(400).json({ success: false, message: 'Missing amount or plan' });
     }
-    
-    if (!isValidAmount(amount)) {
+
+    if (!isValidMembershipPlan(plan)) {
+      return res.status(400).json({ success: false, message: 'Invalid membership plan' });
+    }
+
+    const normalizedPlan = String(plan).trim().toLowerCase() as 'monthly' | 'quarterly' | 'annual';
+    const parsedAmount = Number(amount);
+    const expectedAmount = expectedAmountForPlan(normalizedPlan);
+
+    if (!isValidAmount(parsedAmount)) {
       return res.status(400).json({ success: false, message: 'Invalid payment amount' });
     }
 
-    const accessToken = await getPayPalAccessToken();
+    // Prevent client-side tampering by requiring the fixed amount for each plan.
+    if (Math.abs(parsedAmount - expectedAmount) > 0.0001) {
+      return res.status(400).json({ success: false, message: 'Amount does not match selected plan' });
+    }
 
-    const planDescription = plan === 'monthly' ? 'Monthly Membership' : 
-                           plan === 'quarterly' ? 'Quarterly Membership' :
+    debugLog('🔵 [PayPal] Getting access token...');
+    const accessToken = await getPayPalAccessToken();
+    debugLog('🟢 [PayPal] Access token obtained');
+
+    const planDescription = normalizedPlan === 'monthly' ? 'Monthly Membership' : 
+                           normalizedPlan === 'quarterly' ? 'Quarterly Membership' :
                            'Annual Membership';
 
     const payload = {
@@ -4421,19 +5602,21 @@ app.post('/api/payments/paypal/create-order', authenticateToken, async (req: Aut
       purchase_units: [{
         amount: {
           currency_code: 'PHP',
-          value: String(amount)
+          value: parsedAmount.toFixed(2)
         },
         description: planDescription,
-        custom_id: `${userId}|${plan}` // Store userId and plan in custom_id
+        custom_id: `${userId}|${normalizedPlan}` // Store userId and plan in custom_id
       }],
       application_context: {
         brand_name: 'ActiveCore Fitness',
         landing_page: 'BILLING',
         user_action: 'PAY_NOW',
         return_url: `${APP_URL}/member/payment/success`,
-        cancel_url: `${APP_URL}/member/payment/cancel`
+        cancel_url: `${APP_URL}/member/payment/failed`
       }
     };
+
+    debugLog('🔵 [PayPal] Creating PayPal order with payload:', JSON.stringify(payload, null, 2));
 
     const response = await axios.post(`${PAYPAL_API_URL}/checkout/orders`, payload, {
       headers: {
@@ -4447,25 +5630,39 @@ app.post('/api/payments/paypal/create-order', authenticateToken, async (req: Aut
     const orderId = responseData.id;
     const approvalLink = responseData.links?.find((link: any) => link.rel === 'approve')?.href;
 
+    debugLog('🟢 [PayPal] Order created:', { orderId, approvalLink });
+
     if (!orderId || !approvalLink) {
+      console.error('🔴 [PayPal] Missing orderId or approvalLink in response');
       return res.status(500).json({ success: false, message: 'Failed to create payment order' });
     }
 
     // Insert payment record (pending)
+    debugLog('🔵 [PayPal] Inserting payment record...');
     await pool.query(
       `INSERT INTO payments (user_id, amount, payment_method, membership_type, payment_status, transaction_id, created_at)
          VALUES (?, ?, 'paypal', ?, 'pending', ?, NOW())`,
-      [userId, Number(amount), plan, orderId]
+      [userId, parsedAmount, normalizedPlan, orderId]
     );
+    debugLog('🟢 [PayPal] Payment record inserted');
 
     res.json({ success: true, approvalLink, orderId });
   } catch (err: any) {
     const isDevelopment = process.env.NODE_ENV === 'development';
     const errorCode = err.response?.status || 500;
     
-    // Log error without exposing sensitive details
-    if (isDevelopment) {
+    if (isProduction) {
+      console.error('🔴 [PayPal] Error occurred:', {
+        message: err.message,
+        status: err.response?.status,
+      });
     } else {
+      console.error('🔴 [PayPal] Error occurred:', {
+        message: err.message,
+        status: err.response?.status,
+        data: err.response?.data,
+        isDevelopment
+      });
     }
     
     // Safe error message for client
@@ -4478,26 +5675,63 @@ app.post('/api/payments/paypal/create-order', authenticateToken, async (req: Aut
     res.status(500).json({ 
       success: false, 
       message: clientMessage,
-      ...(isDevelopment && { debug: err.response?.data })
+      ...(isDevelopment && { debug: { error: err.message, status: err.response?.status, data: err.response?.data } })
     });
   }
 });
 
 // Capture PayPal order and update subscription
-app.post('/api/payments/paypal/capture-order', authenticateToken, async (req: AuthRequest, res: Response) => {
+app.post('/api/payments/paypal/capture-order', paymentLimiter, async (req: AuthRequest, res: Response) => {
+  let resolvedUserId: number | null = null;
+  let normalizedOrderId = '';
   try {
-    const userId = req.user!.id;
     const { orderId } = req.body;
 
     if (!orderId) {
       return res.status(400).json({ success: false, message: 'Missing orderId' });
     }
 
+    normalizedOrderId = String(orderId).trim();
+    if (!/^[A-Z0-9]{10,30}$/i.test(normalizedOrderId)) {
+      return res.status(400).json({ success: false, message: 'Invalid orderId format' });
+    }
+
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    let tokenUserId: number | null = null;
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, getJwtSecret()) as any;
+        const parsedUserId = Number(decoded?.id);
+        tokenUserId = Number.isFinite(parsedUserId) ? parsedUserId : null;
+      } catch {
+        tokenUserId = null;
+      }
+    }
+
+    const [orderRows] = await pool.query<any>(
+      `SELECT user_id as userId FROM payments WHERE transaction_id = ? ORDER BY id DESC LIMIT 1`,
+      [normalizedOrderId]
+    );
+    const orderUserIdRaw = Array.isArray(orderRows) && orderRows.length > 0 ? orderRows[0]?.userId : null;
+    const orderUserId = Number.isFinite(Number(orderUserIdRaw)) ? Number(orderUserIdRaw) : null;
+
+    if (tokenUserId && orderUserId && tokenUserId !== orderUserId) {
+      return res.status(403).json({ success: false, message: 'Order does not belong to authenticated user' });
+    }
+
+    const userId = tokenUserId || orderUserId;
+    if (!userId) {
+      return res.status(404).json({ success: false, message: 'Payment order not found in local records' });
+    }
+    resolvedUserId = userId;
+
     const accessToken = await getPayPalAccessToken();
 
     // Capture the payment
     const captureResponse = await axios.post(
-      `${PAYPAL_API_URL}/checkout/orders/${orderId}/capture`,
+      `${PAYPAL_API_URL}/checkout/orders/${normalizedOrderId}/capture`,
       {},
       {
         headers: {
@@ -4511,74 +5745,68 @@ app.post('/api/payments/paypal/capture-order', authenticateToken, async (req: Au
     const paymentStatus = captureData.status;
     const captureId = captureData.purchase_units?.[0]?.payments?.captures?.[0]?.id;
     const customId = captureData.purchase_units?.[0]?.custom_id;
-    const [paymentUserId, plan] = customId?.split('|') || [null, null];
+    const customPlan = (customId?.split('|')?.[1] || '').toString().toLowerCase();
+    const captureAmount = Number(captureData?.purchase_units?.[0]?.amount?.value) || undefined;
 
     if (paymentStatus !== 'COMPLETED') {
       return res.json({ success: false, status: paymentStatus, message: 'Payment not completed' });
     }
 
-    // Update payment record
-    await pool.query(
-      `UPDATE payments SET payment_status = ?, payment_date = NOW() WHERE transaction_id = ? AND user_id = ?`,
-      ['completed', orderId, userId]
-    );
-
-    // Calculate subscription dates
-    let months = 1;
-    if (plan === 'annual') months = 12;
-    else if (plan === 'quarterly') months = 3;
-
-    const subscriptionStart = new Date();
-    const subscriptionEnd = new Date();
-    subscriptionEnd.setMonth(subscriptionEnd.getMonth() + months);
-
-    // Get payment amount
-    const [paymentRows] = await pool.query<any>(
-      `SELECT amount FROM payments WHERE transaction_id = ? AND user_id = ? LIMIT 1`,
-      [orderId, userId]
-    );
-
-    const paymentAmount = paymentRows?.[0]?.amount || 0;
-
-    // Update user subscription
-    await pool.query(
-      `UPDATE users 
-       SET status = 'active',
-           payment_status = 'paid',
-           subscription_start = ?,
-           subscription_end = ?,
-           membership_type = ?,
-           membership_price = ?,
-           next_payment = ?
-       WHERE id = ?`,
-      [
-        isoDateString(subscriptionStart),
-        isoDateString(subscriptionEnd),
-        plan,
-        paymentAmount,
-        isoDateString(subscriptionEnd),
-        userId
-      ]
-    );
-
-    // Record payment history
-    await pool.query(
-      `INSERT INTO payments_history (user_id, payment_id, amount, payment_method, status, created_at)
-         VALUES (?, ?, ?, 'paypal', 'completed', NOW())`,
-      [userId, orderId, paymentAmount]
-    );
+    const activation = await applyPayPalSubscriptionActivation({
+      userId,
+      orderId: normalizedOrderId,
+      captureId,
+      fallbackPlan: customPlan,
+      fallbackAmount: captureAmount,
+    });
 
 
     res.json({
       success: true,
       status: 'completed',
       subscription: {
-        start: subscriptionStart.toISOString().split('T')[0],
-        end: subscriptionEnd.toISOString().split('T')[0],
-        type: plan
+        start: activation.subscriptionStart.toISOString().split('T')[0],
+        end: activation.subscriptionEnd.toISOString().split('T')[0],
+        type: activation.plan
       }
     });
   } catch (err: any) {
+    // If PayPal says this order was already captured, reconcile local records anyway.
+    if (err.response?.status === 422) {
+      const details = err.response?.data?.details;
+      const alreadyCaptured = Array.isArray(details)
+        && details.some((d: any) => String(d?.issue || '').toUpperCase() === 'ORDER_ALREADY_CAPTURED');
+
+      if (alreadyCaptured) {
+        try {
+          const [fallbackRows] = await pool.query<any>(
+            `SELECT user_id as userId FROM payments WHERE transaction_id = ? ORDER BY id DESC LIMIT 1`,
+            [normalizedOrderId]
+          );
+          const fallbackUserIdRaw = Array.isArray(fallbackRows) && fallbackRows.length > 0 ? fallbackRows[0]?.userId : null;
+          const fallbackUserId = Number.isFinite(Number(fallbackUserIdRaw))
+            ? Number(fallbackUserIdRaw)
+            : resolvedUserId;
+          if (!fallbackUserId) {
+            return res.status(404).json({ success: false, message: 'Payment order not found in local records' });
+          }
+          const activation = await applyPayPalSubscriptionActivation({ userId: fallbackUserId, orderId: normalizedOrderId });
+          return res.json({
+            success: true,
+            status: 'completed',
+            reconciled: true,
+            subscription: {
+              start: activation.subscriptionStart.toISOString().split('T')[0],
+              end: activation.subscriptionEnd.toISOString().split('T')[0],
+              type: activation.plan,
+            },
+          });
+        } catch (reconcileErr: any) {
+          return res.status(500).json({ success: false, message: 'Payment captured but subscription reconciliation failed' });
+        }
+      }
+    }
+
     
     // If it's a 404, order may not exist
     if (err.response?.status === 404) {

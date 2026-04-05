@@ -1,0 +1,43 @@
+.account-settings-content {
+  --padding-bottom: 24px;
+}
+
+.account-settings-wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  display: grid;
+  gap: 14px;
+}
+
+.account-loading {
+  min-height: 45vh;
+  display: grid;
+  place-content: center;
+  gap: 10px;
+  justify-items: center;
+  color: var(--ion-color-medium);
+}
+
+.account-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 10px;
+  font-size: 1.05rem;
+}
+
+.account-save-btn {
+  margin-top: 12px;
+}
+
+.account-password-help {
+  margin: 10px 4px 0;
+  font-size: 0.86rem;
+  color: var(--ion-color-medium);
+}
+
+.account-role-note {
+  text-align: center;
+  color: var(--ion-color-medium);
+  margin: 6px 0 14px;
+}

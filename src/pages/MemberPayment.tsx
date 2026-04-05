@@ -11,13 +11,15 @@ import {
   IonBadge,
   IonIcon,
   IonButtons,
+  IonSegment,
+  IonSegmentButton,
+  IonLabel,
   useIonRouter,
   useIonToast,
 } from '@ionic/react';
 import {
   calendar,
   warning,
-  wallet,
   arrowBack,
   checkmarkCircle,
 } from 'ionicons/icons';
@@ -34,9 +36,9 @@ interface Subscription {
 }
 
 const MEMBERSHIP_PRICES: { [key: string]: number } = {
-  monthly: 1500,
-  quarterly: 4000,
-  annual: 15000,
+  monthly: 100,
+  quarterly: 200,
+  annual: 300,
 };
 
 const API_URL = API_CONFIG.BASE_URL;
@@ -71,10 +73,17 @@ const MemberPayment: React.FC = () => {
     }
   };
 
+  const getValidSubscriptionEnd = (): Date | null => {
+    const raw = subscription?.subscriptionEnd;
+    if (!raw) return null;
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
   const getDaysLeft = () => {
-    if (!subscription?.subscriptionEnd) return 0;
+    const endDate = getValidSubscriptionEnd();
+    if (!endDate) return 0;
     const today = new Date();
-    const endDate = new Date(subscription.subscriptionEnd);
     const diffTime = endDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
@@ -150,6 +159,7 @@ const MemberPayment: React.FC = () => {
   };
 
   const daysLeft = getDaysLeft();
+  const validSubscriptionEnd = getValidSubscriptionEnd();
   const isExpiringSoon = daysLeft <= 7 && daysLeft > 0;
   const isExpired = daysLeft <= 0;
   const isActive = subscription?.paymentStatus === 'paid' && daysLeft > 0;
@@ -178,7 +188,7 @@ const MemberPayment: React.FC = () => {
                   <div className="info-item">
                     <span className="info-label">Plan</span>
                     <IonBadge className="plan-badge">
-                      {subscription.membershipType.toUpperCase()}
+                      {subscription.membershipType ? subscription.membershipType.toUpperCase() : 'NOT SET'}
                     </IonBadge>
                   </div>
 
@@ -204,7 +214,7 @@ const MemberPayment: React.FC = () => {
                     </span>
                     <div className="expiry-info">
                       <span className="expiry-date">
-                        {new Date(subscription.subscriptionEnd).toLocaleDateString()}
+                        {validSubscriptionEnd ? validSubscriptionEnd.toLocaleDateString() : 'Not set'}
                       </span>
                       <span
                         className={`days-left ${
@@ -231,29 +241,40 @@ const MemberPayment: React.FC = () => {
             </IonCard>
           )}
 
-          {/* Renewal Card - Coming Soon */}
+          {/* Renewal / PayPal payment card */}
           <IonCard className="renewal-card">
             <IonCardContent>
-              <div style={{
-                textAlign: 'center',
-                padding: '3rem 1rem',
-                color: '#999',
-              }}>
-                <IonIcon 
-                  icon={wallet} 
-                  style={{
-                    fontSize: '3rem',
-                    color: '#ccc',
-                    marginBottom: '1rem',
-                    display: 'block'
-                  }}
-                />
-                <h2 className="card-title-primary" style={{ color: '#666' }}>Renewal Subscription</h2>
-                <p style={{ fontSize: '1.1rem', marginTop: '1rem', color: '#999' }}>Coming Soon</p>
-                <p style={{ fontSize: '0.9rem', color: '#bbb', marginTop: '0.5rem' }}>
-                  The subscription renewal feature is currently under development. We'll notify you when it's ready!
-                </p>
+              <h2 className="card-title-primary" style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                Renew Subscription with PayPal
+              </h2>
+
+              <IonLabel>Choose your membership plan</IonLabel>
+              <IonSegment
+                value={selectedPlan}
+                onIonChange={(e) => setSelectedPlan(e.detail.value as string)}
+                style={{ margin: '0.5rem 0 1rem' }}
+              >
+                <IonSegmentButton value="monthly">Monthly</IonSegmentButton>
+                <IonSegmentButton value="quarterly">Quarterly</IonSegmentButton>
+                <IonSegmentButton value="annual">Annual</IonSegmentButton>
+              </IonSegment>
+
+              <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                <strong>Amount: </strong>₱{MEMBERSHIP_PRICES[selectedPlan].toLocaleString()} (PHP)
               </div>
+
+              <IonButton
+                expand="block"
+                color="primary"
+                onClick={handlePayPalPayment}
+                disabled={isProcessing}
+              >
+                {isProcessing ? 'Processing…' : `Pay ₱${MEMBERSHIP_PRICES[selectedPlan].toLocaleString()} with PayPal`}
+              </IonButton>
+
+              <p style={{ color: '#999', marginTop: '1rem', textAlign: 'center' }}>
+                After payment approval, you will be redirected to confirm your payment and activate your membership.
+              </p>
             </IonCardContent>
           </IonCard>
         </div>

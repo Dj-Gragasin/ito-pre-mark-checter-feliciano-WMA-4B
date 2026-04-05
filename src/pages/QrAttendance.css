@@ -1,6 +1,6 @@
 .qrattendance-container {
   --background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  --padding-top: 0;
+  --padding-top: 0.5rem;
   --padding-bottom: 2rem;
 }
 
@@ -16,6 +16,8 @@
 .date-badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   background: rgba(0, 0, 0, 0.3);
   padding: 0.5rem 1rem;
@@ -24,6 +26,12 @@
   font-size: 0.9rem;
   font-weight: 600;
   margin-bottom: 1rem;
+  max-width: 100%;
+  text-align: center;
+}
+
+.date-badge span {
+  white-space: normal;
 }
 
 .date-badge ion-icon {

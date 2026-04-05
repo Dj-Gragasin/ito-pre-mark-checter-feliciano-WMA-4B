@@ -580,11 +580,16 @@ const MemberDashboard: React.FC = () => {
               </IonCol>
             </IonRow>
 
-            <IonRow>
-              <IonCol size="12" sizeMd="6" sizeLg="4">
-                <IonButton expand="block" color="medium" disabled>
+            <IonRow className="renew-subscription-row">
+              <IonCol size="12" sizeMd="8" sizeLg="6" className="renew-subscription-col">
+                <IonButton
+                  className="renew-subscription-btn"
+                  expand="block"
+                  color="primary"
+                  onClick={() => handleNavigation('/member/payment')}
+                >
                   <IonIcon icon={cardOutline} slot="start" />
-                  Renew Subscription - Coming Soon
+                  Renew Subscription with PayPal
                 </IonButton>
               </IonCol>
             </IonRow>

@@ -44,11 +44,19 @@ interface PendingPayment {
 
 const AdminPendingPayments: React.FC = () => {
   const [payments, setPayments] = useState<PendingPayment[]>([]);
+  const [loadError, setLoadError] = useState('');
   const [showRejectAlert, setShowRejectAlert] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<PendingPayment | null>(null);
   const [presentToast] = useIonToast();
 
   const API_URL = API_CONFIG.BASE_URL;
+
+  const getMemberName = (payment: PendingPayment): string => {
+    const row = payment as any;
+    const first = String(row.firstName ?? row.firstname ?? '').trim();
+    const last = String(row.lastName ?? row.lastname ?? '').trim();
+    return `${first} ${last}`.trim() || 'Member';
+  };
 
   const loadPendingPayments = useCallback(async () => {
     try {
@@ -61,9 +69,20 @@ const AdminPendingPayments: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setPayments(data);
+        setLoadError('');
+      } else {
+        let message = 'Failed to load pending payments';
+        try {
+          const err = await response.json();
+          message = err?.message || message;
+        } catch {
+          // keep default message
+        }
+        setLoadError(message);
       }
     } catch (error) {
       console.error('Error loading pending payments:', error);
+      setLoadError('Unable to reach server. Please check backend connection and try again.');
     }
   }, [API_URL]);
 
@@ -86,7 +105,7 @@ const AdminPendingPayments: React.FC = () => {
         const result = await response.json();
         
         presentToast({
-          message: `✅ Payment approved for ${payment.firstName} ${payment.lastName}!\nSubscription: ${result.subscription.start} to ${result.subscription.end}`,
+          message: `✅ Payment approved for ${getMemberName(payment)}!\nSubscription: ${result.subscription.start} to ${result.subscription.end}`,
           duration: 5000,
           color: 'success',
           position: 'top'
@@ -155,7 +174,16 @@ const AdminPendingPayments: React.FC = () => {
 
       <IonContent className="ion-padding">
         <div className="pending-payments-container">
-          {payments.length === 0 ? (
+          {loadError ? (
+            <div className="no-payments">
+              <IonIcon icon={closeCircle} />
+              <h3>Could Not Load Pending Payments</h3>
+              <p>{loadError}</p>
+              <IonButton onClick={loadPendingPayments} fill="outline" color="medium">
+                Retry
+              </IonButton>
+            </div>
+          ) : payments.length === 0 ? (
             <div className="no-payments">
               <IonIcon icon={checkmarkCircle} />
               <h3>No Pending Payments</h3>
@@ -168,7 +196,7 @@ const AdminPendingPayments: React.FC = () => {
                   <div className="payment-header">
                     <div>
                       <IonCardTitle>
-                        <IonIcon icon={person} /> {payment.firstName} {payment.lastName}
+                        <IonIcon icon={person} /> {getMemberName(payment)}
                       </IonCardTitle>
                       <p className="payment-email">{payment.email}</p>
                     </div>

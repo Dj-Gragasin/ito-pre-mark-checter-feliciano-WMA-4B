@@ -84,7 +84,7 @@ const MembersManagement: React.FC = () => {
     gender: 'male',
     dateOfBirth: '',
     membershipType: 'monthly',
-    membershipPrice: 1500,
+    membershipPrice: 100,
     emergencyContact: '',
     address: '',
     joinDate: new Date().toISOString().split('T')[0],
@@ -95,7 +95,7 @@ const MembersManagement: React.FC = () => {
   const [selectedMemberForPayment, setSelectedMemberForPayment] = useState<Member | null>(null);
   const [paymentData, setPaymentData] = useState({
     membershipType: 'monthly',
-    membershipPrice: 1500,
+    membershipPrice: 100,
     paymentMethod: 'cash',
     notes: '',
   });
@@ -139,6 +139,23 @@ const MembersManagement: React.FC = () => {
 
   useEffect(() => {
     loadMembers();
+
+    const intervalId = window.setInterval(() => {
+      loadMembers();
+    }, 30000);
+
+    const handleRefreshMembers = () => {
+      loadMembers();
+    };
+
+    window.addEventListener('focus', handleRefreshMembers);
+    window.addEventListener('payments:updated', handleRefreshMembers as EventListener);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleRefreshMembers);
+      window.removeEventListener('payments:updated', handleRefreshMembers as EventListener);
+    };
   }, [loadMembers]);
 
   useEffect(() => {
@@ -157,7 +174,7 @@ const MembersManagement: React.FC = () => {
       gender: 'male',
       dateOfBirth: '',
       membershipType: 'monthly',
-      membershipPrice: 1500,
+      membershipPrice: 100,
       emergencyContact: '',
       address: '',
       joinDate: new Date().toISOString().split('T')[0],
@@ -356,13 +373,13 @@ const MembersManagement: React.FC = () => {
   const getMembershipPrice = (type: string): number => {
     switch (type) {
       case 'monthly':
-        return 1500;
+        return 100;
       case 'quarterly':
-        return 4000;
+        return 200;
       case 'annual':
-        return 15000;
+        return 300;
       default:
-        return 1500;
+        return 100;
     }
   };
 
@@ -405,7 +422,7 @@ const MembersManagement: React.FC = () => {
     setSelectedMemberForPayment(member);
     setPaymentData({
       membershipType: member.membershipType || 'monthly',
-      membershipPrice: member.membershipPrice || 1500,
+      membershipPrice: member.membershipPrice || 100,
       paymentMethod: 'cash',
       notes: '',
     });
@@ -446,11 +463,10 @@ const MembersManagement: React.FC = () => {
       if (response.ok && result.success) {
         console.log('✅ Payment recorded successfully!');
         console.log(`💰 Amount: ₱${paymentData.membershipPrice.toLocaleString()}`);
-        console.log(`💰 New Total Revenue: ₱${result.totalRevenue?.toLocaleString() || 'Unknown'}`);
-        console.log(`📅 Subscription: ${result.subscription.start} to ${result.subscription.end}`);
+        console.log('🕒 Payment queued for admin approval');
         
         presentToast({
-          message: `✅ Payment recorded! ₱${paymentData.membershipPrice.toLocaleString()} added. Total revenue: ₱${result.totalRevenue?.toLocaleString() || 0}`,
+          message: `✅ Cash payment recorded and queued. Approve it in Pending Payments to activate the account.`,
           duration: 5000,
           color: 'success',
           position: 'top'
@@ -474,7 +490,7 @@ const MembersManagement: React.FC = () => {
             amount: paymentData.membershipPrice,
             method: paymentData.paymentMethod,
             transactionId: result.transactionId,
-            totalRevenue: result.totalRevenue,
+            paymentStatus: result.paymentStatus,
             timestamp: new Date().toISOString()
           },
         });
@@ -620,46 +636,38 @@ const MembersManagement: React.FC = () => {
                           </div>
                         </div>
 
-                        <IonGrid>
-                          <IonRow>
-                            <IonCol size="12" sizeMd="4">
-                              <IonButton
-                                expand="block"
-                                size="small"
-                                fill="solid"
-                                color="success"
-                                onClick={() => handleRecordPayment(member)}
-                              >
-                                <IonIcon icon={card} slot="start" />
-                                Record
-                              </IonButton>
-                            </IonCol>
-                            <IonCol size="12" sizeMd="4">
-                              <IonButton
-                                expand="block"
-                                size="small"
-                                fill="outline"
-                                color="primary"
-                                onClick={() => handleEditMember(member)}
-                              >
-                                <IonIcon icon={create} slot="start" />
-                                Edit
-                              </IonButton>
-                            </IonCol>
-                            <IonCol size="12" sizeMd="4">
-                              <IonButton
-                                expand="block"
-                                size="small"
-                                fill="outline"
-                                color="danger"
-                                onClick={() => member.id && handleDeleteMember(member.id)}
-                              >
-                                <IonIcon icon={trash} slot="start" />
-                                Delete
-                              </IonButton>
-                            </IonCol>
-                          </IonRow>
-                        </IonGrid>
+                        <div className="member-card-actions">
+                          <IonButton
+                            expand="block"
+                            size="small"
+                            fill="solid"
+                            color="success"
+                            onClick={() => handleRecordPayment(member)}
+                          >
+                            <IonIcon icon={card} slot="start" />
+                            Record
+                          </IonButton>
+                          <IonButton
+                            expand="block"
+                            size="small"
+                            fill="outline"
+                            color="primary"
+                            onClick={() => handleEditMember(member)}
+                          >
+                            <IonIcon icon={create} slot="start" />
+                            Edit
+                          </IonButton>
+                          <IonButton
+                            expand="block"
+                            size="small"
+                            fill="outline"
+                            color="danger"
+                            onClick={() => member.id && handleDeleteMember(member.id)}
+                          >
+                            <IonIcon icon={trash} slot="start" />
+                            Delete
+                          </IonButton>
+                        </div>
                       </IonCardContent>
                     </IonCard>
                   </IonCol>
@@ -774,9 +782,9 @@ const MembersManagement: React.FC = () => {
                   value={currentMember.membershipType}
                   onIonChange={(e) => handleMembershipTypeChange(e.detail.value)}
                 >
-                  <IonSelectOption value="monthly">Monthly - ₱1,500</IonSelectOption>
-                  <IonSelectOption value="quarterly">Quarterly - ₱4,000</IonSelectOption>
-                  <IonSelectOption value="annual">Annual - ₱15,000</IonSelectOption>
+                  <IonSelectOption value="monthly">Monthly - ₱100</IonSelectOption>
+                  <IonSelectOption value="quarterly">Quarterly - ₱200</IonSelectOption>
+                  <IonSelectOption value="annual">Annual - ₱300</IonSelectOption>
                 </IonSelect>
               </IonItem>
 
@@ -858,9 +866,9 @@ const MembersManagement: React.FC = () => {
                       value={paymentData.membershipType}
                       onIonChange={(e) => handlePaymentMembershipTypeChange(e.detail.value)}
                     >
-                      <IonSelectOption value="monthly">Monthly - ₱1,500</IonSelectOption>
-                      <IonSelectOption value="quarterly">Quarterly - ₱4,000</IonSelectOption>
-                      <IonSelectOption value="annual">Annual - ₱15,000</IonSelectOption>
+                      <IonSelectOption value="monthly">Monthly - ₱100</IonSelectOption>
+                      <IonSelectOption value="quarterly">Quarterly - ₱200</IonSelectOption>
+                      <IonSelectOption value="annual">Annual - ₱300</IonSelectOption>
                     </IonSelect>
                   </IonItem>
 
@@ -880,7 +888,7 @@ const MembersManagement: React.FC = () => {
                       onIonChange={(e) => setPaymentData({ ...paymentData, paymentMethod: e.detail.value })}
                     >
                       <IonSelectOption value="cash">Cash</IonSelectOption>
-                      <IonSelectOption value="gcash">GCash (Face-to-Face)</IonSelectOption>
+                      <IonSelectOption value="paypal">PayPal</IonSelectOption>
                       <IonSelectOption value="bank_transfer">Bank Transfer</IonSelectOption>
                       <IonSelectOption value="check">Check</IonSelectOption>
                     </IonSelect>

@@ -13,7 +13,26 @@ body {
 }
 /* App menu width: keep it usable on laptop screens */
 ion-menu.app-menu {
-  --width: min(320px, 85vw);
+  --width: clamp(248px, 24vw, 280px);
+}
+
+/* Desktop split-pane sidebar width */
+ion-split-pane {
+  --side-width: 248px;
+  --side-max-width: 248px;
+  --side-min-width: 248px;
+}
+
+ion-menu.app-menu ion-list {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+ion-menu.app-menu ion-item {
+  --padding-start: 10px;
+  --inner-padding-end: 10px;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 /* Style headers */

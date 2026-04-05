@@ -17,7 +17,7 @@ type TodayReport = {
   revenueToday: number;
   paymentsToday: number;
   cashPaymentsToday: number;
-  gcashPaymentsToday: number;
+  paypalPaymentsToday: number;
   attendanceToday: number;
   newMembersToday: number;
   renewalsToday: number;
@@ -56,7 +56,7 @@ const AdminReports: React.FC = () => {
             revenueToday: Number(data.revenueToday) || 0,
             paymentsToday: Number(data.paymentsToday) || 0,
             cashPaymentsToday: Number(data.cashPaymentsToday) || 0,
-            gcashPaymentsToday: Number(data.gcashPaymentsToday) || 0,
+            paypalPaymentsToday: Number(data.paypalPaymentsToday ?? data.gcashPaymentsToday) || 0,
             attendanceToday: Number(data.attendanceToday) || 0,
             newMembersToday: Number(data.newMembersToday) || 0,
             renewalsToday: Number(data.renewalsToday) || 0,
@@ -154,7 +154,7 @@ const AdminReports: React.FC = () => {
                 </h3>
                 <p className="card-label">Revenue Today</p>
                 <IonBadge color="warning" style={{ marginTop: 8 }}>
-                  {today?.cashPaymentsToday || 0} cash • {today?.gcashPaymentsToday || 0} GCash
+                  {today?.cashPaymentsToday || 0} cash • {today?.paypalPaymentsToday || 0} PayPal
                 </IonBadge>
               </IonCardContent>
             </IonCard>
@@ -227,8 +227,8 @@ const AdminReports: React.FC = () => {
                         <strong>{today?.cashPaymentsToday || 0}</strong>
                       </div>
                       <div className="breakdown-row">
-                        <span>GCash Payments</span>
-                        <strong>{today?.gcashPaymentsToday || 0}</strong>
+                        <span>PayPal Payments</span>
+                        <strong>{today?.paypalPaymentsToday || 0}</strong>
                       </div>
                       <div className="breakdown-row highlight">
                         <span>Total Revenue Today</span>

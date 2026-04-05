@@ -1,0 +1,103 @@
+{
+    "source": "FNRI-DOST Philippines",
+    "diet_framework": {
+        "model": "Pinggang Pinoy",
+        "plate_distribution": {
+            "vegetables": "30%",
+            "fruits": "20%",
+            "protein": "25%",
+            "carbohydrates": "25%"
+        },
+        "food_groups": {
+            "Go": "Carbohydrates (rice, corn, bread, root crops)",
+            "Grow": "Protein (fish, meat, egg, beans, dairy)",
+            "Glow": "Fruits and vegetables"
+        }
+    },
+    "core_guidelines": [
+        "Eat a variety of foods daily",
+        "Eat more vegetables and fruits",
+        "Consume protein foods daily (fish, meat, poultry, beans)",
+        "Include milk or calcium-rich foods daily",
+        "Use iodized salt",
+        "Drink safe water and ensure food safety",
+        "Limit salty, fatty, fried, and sugary foods",
+        "Maintain healthy body weight",
+        "Be physically active",
+        "Avoid alcohol and smoking"
+    ],
+    "nutritional_rules": {
+        "priority": [
+            "high fiber",
+            "adequate protein",
+            "balanced macronutrients",
+            "micronutrient-rich foods"
+        ],
+        "limit": [
+            "processed foods",
+            "excess sugar",
+            "high sodium",
+            "saturated fat"
+        ]
+    },
+    "meal_structure": {
+        "meals_per_day": 3,
+        "optional_snacks": 2,
+        "each_meal_requirements": [
+            "must include vegetables",
+            "must include protein",
+            "must include carbohydrate source",
+            "include fruit at least once per meal or snack"
+        ]
+    },
+    "local_food_preference": {
+        "carbs": [
+            "rice",
+            "corn",
+            "sweet potato",
+            "cassava"
+        ],
+        "protein": [
+            "fish",
+            "chicken",
+            "pork",
+            "egg",
+            "monggo",
+            "tofu"
+        ],
+        "vegetables": [
+            "malunggay",
+            "kangkong",
+            "ampalaya",
+            "pechay",
+            "kalabasa"
+        ],
+        "fruits": [
+            "banana",
+            "papaya",
+            "mango",
+            "pineapple"
+        ],
+        "dairy": [
+            "milk",
+            "cheese"
+        ],
+        "others": [
+            "iodized salt",
+            "clean water"
+        ]
+    },
+    "calorie_reference": {
+        "note": "Adjust based on PDRI (age, sex, activity level)",
+        "example": {
+            "adult_male": "approx 2500 kcal",
+            "adult_female": "approx 2000 kcal"
+        }
+    },
+    "generation_constraints": {
+        "always_follow_fnri": true,
+        "prioritize_local_foods": true,
+        "avoid_ultra_processed": true,
+        "ensure_balance_per_meal": true
+    }
+}
