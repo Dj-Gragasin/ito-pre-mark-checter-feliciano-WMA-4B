@@ -1237,15 +1237,31 @@ function recomputeWeekPlanTotals(weekPlan: any[]): any[] {
 }
 
 function pickUniqueMeals(source: any[], used: Set<string>, count: number) {
-  let pool = source.filter(m => !used.has(m.name));
-  if (pool.length < count) {
-    used.clear();
-    pool = [...source];
+  const mealKey = (meal: any) => String(meal?.name || '').trim().toLowerCase();
+  const validSource = Array.isArray(source) ? source.filter((m: any) => !!mealKey(m)) : [];
+  let pool = validSource.filter((m: any) => !used.has(mealKey(m)));
+  if (pool.length === 0) {
+    // Allow repeats only when unique options are exhausted.
+    pool = [...validSource];
   }
   const shuffled = shuffleArray(pool);
   const picked = shuffled.slice(0, Math.min(count, shuffled.length));
-  picked.forEach(m => used.add(m.name));
+  picked.forEach((m: any) => used.add(mealKey(m)));
   return picked;
+}
+
+function hasFlatMainVariety(weekPlan: any[]): boolean {
+  if (!Array.isArray(weekPlan) || weekPlan.length < 3) return false;
+
+  const slots: Array<'breakfast' | 'lunch' | 'dinner'> = ['breakfast', 'lunch', 'dinner'];
+  return slots.every((slot) => {
+    const names = new Set(
+      weekPlan
+        .map((d: any) => String(d?.meals?.[slot]?.name || '').trim().toLowerCase())
+        .filter(Boolean)
+    );
+    return names.size <= 1;
+  });
 }
 
 function normalizeSelectionList(input: any): string[] {
@@ -1730,19 +1746,27 @@ function generateWeekPlan(
     dish?.fats ?? dish?.fat,
     toFiniteNumber(dish?.calories ?? dish?.cal ?? 0, 0)
   );
+  const mealKey = (dish: any) => String(dish?.name || '').trim().toLowerCase();
 
   const pickUniqueClosestCalories = (
     source: any[],
     usedSet: Set<string>,
-    desiredCalories: number
+    desiredCalories: number,
+    avoidSet: Set<string> = new Set<string>()
   ) => {
     if (!Array.isArray(source) || source.length === 0) return null;
 
-    let pool = source.filter((m: any) => m && m.name && !usedSet.has(m.name));
+    const validSource = source.filter((m: any) => !!mealKey(m));
+    if (validSource.length === 0) return null;
+
+    const notUsedNotAvoided = validSource.filter((m: any) => !usedSet.has(mealKey(m)) && !avoidSet.has(mealKey(m)));
+    const notAvoided = validSource.filter((m: any) => !avoidSet.has(mealKey(m)));
+    const notUsed = validSource.filter((m: any) => !usedSet.has(mealKey(m)));
+
+    let pool = notUsedNotAvoided;
     if (pool.length === 0) {
-      // Allow repeats only when we run out of unique options.
-      usedSet.clear();
-      pool = source.filter((m: any) => m && m.name);
+      // Fallback order: keep no-immediate-repeat first, then no-global-repeat, then any.
+      pool = notAvoided.length > 0 ? notAvoided : (notUsed.length > 0 ? notUsed : validSource);
     }
     if (pool.length === 0) return null;
 
@@ -1759,7 +1783,7 @@ function generateWeekPlan(
       }
     }
 
-    usedSet.add(best.name);
+    usedSet.add(mealKey(best));
     return best;
   };
 
@@ -1796,7 +1820,7 @@ function generateWeekPlan(
 
   if (aiDay && aiDay.meals) {
     Object.values(aiDay.meals).forEach((m: any) => {
-      if (m && m.name) used.add(m.name);
+      if (mealKey(m)) used.add(mealKey(m));
     });
   }
 
@@ -1814,7 +1838,7 @@ function generateWeekPlan(
       const normalizedMeals: any = {};
       Object.entries(aiDay.meals || {}).forEach(([k,v]: any) => {
         normalizedMeals[k] = createMealObject(v);
-        if (normalizedMeals[k].name) used.add(normalizedMeals[k].name);
+        if (mealKey(normalizedMeals[k])) used.add(mealKey(normalizedMeals[k]));
       });
       const totals = sumMacros(Object.values(normalizedMeals));
       weekPlan.push({
@@ -1829,40 +1853,61 @@ function generateWeekPlan(
     }
 
     // Pick meals by category when possible, otherwise fallback to the full pool.
+    const prevDayMeals = weekPlan.length > 0 ? weekPlan[weekPlan.length - 1]?.meals : null;
+    const prevDayMainNames = new Set<string>(
+      [prevDayMeals?.breakfast, prevDayMeals?.lunch, prevDayMeals?.dinner].map((m: any) => mealKey(m)).filter(Boolean)
+    );
+    const usedTodayMainNames = new Set<string>();
+
+    const breakfastAvoid = new Set<string>([...prevDayMainNames, ...usedTodayMainNames]);
     const breakfastPick =
       pickUniqueClosestCalories(
         breakfastPool.length > 0 ? breakfastPool : allMainPool,
         used,
-        breakfastCaloriesTarget
-      ) || (allMainPool[Math.floor(Math.random() * allMainPool.length)] || buildDietFallbackMeal('breakfast', normalizedDietType, breakfastCaloriesTarget, restrictionTokens));
+        breakfastCaloriesTarget,
+        breakfastAvoid
+      ) || buildDietFallbackMeal('breakfast', normalizedDietType, breakfastCaloriesTarget, restrictionTokens);
+    if (mealKey(breakfastPick)) usedTodayMainNames.add(mealKey(breakfastPick));
 
+    const lunchAvoid = new Set<string>([...prevDayMainNames, ...usedTodayMainNames]);
     const lunchPick =
       pickUniqueClosestCalories(
         lunchPool.length > 0 ? lunchPool : allMainPool,
         used,
-        lunchCaloriesTargetBase
-      ) || (allMainPool[Math.floor(Math.random() * allMainPool.length)] || buildDietFallbackMeal('lunch', normalizedDietType, lunchCaloriesTargetBase, restrictionTokens));
+        lunchCaloriesTargetBase,
+        lunchAvoid
+      ) || buildDietFallbackMeal('lunch', normalizedDietType, lunchCaloriesTargetBase, restrictionTokens);
+    if (mealKey(lunchPick)) usedTodayMainNames.add(mealKey(lunchPick));
 
+    const dinnerAvoid = new Set<string>([...prevDayMainNames, ...usedTodayMainNames]);
     const dinnerPick =
       pickUniqueClosestCalories(
         dinnerPool.length > 0 ? dinnerPool : allMainPool,
         used,
-        dinnerCaloriesTargetBase
-      ) || (allMainPool[Math.floor(Math.random() * allMainPool.length)] || buildDietFallbackMeal('dinner', normalizedDietType, dinnerCaloriesTargetBase, restrictionTokens));
+        dinnerCaloriesTargetBase,
+        dinnerAvoid
+      ) || buildDietFallbackMeal('dinner', normalizedDietType, dinnerCaloriesTargetBase, restrictionTokens);
 
     // Pick 2 snacks, aiming to fill remaining calories for the day.
     const mainsCalories = dishCalories(breakfastPick) + dishCalories(lunchPick) + dishCalories(dinnerPick);
     const snacksTotalTarget = Math.max(0, dailyCalorieTarget - mainsCalories);
     const snack1Target = snacksTotalTarget / 2;
 
+    const prevDaySnackNames = new Set<string>(
+      [prevDayMeals?.snack1, prevDayMeals?.snack2].map((m: any) => mealKey(m)).filter(Boolean)
+    );
+    const usedTodaySnackNames = new Set<string>();
+
     const snack1 =
-      pickUniqueClosestCalories(snacksPool, usedSnacks, snack1Target) ||
+      pickUniqueClosestCalories(snacksPool, usedSnacks, snack1Target, prevDaySnackNames) ||
       pickUniqueMeals(snacksPool, usedSnacks, 1)[0] ||
       buildDietFallbackMeal('snack1', normalizedDietType, snack1Target, restrictionTokens);
+    if (mealKey(snack1)) usedTodaySnackNames.add(mealKey(snack1));
 
     const snack2Target = Math.max(0, snacksTotalTarget - dishCalories(snack1));
+    const snack2Avoid = new Set<string>([...prevDaySnackNames, ...usedTodaySnackNames]);
     const snack2 =
-      pickUniqueClosestCalories(snacksPool, usedSnacks, snack2Target) ||
+      pickUniqueClosestCalories(snacksPool, usedSnacks, snack2Target, snack2Avoid) ||
       pickUniqueMeals(snacksPool, usedSnacks, 1)[0] ||
       buildDietFallbackMeal('snack2', normalizedDietType, snack2Target, restrictionTokens);
 
@@ -3596,6 +3641,12 @@ Rules:
     } else {
       weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens, filteredDbDishes, normalizedDiet);
       weekPlan = addRiceSidesToMeals(weekPlan); // Add rice sides to complete Filipino meals
+      weekPlan = scaleWeekPlanToCalorieTarget(weekPlan, targets);
+    }
+
+    if (hasFlatMainVariety(weekPlan)) {
+      weekPlan = generateWeekPlan(null, targets, goal, allRestrictionTokens, filteredDbDishes, normalizedDiet);
+      weekPlan = addRiceSidesToMeals(weekPlan);
       weekPlan = scaleWeekPlanToCalorieTarget(weekPlan, targets);
     }
 
