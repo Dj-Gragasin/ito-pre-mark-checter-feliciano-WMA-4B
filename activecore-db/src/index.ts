@@ -2808,9 +2808,7 @@ app.get('/api/member/subscription', authenticateToken, async (req: AuthRequest, 
     };
 
     const defaultPriceByPlan = (plan: 'monthly' | 'quarterly' | 'annual') => {
-      if (plan === 'quarterly') return 200;
-      if (plan === 'annual') return 300;
-      return 100;
+      return expectedAmountForPlan(plan);
     };
 
     const [member] = await pool.query<any>(
@@ -5189,10 +5187,20 @@ function isValidMembershipPlan(plan: any): plan is 'monthly' | 'quarterly' | 'an
   return normalized === 'monthly' || normalized === 'quarterly' || normalized === 'annual';
 }
 
+function shouldUseLowCostPayPalPricing(): boolean {
+  const explicit = String(process.env.PAYPAL_LOW_COST_PRICING || '').trim().toLowerCase();
+  if (explicit === '1' || explicit === 'true' || explicit === 'yes') return true;
+  if (explicit === '0' || explicit === 'false' || explicit === 'no') return false;
+
+  // Default to low-cost pricing on live PayPal so production verification is affordable.
+  return PAYPAL_MODE === 'live';
+}
+
 function expectedAmountForPlan(plan: 'monthly' | 'quarterly' | 'annual'): number {
-  if (plan === 'quarterly') return 200;
-  if (plan === 'annual') return 300;
-  return 100;
+  const useLowCostPricing = shouldUseLowCostPayPalPricing();
+  if (plan === 'quarterly') return useLowCostPricing ? 2 : 200;
+  if (plan === 'annual') return useLowCostPricing ? 3 : 300;
+  return useLowCostPricing ? 1 : 100;
 }
 
 function isValidEmail(email?: string) {
