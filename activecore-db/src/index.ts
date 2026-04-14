@@ -2002,6 +2002,26 @@ function isoDateString(input?: Date | string | null): string {
   return d.toISOString().split('T')[0];
 }
 
+function isFutureDateOnly(input?: string | null): boolean {
+  if (!input || typeof input !== 'string') return false;
+  const value = input.trim();
+  if (!value) return false;
+
+  let dateOnly: Date;
+  const ymd = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (ymd) {
+    dateOnly = new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
+  } else {
+    const parsed = new Date(value);
+    if (isNaN(parsed.getTime())) return false;
+    dateOnly = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+  }
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return dateOnly.getTime() > today.getTime();
+}
+
 // ============================================
 // INPUT VALIDATION HELPERS
 // ============================================
@@ -2181,15 +2201,13 @@ app.get('/api/system/status', async (req: Request, res: Response) => {
 // ===== AUTHENTICATION ROUTES =====
 app.post('/api/auth/login', authLimiter, async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, username, password } = req.body;
+    const loginIdRaw = typeof username === 'string' && username.trim() ? username : email;
+    const loginId = sanitizeInput(String(loginIdRaw || ''));
     
     // Validate inputs
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required' });
-    }
-    
-    if (!isValidEmail(email)) {
-      return res.status(400).json({ message: 'Invalid email format' });
+    if (!loginId || !password) {
+      return res.status(400).json({ message: 'Username and password are required' });
     }
     
     if (typeof password !== 'string' || password.length === 0) {
@@ -2198,8 +2216,8 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 
 
     const [users] = await pool.query<any>(
-      'SELECT * FROM users WHERE email = ?',
-      [email]
+      'SELECT * FROM users WHERE LOWER(email) = LOWER(?)',
+      [loginId]
     );
 
     if (!Array.isArray(users) || users.length === 0) {
@@ -2226,6 +2244,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       user: {
         id: user.id,
         email: user.email,
+        username: user.email,
         firstName: user.first_name,
         lastName: user.last_name,
         role: user.role
@@ -2237,21 +2256,21 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 });
 
 // ===== DEV UTILITIES (development only) =====
-// Creates a JWT for an existing user by email, for local/dev convenience.
+// Creates a JWT for an existing user by username, for local/dev convenience.
 app.post('/api/dev/token', async (req, res) => {
   try {
     if (process.env.NODE_ENV !== 'development') {
       return res.status(404).json({ success: false, message: 'Not found' });
     }
 
-    const email = String(req.body?.email || '').trim();
-    if (!email) {
-      return res.status(400).json({ success: false, message: 'Email is required' });
+    const username = String(req.body?.username || req.body?.email || '').trim();
+    if (!username) {
+      return res.status(400).json({ success: false, message: 'Username is required' });
     }
 
     const [users] = await pool.query<any>(
-      'SELECT id, email, first_name, last_name, role FROM users WHERE email = ?',
-      [email]
+      'SELECT id, email, first_name, last_name, role FROM users WHERE LOWER(email) = LOWER(?)',
+      [username]
     );
 
     if (!Array.isArray(users) || users.length === 0) {
@@ -2271,6 +2290,7 @@ app.post('/api/dev/token', async (req, res) => {
       user: {
         id: user.id,
         email: user.email,
+        username: user.email,
         firstName: user.first_name,
         lastName: user.last_name,
         role: user.role,
@@ -2321,6 +2341,7 @@ app.post('/api/register', registerLimiter, async (req: Request, res: Response) =
       firstName,
       lastName,
       email,
+      username,
       password,
       phone,
       gender,
@@ -2333,19 +2354,13 @@ app.post('/api/register', registerLimiter, async (req: Request, res: Response) =
     } = req.body;
 
 
+    const loginId = sanitizeInput(String(username || email || ''));
+
     // Validate required fields
-    if (!firstName || !lastName || !email || !password || !phone) {
+    if (!firstName || !lastName || !loginId || !password || !phone) {
       return res.status(400).json({ 
         success: false, 
         message: 'Missing required fields' 
-      });
-    }
-    
-    // Validate email format
-    if (!isValidEmail(email)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid email format' 
       });
     }
     
@@ -2358,11 +2373,11 @@ app.post('/api/register', registerLimiter, async (req: Request, res: Response) =
       });
     }
     
-    // Validate phone format
-    if (!isValidPhone(phone)) {
+    const normalizedPhone = normalizePHMobile(phone);
+    if (!normalizedPhone) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid phone number format'
+        message: 'Invalid mobile number. Enter exactly 11 digits (09XXXXXXXXX).'
       });
     }
     
@@ -2376,15 +2391,22 @@ app.post('/api/register', registerLimiter, async (req: Request, res: Response) =
       });
     }
 
+    if (typeof dateOfBirth === 'string' && dateOfBirth.trim() && isFutureDateOnly(dateOfBirth)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Date of birth cannot be in the future'
+      });
+    }
+
     const [existingUsers] = await pool.query(
-      'SELECT id FROM users WHERE email = ?',
-      [email]
+      'SELECT id FROM users WHERE LOWER(email) = LOWER(?)',
+      [loginId]
     );
 
     if ((existingUsers as any[]).length > 0) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Email already registered' 
+        message: 'Username already registered' 
       });
     }
 
@@ -2418,9 +2440,9 @@ app.post('/api/register', registerLimiter, async (req: Request, res: Response) =
       [
         firstName,
         lastName,
-        email,
+        loginId,
         hashedPassword,
-        phone,
+        normalizedPhone,
         gender || 'male',
         dateOfBirth || null,
         membershipType || 'monthly',
@@ -2442,7 +2464,7 @@ app.post('/api/register', registerLimiter, async (req: Request, res: Response) =
       userId,
     });
   } catch (error: any) {
-    logError('User registration failed', error, { email: req.body.email });
+    logError('User registration failed', error, { username: req.body.username || req.body.email });
     res.status(500).json({ 
       success: false, 
       message: getErrorMessage(error) || 'Registration failed' 
@@ -2575,6 +2597,7 @@ app.post('/api/members', authenticateToken, requireAdmin, async (req: AuthReques
       firstName, 
       lastName, 
       email, 
+      username,
       password, 
       phone, 
       gender, 
@@ -2588,18 +2611,28 @@ app.post('/api/members', authenticateToken, requireAdmin, async (req: AuthReques
       
     } = req.body;
 
+    const loginId = sanitizeInput(String(username || email || ''));
 
-    if (!firstName || !lastName || !email || !password) {
+    if (!firstName || !lastName || !loginId || !password || !phone) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
+    if (typeof dateOfBirth === 'string' && dateOfBirth.trim() && isFutureDateOnly(dateOfBirth)) {
+      return res.status(400).json({ message: 'Date of birth cannot be in the future' });
+    }
+
+    const normalizedPhone = normalizePHMobile(phone);
+    if (!normalizedPhone) {
+      return res.status(400).json({ message: 'Invalid mobile number. Enter exactly 11 digits (09XXXXXXXXX).' });
+    }
+
     const [existing] = await pool.query<any>(
-      'SELECT id FROM users WHERE email = ?',
-      [email]
+      'SELECT id FROM users WHERE LOWER(email) = LOWER(?)',
+      [loginId]
     );
 
     if (existing.length > 0) {
-      return res.status(400).json({ message: 'Email already exists' });
+      return res.status(400).json({ message: 'Username already exists' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
@@ -2632,9 +2665,9 @@ app.post('/api/members', authenticateToken, requireAdmin, async (req: AuthReques
       [
         firstName,
         lastName,
-        email,
+        loginId,
         hashedPassword,
-        phone,
+        normalizedPhone,
         gender || 'male',
         dateOfBirth || null,
         status || 'active',
@@ -2704,14 +2737,21 @@ app.put('/api/members/:id', authenticateToken, requireAdmin, async (req: AuthReq
       updateValues.push(hashedPassword);
     }
     if (hasText(phone)) {
+      const normalizedPhone = normalizePHMobile(phone);
+      if (!normalizedPhone) {
+        return res.status(400).json({ message: 'Invalid mobile number. Enter exactly 11 digits (09XXXXXXXXX).' });
+      }
       updateFields.push('phone = ?');
-      updateValues.push(phone.trim());
+      updateValues.push(normalizedPhone);
     }
     if (hasText(gender)) {
       updateFields.push('gender = ?');
       updateValues.push(gender.trim());
     }
     if (hasText(dateOfBirth)) {
+      if (isFutureDateOnly(dateOfBirth.trim())) {
+        return res.status(400).json({ message: 'Date of birth cannot be in the future' });
+      }
       updateFields.push('date_of_birth = ?');
       updateValues.push(dateOfBirth.trim());
     }
@@ -4558,6 +4598,7 @@ app.get('/api/user/profile', authenticateToken, async (req: AuthRequest, res: Re
       user: {
         id: user.id,
         email: user.email,
+        username: user.email,
         firstName: user.first_name,
         lastName: user.last_name,
         role: user.role
@@ -4573,7 +4614,7 @@ app.put('/api/user/profile', authenticateToken, async (req: AuthRequest, res: Re
     const userId = req.user!.id;
     const firstNameRaw = req.body?.firstName;
     const lastNameRaw = req.body?.lastName;
-    const emailRaw = req.body?.email;
+    const usernameRaw = req.body?.username ?? req.body?.email;
 
     const updates: string[] = [];
     const values: any[] = [];
@@ -4596,22 +4637,22 @@ app.put('/api/user/profile', authenticateToken, async (req: AuthRequest, res: Re
       values.push(lastName);
     }
 
-    if (typeof emailRaw === 'string') {
-      const email = sanitizeInput(emailRaw).toLowerCase();
-      if (!isValidEmail(email)) {
-        return res.status(400).json({ success: false, message: 'Invalid email format.' });
+    if (typeof usernameRaw === 'string') {
+      const username = sanitizeInput(usernameRaw);
+      if (!username) {
+        return res.status(400).json({ success: false, message: 'Username cannot be empty.' });
       }
 
       const [existing] = await pool.query<any>(
-        'SELECT id FROM users WHERE email = ? AND id <> ? LIMIT 1',
-        [email, userId]
+        'SELECT id FROM users WHERE LOWER(email) = LOWER(?) AND id <> ? LIMIT 1',
+        [username, userId]
       );
       if (Array.isArray(existing) && existing.length > 0) {
-        return res.status(409).json({ success: false, message: 'Email is already in use.' });
+        return res.status(409).json({ success: false, message: 'Username is already in use.' });
       }
 
       updates.push('email = ?');
-      values.push(email);
+      values.push(username);
     }
 
     if (updates.length === 0) {
@@ -4636,6 +4677,7 @@ app.put('/api/user/profile', authenticateToken, async (req: AuthRequest, res: Re
       user: {
         id: user.id,
         email: user.email,
+        username: user.email,
         firstName: user.first_name,
         lastName: user.last_name,
         role: user.role,
@@ -5166,12 +5208,20 @@ function sanitizeInput(input: any): string {
     .substring(0, 255); // Max 255 chars
 }
 
+function normalizePHMobile(phone: any): string | null {
+  const digits = String(phone || '').replace(/\D/g, '');
+
+  if (/^09\d{9}$/.test(digits)) return digits;
+
+  return null;
+}
+
 /**
- * Validates phone number (basic format)
+ * Validates Philippine mobile numbers in local format.
+ * Accepted input format: exactly 11 digits (09XXXXXXXXX).
  */
 function isValidPhone(phone: string): boolean {
-  const phoneRegex = /^[\d\s\-\+\(\)]{7,}$/;
-  return phoneRegex.test(String(phone).replace(/\s/g, ''));
+  return normalizePHMobile(phone) !== null;
 }
 
 /**

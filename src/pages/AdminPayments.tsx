@@ -47,7 +47,6 @@ interface Payment {
   transaction_id: string;
   subscription_start?: string;
   subscription_end?: string;
-  notes?: string;
 }
 
 const AdminPayments: React.FC = () => {
@@ -350,12 +349,6 @@ const AdminPayments: React.FC = () => {
                             </div>
                           )}
 
-                          {payment.notes && (
-                            <div className="payment-row">
-                              <span>Notes:</span>
-                              <strong>{payment.notes}</strong>
-                            </div>
-                          )}
                         </div>
 
                         {(payment.payment_method?.toLowerCase().includes('paypal') ||

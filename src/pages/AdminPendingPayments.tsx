@@ -38,7 +38,6 @@ interface PendingPayment {
   membership_type: string;
   payment_status: string;
   transaction_id: string;
-  notes: string;
   payment_date: string;
 }
 
@@ -227,12 +226,6 @@ const AdminPendingPayments: React.FC = () => {
                       <span>Date:</span>
                       <span>{new Date(payment.payment_date).toLocaleString()}</span>
                     </div>
-                    {payment.notes && (
-                      <div className="detail-row notes">
-                        <span>Notes:</span>
-                        <p>{payment.notes}</p>
-                      </div>
-                    )}
                   </div>
 
                   <div className="action-buttons">

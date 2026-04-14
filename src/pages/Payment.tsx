@@ -32,6 +32,7 @@ import './Payment.css';
 // Types
 interface FormData {
   fullName: string;
+  phone: string;
   email: string;
   password: string;
   plan: string;
@@ -53,6 +54,7 @@ type MembershipPlan = 'monthly' | 'quarterly' | 'annual';
 const Payment: React.FC = () => {
   const [formData, setFormData] = useState<FormData>({
     fullName: '',
+    phone: '',
     email: '',
     password: '',
     plan: '',
@@ -88,6 +90,14 @@ const Payment: React.FC = () => {
     }
   };
 
+  const normalizePHMobile = (value: string): string | null => {
+    const digits = String(value || '').replace(/\D/g, '');
+
+    if (/^09\d{9}$/.test(digits)) return digits;
+
+    return null;
+  };
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
     let isValid = true;
@@ -95,6 +105,11 @@ const Payment: React.FC = () => {
     // Personal Information Validation
     if (!formData.fullName || formData.fullName.length < 2) {
       newErrors.fullName = 'Please enter your full name';
+      isValid = false;
+    }
+
+    if (!normalizePHMobile(formData.phone)) {
+      newErrors.phone = 'Enter exactly 11 digits (09XXXXXXXXX)';
       isValid = false;
     }
 
@@ -141,8 +156,10 @@ const Payment: React.FC = () => {
 
   const createMember = async (paymentId: string): Promise<boolean> => {
     try {
+      const normalizedPhone = normalizePHMobile(formData.phone);
       const memberData = {
         fullName: formData.fullName,
+        phone: normalizedPhone || formData.phone,
         email: formData.email,
         password: formData.password, // In production, hash this on the backend
         plan: formData.plan,
@@ -184,6 +201,7 @@ const Payment: React.FC = () => {
       customer: {
         name: formData.fullName,
         email: formData.email,
+        phone: normalizePHMobile(formData.phone) || formData.phone,
       },
       paymentMethod: formData.paymentMethod,
       ...(formData.paymentMethod === 'card' && {
@@ -285,6 +303,7 @@ const Payment: React.FC = () => {
         // Reset form
         setFormData({
           fullName: '',
+          phone: '',
           email: '',
           password: '',
           plan: '',
@@ -342,6 +361,27 @@ const Payment: React.FC = () => {
                           {errors.fullName && (
                             <IonText className="payment-error" color="danger">
                               {errors.fullName}
+                            </IonText>
+                          )}
+                        </IonCol>
+                        <IonCol size="12" sizeMd="6">
+                          <IonItem className="payment-item" fill="outline">
+                            <IonLabel position="stacked">Mobile Number (+63)</IonLabel>
+                            <IonInput
+                              type="tel"
+                              maxlength={11}
+                              value={formData.phone}
+                              autocomplete="tel"
+                              inputmode="tel"
+                              placeholder="09XXXXXXXXX"
+                              onIonInput={(e) =>
+                                setField('phone', String(e.detail.value ?? '').replace(/\D/g, '').slice(0, 11) as any)
+                              }
+                            />
+                          </IonItem>
+                          {errors.phone && (
+                            <IonText className="payment-error" color="danger">
+                              {errors.phone}
                             </IonText>
                           )}
                         </IonCol>

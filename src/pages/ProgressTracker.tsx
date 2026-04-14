@@ -54,7 +54,6 @@ interface ProgressRecord {
   date: string;
   weight: number;
   bmi: number;
-  notes: string;
 }
 
 type ReportMode = 'daily' | 'weekly' | 'monthly';
@@ -111,14 +110,38 @@ type AggregatedRow = {
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
+const computeBmiFromMetric = (weightKg: number, heightCm: number): number | null => {
+  if (!Number.isFinite(weightKg) || weightKg <= 0) return null;
+  if (!Number.isFinite(heightCm) || heightCm <= 0) return null;
+
+  const heightMeters = heightCm / 100;
+  const bmi = weightKg / (heightMeters * heightMeters);
+  if (!Number.isFinite(bmi)) return null;
+  return bmi;
+};
+
+// PH adult BMI labels (Asia-Pacific cutoffs commonly used in Philippine clinical practice).
+const getPhBmiCategory = (bmi: number): string => {
+  if (!Number.isFinite(bmi)) return 'N/A';
+  if (bmi < 18.5) return 'Underweight';
+  if (bmi < 23) return 'Normal';
+  if (bmi < 25) return 'Overweight';
+  if (bmi < 30) return 'Obese I';
+  return 'Obese II';
+};
+
 const ProgressTracker: React.FC = () => {
   const [records, setRecords] = useState<ProgressRecord[]>([]);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [weight, setWeight] = useState('');
-  const [bmi, setBmi] = useState('');
   const [heightCm, setHeightCm] = useState('');
-  const [notes, setNotes] = useState('');
   const [reportMode, setReportMode] = useState<ReportMode>('daily');
+
+  const computedBmi = useMemo(() => {
+    return computeBmiFromMetric(parseFloat(weight), parseFloat(heightCm));
+  }, [weight, heightCm]);
+
+  const computedBmiText = computedBmi !== null ? computedBmi.toFixed(1) : '';
 
   const loadRecords = async () => {
     const token = localStorage.getItem('token') || '';
@@ -153,16 +176,15 @@ const ProgressTracker: React.FC = () => {
   }, []);
 
   const handleUpdate = () => {
-    if (!weight || !bmi) {
-      alert('Please enter both weight and BMI');
+    if (!weight || !heightCm || computedBmi === null) {
+      alert('Please enter valid weight and height so BMI can be calculated automatically');
       return;
     }
 
     const newRecord: ProgressRecord = {
       date,
       weight: parseFloat(weight),
-      bmi: parseFloat(bmi),
-      notes
+      bmi: round1(computedBmi),
     };
 
     const updatedRecords = [...records, newRecord].sort((a, b) => 
@@ -209,31 +231,7 @@ const ProgressTracker: React.FC = () => {
   const clearForm = () => {
     setDate(new Date().toISOString().split('T')[0]);
     setWeight('');
-    setBmi('');
     setHeightCm('');
-    setNotes('');
-  };
-
-  const handleCalculateBmi = () => {
-    const w = parseFloat(weight);
-    const hcm = parseFloat(heightCm);
-
-    if (!Number.isFinite(w) || w <= 0) {
-      alert('Please enter a valid weight (kg) first');
-      return;
-    }
-    if (!Number.isFinite(hcm) || hcm <= 0) {
-      alert('Please enter a valid height (cm)');
-      return;
-    }
-
-    const hm = hcm / 100;
-    const bmiValue = w / (hm * hm);
-    if (!Number.isFinite(bmiValue)) {
-      alert('Unable to calculate BMI from those values');
-      return;
-    }
-    setBmi(bmiValue.toFixed(1));
   };
 
   const handleDeleteAll = () => {
@@ -298,6 +296,12 @@ const ProgressTracker: React.FC = () => {
       setRecords(updatedRecords);
       localStorage.setItem('progressRecords', JSON.stringify(updatedRecords));
     }
+  };
+
+  const handleProgressInputKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    handleUpdate();
   };
 
   const sortedRecords = useMemo(() => {
@@ -562,13 +566,14 @@ const ProgressTracker: React.FC = () => {
                 </div>
                 <IonItem>
                   <IonLabel position="stacked">Date</IonLabel>
-                  <IonInput type="date" value={date} onIonChange={e => setDate(e.detail.value!)} />
+                  <IonInput type="date" value={date} onKeyDown={handleProgressInputKeyDown} onIonChange={e => setDate(e.detail.value!)} />
                 </IonItem>
                 <IonItem>
                   <IonLabel position="stacked">Weight (kg)</IonLabel>
                   <IonInput
                     type="number"
                     value={weight}
+                    onKeyDown={handleProgressInputKeyDown}
                     onIonChange={e => setWeight(e.detail.value!)}
                     placeholder="Enter your weight"
                   />
@@ -580,36 +585,26 @@ const ProgressTracker: React.FC = () => {
               <div className="form-section">
                 <div className="form-section-title">
                   <IonIcon icon={analytics} />
-                  <span>BMI & Notes</span>
+                  <span>BMI</span>
                 </div>
                 <IonItem>
                   <IonLabel position="stacked">Height (cm)</IonLabel>
                   <IonInput
                     type="number"
                     value={heightCm}
+                    onKeyDown={handleProgressInputKeyDown}
                     onIonChange={e => setHeightCm(e.detail.value!)}
                     placeholder="e.g., 170"
                   />
                 </IonItem>
                 <IonItem>
-                  <IonLabel position="stacked">BMI</IonLabel>
+                  <IonLabel position="stacked">BMI (Auto)</IonLabel>
                   <IonInput
                     type="number"
-                    value={bmi}
-                    onIonChange={e => setBmi(e.detail.value!)}
-                    placeholder="Enter your BMI"
+                    value={computedBmiText}
+                    readonly={true}
+                    placeholder="Auto-calculated"
                   />
-                </IonItem>
-
-                <div className="bmi-calc-row">
-                  <IonButton size="small" fill="outline" onClick={handleCalculateBmi}>
-                    Calculate BMI
-                  </IonButton>
-                  <div className="bmi-calc-hint">Uses Weight (kg) and Height (cm)</div>
-                </div>
-                <IonItem>
-                  <IonLabel position="stacked">Notes</IonLabel>
-                  <IonInput value={notes} onIonChange={e => setNotes(e.detail.value!)} placeholder="Add notes" />
                 </IonItem>
               </div>
             </IonCol>
@@ -666,7 +661,6 @@ const ProgressTracker: React.FC = () => {
                           <th>Date</th>
                           <th>Weight (kg)</th>
                           <th>BMI</th>
-                          <th>Notes</th>
                           <th>Action</th>
                         </tr>
                       </thead>
@@ -675,8 +669,7 @@ const ProgressTracker: React.FC = () => {
                           <tr key={`${record.date}-${index}`}>
                             <td>{record.date}</td>
                             <td>{record.weight}</td>
-                            <td>{record.bmi}</td>
-                            <td>{record.notes}</td>
+                            <td>{record.bmi} ({getPhBmiCategory(Number(record.bmi))})</td>
                             <td>
                               <IonButton
                                 fill="clear"
@@ -719,7 +712,7 @@ const ProgressTracker: React.FC = () => {
                               </div>
                             </td>
                             <td>{row.avgWeight} kg</td>
-                            <td>{row.avgBmi}</td>
+                            <td>{row.avgBmi} ({getPhBmiCategory(Number(row.avgBmi))})</td>
                             <td>{row.deltaWeight >= 0 ? '+' : ''}{row.deltaWeight} kg</td>
                             <td>{row.entries}</td>
                           </tr>
@@ -743,7 +736,6 @@ const ProgressTracker: React.FC = () => {
                               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                                 <div>
                                   <div style={{ fontWeight: 700 }}>{record.date}</div>
-                                  <div style={{ color: '#b0b0b0', fontSize: 13 }}>{record.notes || '—'}</div>
                                 </div>
                                 <IonButton
                                   color="danger"
@@ -764,6 +756,7 @@ const ProgressTracker: React.FC = () => {
                                   <IonCol size="6">
                                     <div style={{ color: '#b0b0b0', fontSize: 12 }}>BMI</div>
                                     <div style={{ fontWeight: 700 }}>{record.bmi}</div>
+                                    <div style={{ color: '#b0b0b0', fontSize: 11 }}>{getPhBmiCategory(Number(record.bmi))}</div>
                                   </IonCol>
                                 </IonRow>
                               </IonGrid>
@@ -799,6 +792,7 @@ const ProgressTracker: React.FC = () => {
                                   <IonCol size="4">
                                     <div style={{ color: '#b0b0b0', fontSize: 12 }}>Avg BMI</div>
                                     <div style={{ fontWeight: 700 }}>{row.avgBmi}</div>
+                                    <div style={{ color: '#b0b0b0', fontSize: 11 }}>{getPhBmiCategory(Number(row.avgBmi))}</div>
                                   </IonCol>
                                   <IonCol size="4">
                                     <div style={{ color: '#b0b0b0', fontSize: 12 }}>Entries</div>

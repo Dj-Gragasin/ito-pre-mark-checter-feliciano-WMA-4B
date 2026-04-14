@@ -9,14 +9,14 @@ const notifyAuthChanged = () => {
   }
 };
 
-export const loginUser = async (email: string, password: string) => {
+export const loginUser = async (username: string, password: string) => {
   try {
     const response = await fetch(`${API_CONFIG.BASE_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, email: username, password }),
     });
 
     let data: any = null;
@@ -107,7 +107,7 @@ const isTokenValid = async (token: string): Promise<boolean> => {
  * - If token exists, returns it.
  * - If not, and in development, requests /api/dev/token to get a test token and user.
  */
-export const ensureToken = async (options?: { devEmail?: string }): Promise<string | null> => {
+export const ensureToken = async (options?: { devEmail?: string; devUsername?: string }): Promise<string | null> => {
   const existing = getToken();
   if (existing) {
     const valid = await isTokenValid(existing);
@@ -118,11 +118,11 @@ export const ensureToken = async (options?: { devEmail?: string }): Promise<stri
   if (process.env.NODE_ENV !== 'development') return null;
 
   try {
-    const devEmail = options?.devEmail || 'member@activecore.com';
+    const devUsername = options?.devUsername || options?.devEmail || 'member@activecore.com';
     const res = await fetch(`${API_CONFIG.BASE_URL}/dev/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: devEmail }),
+      body: JSON.stringify({ username: devUsername, email: devUsername }),
     });
 
     const json = await res.json();

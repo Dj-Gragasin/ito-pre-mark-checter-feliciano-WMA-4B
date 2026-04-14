@@ -14,7 +14,6 @@ import {
   IonIcon,
   IonModal,
   IonInput,
-  IonTextarea,
   IonSelect,
   IonSelectOption,
   IonAlert,
@@ -39,7 +38,6 @@ interface Equipment {
   status: string;
   lastMaintenance: string;
   nextSchedule: string;
-  notes: string;
 }
 
 const API_URL = API_CONFIG.BASE_URL;
@@ -62,7 +60,6 @@ const EquipmentManagement: React.FC = () => {
     status: "operational",
     lastMaintenance: "",
     nextSchedule: "",
-    notes: "",
   });
 
   const loadEquipments = useCallback(async () => {
@@ -168,7 +165,6 @@ const EquipmentManagement: React.FC = () => {
           status: formData.status,
           lastMaintenance: formData.lastMaintenance || null,
           nextSchedule: formData.nextSchedule || null,
-          notes: formData.notes || '',
         }),
       });
 
@@ -248,10 +244,17 @@ const EquipmentManagement: React.FC = () => {
       status: "operational",
       lastMaintenance: "",
       nextSchedule: "",
-      notes: "",
     });
     setEditingEquipment(null);
     setShowModal(false);
+  };
+
+  const handleEquipmentFormKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    if (showModal) {
+      handleSave();
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -363,7 +366,6 @@ const EquipmentManagement: React.FC = () => {
                           {equipment.nextSchedule && (
                             <p><strong>Next Schedule:</strong> {equipment.nextSchedule}</p>
                           )}
-                          {equipment.notes && <p><strong>Notes:</strong> {equipment.notes}</p>}
                         </div>
 
                         <IonGrid>
@@ -414,6 +416,7 @@ const EquipmentManagement: React.FC = () => {
                 <IonLabel position="stacked">Equipment Name *</IonLabel>
                 <IonInput
                   value={formData.equipName}
+                  onKeyDown={handleEquipmentFormKeyDown}
                   onIonInput={(e) => setFormData({ ...formData, equipName: e.detail.value || "" })}
                   placeholder="Enter equipment name"
                 />
@@ -437,6 +440,7 @@ const EquipmentManagement: React.FC = () => {
                 <IonInput
                   type="date"
                   value={formData.purchaseDate}
+                  onKeyDown={handleEquipmentFormKeyDown}
                   onIonChange={(e) => setFormData({ ...formData, purchaseDate: e.detail.value || "" })}
                 />
               </IonItem>
@@ -458,6 +462,7 @@ const EquipmentManagement: React.FC = () => {
                 <IonInput
                   type="date"
                   value={formData.lastMaintenance}
+                  onKeyDown={handleEquipmentFormKeyDown}
                   onIonChange={(e) => setFormData({ ...formData, lastMaintenance: e.detail.value || "" })}
                 />
               </IonItem>
@@ -467,19 +472,11 @@ const EquipmentManagement: React.FC = () => {
                 <IonInput
                   type="date"
                   value={formData.nextSchedule}
+                  onKeyDown={handleEquipmentFormKeyDown}
                   onIonChange={(e) => setFormData({ ...formData, nextSchedule: e.detail.value || "" })}
                 />
               </IonItem>
 
-              <IonItem>
-                <IonLabel position="stacked">Notes (Optional)</IonLabel>
-                <IonTextarea
-                  value={formData.notes}
-                  onIonInput={(e) => setFormData({ ...formData, notes: e.detail.value || "" })}
-                  placeholder="Additional notes..."
-                  rows={4}
-                />
-              </IonItem>
             </IonList>
           </IonContent>
 

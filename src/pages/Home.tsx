@@ -27,7 +27,7 @@ import { loginUser } from '../services/auth.service';
 import './Home.css';
 
 const Home: React.FC = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showLogin, setShowLogin] = useState(false);
   const [showLearnMore, setShowLearnMore] = useState(false);
@@ -48,7 +48,7 @@ const Home: React.FC = () => {
         setLoginMessage('Logging in… (this can take a moment)');
       }, 5000);
 
-      const result = await loginUser(email, password);
+      const result = await loginUser(username, password);
       if (result.user.role === 'admin') {
         router.push('/admin', 'root', 'replace');
       } else {
@@ -61,6 +61,18 @@ const Home: React.FC = () => {
       console.error('Login error:', error);
     } finally {
       setIsLoggingIn(false);
+    }
+  };
+
+  const handleLoginSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    handleLogin();
+  };
+
+  const handleLoginInputKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      handleLogin();
     }
   };
 
@@ -249,19 +261,20 @@ const Home: React.FC = () => {
               message={loginMessage}
               backdropDismiss={false}
             />
-            <div className="login-form">
+            <form className="login-form" onSubmit={handleLoginSubmit}>
               {error && (
                 <IonItem color="danger" lines="none">
                   <IonLabel>{error}</IonLabel>
                 </IonItem>
               )}
               <IonItem>
-                <IonLabel position="stacked">Email</IonLabel>
+                <IonLabel position="stacked">Username</IonLabel>
                 <IonInput
-                  type="email"
-                  value={email}
-                  onIonChange={e => setEmail(e.detail.value || '')}
-                  placeholder="Enter your email"
+                  type="text"
+                  value={username}
+                  onIonChange={e => setUsername(e.detail.value || '')}
+                  onKeyDown={handleLoginInputKeyDown}
+                  placeholder="Enter your username"
                   disabled={isLoggingIn}
                 />
               </IonItem>
@@ -271,12 +284,13 @@ const Home: React.FC = () => {
                   type="password"
                   value={password}
                   onIonChange={e => setPassword(e.detail.value || '')}
+                  onKeyDown={handleLoginInputKeyDown}
                   placeholder="Enter your password"
                   disabled={isLoggingIn}
                 />
               </IonItem>
               <div className="ion-padding-top">
-                <IonButton expand="block" onClick={handleLogin} disabled={isLoggingIn}>
+                <IonButton type="submit" expand="block" disabled={isLoggingIn}>
                   {isLoggingIn ? (
                     <>
                       <IonSpinner name="crescent" style={{ marginRight: 10 }} />
@@ -287,7 +301,7 @@ const Home: React.FC = () => {
                   )}
                 </IonButton>
               </div>
-            </div>
+            </form>
           </IonContent>
         </IonModal>
       </IonContent>

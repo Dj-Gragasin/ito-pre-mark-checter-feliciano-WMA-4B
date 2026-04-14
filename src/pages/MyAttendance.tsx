@@ -94,7 +94,7 @@ const MyAttendance: React.FC = () => {
           const data = await response.json();
           if (data.success && data.user) {
             const fullName = `${data.user.firstName || ''} ${data.user.lastName || ''}`.trim();
-            setUserName(fullName || data.user.email || "Member");
+            setUserName(fullName || data.user.username || data.user.email || "Member");
             setFirstName(data.user.firstName || "M");
             console.log('👤 User loaded from API:', fullName);
             return;
@@ -107,7 +107,7 @@ const MyAttendance: React.FC = () => {
       if (userStr) {
         const user = JSON.parse(userStr);
         const fullName = `${user.firstName || user.first_name || ''} ${user.lastName || user.last_name || ''}`.trim();
-        setUserName(fullName || user.email || "Member");
+        setUserName(fullName || user.username || user.email || "Member");
         setFirstName(user.firstName || user.first_name || "M");
         console.log('👤 User loaded from localStorage:', fullName);
       }

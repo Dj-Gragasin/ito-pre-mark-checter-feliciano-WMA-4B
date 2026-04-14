@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -24,7 +24,6 @@ import {
   IonSearchbar,
   IonBadge,
   IonList,
-  IonTextarea,
   IonGrid,
   IonRow,
   IonCol,
@@ -38,7 +37,6 @@ import {
   checkmark,
   calendar,
   card,
-  mail,
   call,
   fitness,
 } from 'ionicons/icons';
@@ -49,6 +47,7 @@ import { API_CONFIG } from '../config/api.config';
 const API_URL = API_CONFIG.BASE_URL;
 
 type PaymentStatus = 'pending' | 'paid' | 'expired' | 'cancelled';
+type MemberStatusFilter = 'all' | 'active' | 'inactive';
 
 interface Member {
   id?: number;
@@ -72,6 +71,7 @@ const MembersManagement: React.FC = () => {
   const [members, setMembers] = useState<Member[]>([]);
   const [filteredMembers, setFilteredMembers] = useState<Member[]>([]);
   const [searchText, setSearchText] = useState('');
+  const [memberStatusFilter, setMemberStatusFilter] = useState<MemberStatusFilter>('all');
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [originalMember, setOriginalMember] = useState<Member | null>(null);
@@ -97,8 +97,11 @@ const MembersManagement: React.FC = () => {
     membershipType: 'monthly',
     membershipPrice: 100,
     paymentMethod: 'cash',
-    notes: '',
   });
+  const todayDate = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+  }, []);
   const [isSubmitting, setIsSubmitting] = useState(false); // ✅ Add this line
   const [presentToast] = useIonToast();
 
@@ -124,18 +127,25 @@ const MembersManagement: React.FC = () => {
   }, [presentToast]);
 
   const filterMembers = useCallback(() => {
-    if (!searchText.trim()) {
-      setFilteredMembers(members);
-      return;
+    let filtered = members;
+
+    if (memberStatusFilter !== 'all') {
+      filtered = filtered.filter(
+        (m) => String(m.status || '').toLowerCase() === memberStatusFilter
+      );
     }
-    const filtered = members.filter(
-      (m) =>
-        m.firstName.toLowerCase().includes(searchText.toLowerCase()) ||
-        m.lastName.toLowerCase().includes(searchText.toLowerCase()) ||
-        m.email.toLowerCase().includes(searchText.toLowerCase())
-    );
+
+    if (searchText.trim()) {
+      filtered = filtered.filter(
+        (m) =>
+          m.firstName.toLowerCase().includes(searchText.toLowerCase()) ||
+          m.lastName.toLowerCase().includes(searchText.toLowerCase()) ||
+          m.email.toLowerCase().includes(searchText.toLowerCase())
+      );
+    }
+
     setFilteredMembers(filtered);
-  }, [members, searchText]);
+  }, [members, searchText, memberStatusFilter]);
 
   useEffect(() => {
     loadMembers();
@@ -194,6 +204,14 @@ const MembersManagement: React.FC = () => {
 
   const normalizeText = (value: any): string => String(value ?? '').trim();
 
+  const normalizePHMobile = (value: any): string | null => {
+    const digits = String(value ?? '').replace(/\D/g, '');
+
+    if (/^09\d{9}$/.test(digits)) return digits;
+
+    return null;
+  };
+
   const addIfChanged = (payload: any, key: keyof Member, value: any, original: any) => {
     if (typeof value === 'string') {
       const v = normalizeText(value);
@@ -221,6 +239,17 @@ const MembersManagement: React.FC = () => {
         presentToast({ message: 'Fill all required fields', duration: 2000, color: 'warning' });
         return;
       }
+
+      const normalizedPhone = normalizePHMobile(currentMember.phone);
+      if (!normalizedPhone) {
+        presentToast({
+          message: 'Invalid mobile number. Enter exactly 11 digits (09XXXXXXXXX).',
+          duration: 2600,
+          color: 'warning',
+        });
+        return;
+      }
+
       if (!normalizeText(currentMember.password)) {
         presentToast({ message: 'Password is required', duration: 2000, color: 'warning' });
         return;
@@ -241,10 +270,12 @@ const MembersManagement: React.FC = () => {
     const payload: any = {};
 
     if (!isEditing) {
+      const normalizedPhone = normalizePHMobile(currentMember.phone) as string;
       payload.firstName = normalizeText(currentMember.firstName);
       payload.lastName = normalizeText(currentMember.lastName);
-      payload.email = normalizeText(currentMember.email);
-      payload.phone = normalizeText(currentMember.phone);
+      payload.username = normalizeText(currentMember.email);
+      payload.email = payload.username;
+      payload.phone = normalizedPhone;
       payload.gender = currentMember.gender;
       payload.dateOfBirth = currentMember.dateOfBirth;
       payload.membershipType = currentMember.membershipType;
@@ -259,7 +290,28 @@ const MembersManagement: React.FC = () => {
       addIfChanged(payload, 'firstName', currentMember.firstName, original!.firstName);
       addIfChanged(payload, 'lastName', currentMember.lastName, original!.lastName);
       addIfChanged(payload, 'email', currentMember.email, original!.email);
-      addIfChanged(payload, 'phone', currentMember.phone, original!.phone);
+      if (payload.email !== undefined) {
+        payload.username = payload.email;
+      }
+
+      if (normalizeText(currentMember.phone)) {
+        const normalizedCurrentPhone = normalizePHMobile(currentMember.phone);
+        if (!normalizedCurrentPhone) {
+          presentToast({
+            message: 'Invalid mobile number. Enter exactly 11 digits (09XXXXXXXXX).',
+            duration: 2600,
+            color: 'warning',
+          });
+          return;
+        }
+
+        const normalizedOriginalPhone =
+          normalizePHMobile(original!.phone) || normalizeText(original!.phone);
+
+        if (normalizedCurrentPhone !== normalizedOriginalPhone) {
+          payload.phone = normalizedCurrentPhone;
+        }
+      }
 
       // Selects: send if changed (these are never blank)
       if (currentMember.gender && currentMember.gender !== original!.gender) payload.gender = currentMember.gender;
@@ -424,7 +476,6 @@ const MembersManagement: React.FC = () => {
       membershipType: member.membershipType || 'monthly',
       membershipPrice: member.membershipPrice || 100,
       paymentMethod: 'cash',
-      notes: '',
     });
     setShowPaymentModal(true);
   };
@@ -441,7 +492,6 @@ const MembersManagement: React.FC = () => {
         membershipType: paymentData.membershipType,
         amount: paymentData.membershipPrice,
         paymentMethod: paymentData.paymentMethod,
-        notes: paymentData.notes || ''
       };
 
       console.log('📝 Payment payload:', paymentPayload);
@@ -523,6 +573,36 @@ const MembersManagement: React.FC = () => {
     });
   };
 
+  const handleMemberFormKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    if (showModal) {
+      handleSaveMember();
+    }
+  };
+
+  const handlePaymentFormKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    if (showPaymentModal && !isSubmitting) {
+      handleSavePayment();
+    }
+  };
+
+  const emptyStateTitle =
+    memberStatusFilter === 'active'
+      ? 'No Active Members Found'
+      : memberStatusFilter === 'inactive'
+        ? 'No Inactive Members Found'
+        : 'No Members Found';
+
+  const emptyStateDescription =
+    memberStatusFilter === 'active'
+      ? 'There are currently no active members.'
+      : memberStatusFilter === 'inactive'
+        ? 'There are currently no inactive members.'
+        : 'Add your first member to get started';
+
   return (
     <IonPage>
       <IonHeader>
@@ -532,8 +612,9 @@ const MembersManagement: React.FC = () => {
           </IonButtons>
           <IonTitle>Members Management</IonTitle>
           <IonButtons slot="end">
-            <IonButton onClick={handleAddMember}>
-              <IonIcon icon={add} />
+            <IonButton onClick={handleAddMember} color="success" fill="solid" className="add-member-btn">
+              <IonIcon icon={add} slot="start" />
+              Add Member
             </IonButton>
           </IonButtons>
         </IonToolbar>
@@ -544,21 +625,61 @@ const MembersManagement: React.FC = () => {
           <IonGrid fixed>
             {/* Header Stats */}
             <IonRow>
-              <IonCol size="12" sizeMd="4">
-                <div className="stat-card">
+              <IonCol size="12" sizeSm="6" sizeMd="3">
+                <div
+                  className={`stat-card clickable ${memberStatusFilter === 'all' ? 'active-filter' : ''}`}
+                  onClick={() => setMemberStatusFilter('all')}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setMemberStatusFilter('all');
+                    }
+                  }}
+                >
                   <IonIcon icon={person} />
                   <h3>{members.length}</h3>
                   <p>Total Members</p>
                 </div>
               </IonCol>
-              <IonCol size="12" sizeMd="4">
-                <div className="stat-card success">
+              <IonCol size="12" sizeSm="6" sizeMd="3">
+                <div
+                  className={`stat-card success clickable ${memberStatusFilter === 'active' ? 'active-filter' : ''}`}
+                  onClick={() => setMemberStatusFilter('active')}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setMemberStatusFilter('active');
+                    }
+                  }}
+                >
                   <IonIcon icon={checkmark} />
                   <h3>{members.filter((m) => m.status === 'active').length}</h3>
                   <p>Active Members</p>
                 </div>
               </IonCol>
-              <IonCol size="12" sizeMd="4">
+              <IonCol size="12" sizeSm="6" sizeMd="3">
+                <div
+                  className={`stat-card danger clickable ${memberStatusFilter === 'inactive' ? 'active-filter' : ''}`}
+                  onClick={() => setMemberStatusFilter('inactive')}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setMemberStatusFilter('inactive');
+                    }
+                  }}
+                >
+                  <IonIcon icon={close} />
+                  <h3>{members.filter((m) => m.status === 'inactive').length}</h3>
+                  <p>Inactive Members</p>
+                </div>
+              </IonCol>
+              <IonCol size="12" sizeSm="6" sizeMd="3">
                 <div className="stat-card warning">
                   <IonIcon icon={calendar} />
                   <h3>{members.filter((m) => m.paymentStatus === 'pending').length}</h3>
@@ -585,12 +706,8 @@ const MembersManagement: React.FC = () => {
                 <IonCol size="12">
                   <div className="empty-state">
                     <IonIcon icon={person} />
-                    <h3>No Members Found</h3>
-                    <p>Add your first member to get started</p>
-                    <IonButton expand="block" onClick={handleAddMember}>
-                      <IonIcon icon={add} slot="start" />
-                      Add Member
-                    </IonButton>
+                    <h3>{emptyStateTitle}</h3>
+                    <p>{emptyStateDescription}</p>
                   </div>
                 </IonCol>
               ) : (
@@ -619,7 +736,7 @@ const MembersManagement: React.FC = () => {
                       <IonCardContent>
                         <div className="member-details">
                           <div className="detail-item">
-                            <IonIcon icon={mail} />
+                            <IonIcon icon={person} />
                             <span>{member.email}</span>
                           </div>
                           <div className="detail-item">
@@ -695,6 +812,7 @@ const MembersManagement: React.FC = () => {
                 <IonLabel position="stacked">First Name *</IonLabel>
                 <IonInput
                   value={currentMember.firstName}
+                  onKeyDown={handleMemberFormKeyDown}
                   onIonInput={(e) =>
                     setCurrentMember({ ...currentMember, firstName: e.detail.value || '' })
                   }
@@ -706,6 +824,7 @@ const MembersManagement: React.FC = () => {
                 <IonLabel position="stacked">Last Name *</IonLabel>
                 <IonInput
                   value={currentMember.lastName}
+                  onKeyDown={handleMemberFormKeyDown}
                   onIonInput={(e) =>
                     setCurrentMember({ ...currentMember, lastName: e.detail.value || '' })
                   }
@@ -714,14 +833,15 @@ const MembersManagement: React.FC = () => {
               </IonItem>
 
               <IonItem>
-                <IonLabel position="stacked">Email *</IonLabel>
+                <IonLabel position="stacked">Username *</IonLabel>
                 <IonInput
-                  type="email"
+                  type="text"
                   value={currentMember.email}
+                  onKeyDown={handleMemberFormKeyDown}
                   onIonInput={(e) =>
                     setCurrentMember({ ...currentMember, email: e.detail.value || '' })
                   }
-                  placeholder="Enter email"
+                  placeholder="Enter username"
                 />
               </IonItem>
 
@@ -731,6 +851,7 @@ const MembersManagement: React.FC = () => {
                   <IonInput
                     type="password"
                     value={currentMember.password}
+                    onKeyDown={handleMemberFormKeyDown}
                     onIonInput={(e) =>
                       setCurrentMember({ ...currentMember, password: e.detail.value || '' })
                     }
@@ -740,14 +861,17 @@ const MembersManagement: React.FC = () => {
               )}
 
               <IonItem>
-                <IonLabel position="stacked">Phone *</IonLabel>
+                <IonLabel position="stacked">Mobile Number (+63) *</IonLabel>
                 <IonInput
                   type="tel"
+                  inputmode="tel"
+                  maxlength={11}
                   value={currentMember.phone}
+                  onKeyDown={handleMemberFormKeyDown}
                   onIonInput={(e) =>
-                    setCurrentMember({ ...currentMember, phone: e.detail.value || '' })
+                    setCurrentMember({ ...currentMember, phone: String(e.detail.value || '').replace(/\D/g, '').slice(0, 11) })
                   }
-                  placeholder="Enter phone number"
+                  placeholder="09XXXXXXXXX"
                 />
               </IonItem>
 
@@ -769,7 +893,9 @@ const MembersManagement: React.FC = () => {
                 <IonLabel position="stacked">Date of Birth</IonLabel>
                 <IonInput
                   type="date"
+                  max={todayDate}
                   value={currentMember.dateOfBirth}
+                  onKeyDown={handleMemberFormKeyDown}
                   onIonInput={(e) =>
                     setCurrentMember({ ...currentMember, dateOfBirth: e.detail.value || '' })
                   }
@@ -792,6 +918,7 @@ const MembersManagement: React.FC = () => {
                 <IonLabel position="stacked">Emergency Contact</IonLabel>
                 <IonInput
                   value={currentMember.emergencyContact}
+                  onKeyDown={handleMemberFormKeyDown}
                   onIonInput={(e) =>
                     setCurrentMember({ ...currentMember, emergencyContact: e.detail.value || '' })
                   }
@@ -803,6 +930,7 @@ const MembersManagement: React.FC = () => {
                 <IonLabel position="stacked">Address</IonLabel>
                 <IonInput
                   value={currentMember.address}
+                  onKeyDown={handleMemberFormKeyDown}
                   onIonInput={(e) =>
                     setCurrentMember({ ...currentMember, address: e.detail.value || '' })
                   }
@@ -877,6 +1005,7 @@ const MembersManagement: React.FC = () => {
                     <IonInput
                       type="number"
                       value={paymentData.membershipPrice}
+                      onKeyDown={handlePaymentFormKeyDown}
                       onIonInput={(e) => setPaymentData({ ...paymentData, membershipPrice: parseFloat(e.detail.value || '0') })}
                     />
                   </IonItem>
@@ -894,15 +1023,6 @@ const MembersManagement: React.FC = () => {
                     </IonSelect>
                   </IonItem>
 
-                  <IonItem>
-                    <IonLabel position="stacked">Notes (Optional)</IonLabel>
-                    <IonTextarea
-                      value={paymentData.notes}
-                      onIonInput={(e) => setPaymentData({ ...paymentData, notes: e.detail.value || '' })}
-                      placeholder="Add payment notes..."
-                      rows={3}
-                    />
-                  </IonItem>
                 </IonList>
               </>
             )}

@@ -28,6 +28,7 @@ type UserProfile = {
   firstName: string;
   lastName: string;
   email: string;
+  username?: string;
   role: string;
 };
 
@@ -41,7 +42,7 @@ const AccountSettings: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -73,7 +74,7 @@ const AccountSettings: React.FC = () => {
       setProfile(user);
       setFirstName(user.firstName || "");
       setLastName(user.lastName || "");
-      setEmail(user.email || "");
+      setUsername(user.username || user.email || "");
     } catch (error: any) {
       presentToast({
         message: `Error: ${error?.message || "Failed to load account settings"}`,
@@ -95,7 +96,8 @@ const AccountSettings: React.FC = () => {
         id: user.id,
         firstName: user.firstName,
         lastName: user.lastName,
-        email: user.email,
+        email: user.username || user.email,
+        username: user.username || user.email,
         role: user.role,
       };
       localStorage.setItem("user", JSON.stringify(normalized));
@@ -109,11 +111,11 @@ const AccountSettings: React.FC = () => {
   const handleSaveProfile = async () => {
     const first = firstName.trim();
     const last = lastName.trim();
-    const emailValue = email.trim().toLowerCase();
+    const usernameValue = username.trim();
 
-    if (!first || !last || !emailValue) {
+    if (!first || !last || !usernameValue) {
       presentToast({
-        message: "First name, last name, and email are required.",
+        message: "First name, last name, and username are required.",
         duration: 2500,
         color: "warning",
       });
@@ -134,7 +136,8 @@ const AccountSettings: React.FC = () => {
         body: JSON.stringify({
           firstName: first,
           lastName: last,
-          email: emailValue,
+          username: usernameValue,
+          email: usernameValue,
         }),
       });
 
@@ -147,7 +150,7 @@ const AccountSettings: React.FC = () => {
       setProfile(updatedUser);
       setFirstName(updatedUser.firstName || "");
       setLastName(updatedUser.lastName || "");
-      setEmail(updatedUser.email || "");
+      setUsername(updatedUser.username || updatedUser.email || "");
       syncUserToStorage(updatedUser);
 
       presentToast({
@@ -227,6 +230,22 @@ const AccountSettings: React.FC = () => {
     }
   };
 
+  const handleProfileKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    if (!savingProfile) {
+      handleSaveProfile();
+    }
+  };
+
+  const handlePasswordKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    if (!savingPassword) {
+      handleChangePassword();
+    }
+  };
+
   return (
     <IonPage>
       <IonHeader>
@@ -256,6 +275,7 @@ const AccountSettings: React.FC = () => {
                     <IonLabel position="stacked">First Name</IonLabel>
                     <IonInput
                       value={firstName}
+                      onKeyDown={handleProfileKeyDown}
                       onIonChange={(e) => setFirstName(String(e.detail.value || ""))}
                     />
                   </IonItem>
@@ -263,15 +283,17 @@ const AccountSettings: React.FC = () => {
                     <IonLabel position="stacked">Last Name</IonLabel>
                     <IonInput
                       value={lastName}
+                      onKeyDown={handleProfileKeyDown}
                       onIonChange={(e) => setLastName(String(e.detail.value || ""))}
                     />
                   </IonItem>
                   <IonItem>
-                    <IonLabel position="stacked">Email</IonLabel>
+                    <IonLabel position="stacked">Username</IonLabel>
                     <IonInput
-                      type="email"
-                      value={email}
-                      onIonChange={(e) => setEmail(String(e.detail.value || ""))}
+                      type="text"
+                      value={username}
+                      onKeyDown={handleProfileKeyDown}
+                      onIonChange={(e) => setUsername(String(e.detail.value || ""))}
                     />
                   </IonItem>
                 </IonList>
@@ -299,6 +321,7 @@ const AccountSettings: React.FC = () => {
                     <IonInput
                       type="password"
                       value={currentPassword}
+                      onKeyDown={handlePasswordKeyDown}
                       onIonChange={(e) => setCurrentPassword(String(e.detail.value || ""))}
                     />
                   </IonItem>
@@ -307,6 +330,7 @@ const AccountSettings: React.FC = () => {
                     <IonInput
                       type="password"
                       value={newPassword}
+                      onKeyDown={handlePasswordKeyDown}
                       onIonChange={(e) => setNewPassword(String(e.detail.value || ""))}
                     />
                   </IonItem>
@@ -315,6 +339,7 @@ const AccountSettings: React.FC = () => {
                     <IonInput
                       type="password"
                       value={confirmPassword}
+                      onKeyDown={handlePasswordKeyDown}
                       onIonChange={(e) => setConfirmPassword(String(e.detail.value || ""))}
                     />
                   </IonItem>

@@ -26,7 +26,6 @@ import {
   qrCodeOutline,
   refreshOutline,
   peopleOutline,
-  checkmarkCircle,
   timeOutline,
   locationOutline,
   warningOutline,
@@ -171,7 +170,7 @@ const AdminAttendance: React.FC = () => {
           <div className="stats-header">
             <IonGrid>
               <IonRow>
-                <IonCol size="12" sizeMd="6">
+                <IonCol size="12" sizeMd="12">
                   <IonCard className="stat-card">
                     <IonCardContent>
                       <div className="stat-content">
@@ -179,19 +178,6 @@ const AdminAttendance: React.FC = () => {
                         <div className="stat-info">
                           <h3>{attendanceRecords.length}</h3>
                           <p>Check-ins Today</p>
-                        </div>
-                      </div>
-                    </IonCardContent>
-                  </IonCard>
-                </IonCol>
-                <IonCol size="12" sizeMd="6">
-                  <IonCard className="stat-card">
-                    <IonCardContent>
-                      <div className="stat-content">
-                        <IonIcon icon={checkmarkCircle} className="stat-icon success" />
-                        <div className="stat-info">
-                          <h3>{attendanceRecords.filter(r => r.status === "present").length}</h3>
-                          <p>On Time</p>
                         </div>
                       </div>
                     </IonCardContent>
@@ -302,10 +288,9 @@ const AdminAttendance: React.FC = () => {
                         <thead>
                           <tr>
                             <th>Member</th>
-                            <th>Email</th>
-                            <th>Check-in Time</th>
+                            <th>Username</th>
+                            <th>Check-in</th>
                             <th>Location</th>
-                            <th>Status</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -333,14 +318,6 @@ const AdminAttendance: React.FC = () => {
                                   <IonIcon icon={locationOutline} />
                                   <span>{record.location}</span>
                                 </div>
-                              </td>
-                              <td>
-                                <IonBadge
-                                  color={record.status === "present" ? "success" : "warning"}
-                                  className="status-badge"
-                                >
-                                  {record.status.toUpperCase()}
-                                </IonBadge>
                               </td>
                             </tr>
                           ))}
@@ -376,15 +353,6 @@ const AdminAttendance: React.FC = () => {
                                     <IonIcon icon={locationOutline} />
                                     <span>{record.location}</span>
                                   </div>
-                                </div>
-
-                                <div style={{ marginTop: 12 }}>
-                                  <IonBadge
-                                    color={record.status === 'present' ? 'success' : 'warning'}
-                                    className="status-badge"
-                                  >
-                                    {record.status.toUpperCase()}
-                                  </IonBadge>
                                 </div>
                               </IonCardContent>
                             </IonCard>
