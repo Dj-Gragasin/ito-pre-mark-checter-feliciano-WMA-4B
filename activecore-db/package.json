@@ -12,6 +12,7 @@
     "db:init": "mysql -u root < src/database/init.sql"
   },
   "dependencies": {
+    "@getbrevo/brevo": "^2.3.0",
     "@paypal/checkout-server-sdk": "^1.0.3",
     "@sentry/node": "^10.32.1",
     "@types/axios": "^0.9.36",

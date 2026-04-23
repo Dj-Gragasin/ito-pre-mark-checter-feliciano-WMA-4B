@@ -85,3 +85,45 @@ export const isValidDate = (date: string): boolean => {
   const parsedDate = new Date(date);
   return parsedDate.toString() !== 'Invalid Date';
 };
+
+/**
+ * Enhanced email validation
+ */
+export const isValidEmail = (email: string): boolean => {
+  // RFC 5322 simplified regex for email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  
+  if (!email || !emailRegex.test(email)) {
+    return false;
+  }
+
+  // Additional checks
+  if (email.length > 254) {
+    return false; // Email too long
+  }
+
+  const [localPart, domain] = email.split('@');
+  
+  if (localPart.length > 64) {
+    return false; // Local part too long
+  }
+
+  // Check for consecutive dots
+  if (email.includes('..')) {
+    return false;
+  }
+
+  // Check domain has at least one TLD
+  if (!domain.includes('.')) {
+    return false;
+  }
+
+  return true;
+};
+
+/**
+ * Normalize email (lowercase and trim)
+ */
+export const normalizeEmail = (email: string): string => {
+  return email.toLowerCase().trim();
+};

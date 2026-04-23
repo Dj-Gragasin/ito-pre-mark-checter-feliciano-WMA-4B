@@ -3,14 +3,11 @@ import fs from 'fs';
 import path from 'path';
 
 // When started from the repo root (e.g. `npm --prefix activecore-db ...`), CWD may not be activecore-db/.
-// Load env files relative to this package so local dev reliably picks up activecore-db/.env.local.
-const envCandidates = [
-  path.resolve(__dirname, '..', '.env.local'),
-  path.resolve(__dirname, '..', '.env'),
-];
+// Use only activecore-db/.env.local for runtime configuration.
+// `.env.local` is the single source of truth; `.env.local.example` is only a template.
+const envPath = path.resolve(__dirname, '..', '.env.local');
 
-const envPath = envCandidates.find((p) => fs.existsSync(p));
-if (envPath) {
+if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, override: true });
 } else {
   dotenv.config();
@@ -42,6 +39,8 @@ if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim() !== '') {
 import nodemailer, { Transporter } from 'nodemailer';
 import crypto from 'crypto';
 import qrTokenRouter from './routes/qrToken';
+import { sendAbsenceReminders } from './utils/absenceReminder.service';
+import { sendAbsenceReminderEmail } from './utils/brevo.service';
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
@@ -5242,8 +5241,8 @@ function shouldUseLowCostPayPalPricing(): boolean {
   if (explicit === '1' || explicit === 'true' || explicit === 'yes') return true;
   if (explicit === '0' || explicit === 'false' || explicit === 'no') return false;
 
-  // Default to low-cost pricing on live PayPal so production verification is affordable.
-  return PAYPAL_MODE === 'live';
+  // Default to low-cost pricing on sandbox for testing, but use normal pricing on live.
+  return PAYPAL_MODE === 'sandbox';
 }
 
 function expectedAmountForPlan(plan: 'monthly' | 'quarterly' | 'annual'): number {
@@ -5391,6 +5390,34 @@ app.post('/api/admin/attendance/test-email', authenticateToken, requireAdmin, as
     res.json({ success: true, message: `Test email sent to ${to}` });
   } catch (err: any) {
     res.status(500).json({ success: false, message: 'Failed to send test email.' });
+  }
+});
+
+// Send absence reminders to all absent members
+app.post('/api/admin/attendance/send-absence-reminders', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { thresholdDays } = req.body;
+    const days = thresholdDays ? Math.max(1, Number(thresholdDays)) : 3;
+
+    logInfo(`Admin triggered absence reminder campaign with ${days} day threshold`);
+    const stats = await sendAbsenceReminders(days);
+
+    res.json({
+      success: true,
+      message: `Absence reminder campaign completed`,
+      stats: {
+        totalAbsentUsers: stats.total,
+        emailsSent: stats.sent,
+        emailsFailed: stats.failed,
+      },
+    });
+  } catch (error: any) {
+    logError('Error in absence reminder endpoint:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send absence reminders',
+      error: getErrorMessage(error),
+    });
   }
 });
 
