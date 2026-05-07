@@ -49,8 +49,6 @@ interface PaymentResponse {
   message: string;
 }
 
-type MembershipPlan = 'monthly' | 'quarterly' | 'annual';
-
 const Payment: React.FC = () => {
   const [formData, setFormData] = useState<FormData>({
     fullName: '',
@@ -69,18 +67,10 @@ const Payment: React.FC = () => {
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
 
-  const isProductionBuild = process.env.NODE_ENV === 'production';
-
-  const planPrices: Record<MembershipPlan, number> = {
-    monthly: isProductionBuild ? 1 : 100,
-    quarterly: isProductionBuild ? 2 : 200,
-    annual: isProductionBuild ? 3 : 300,
-  };
-
-  const planLabels: Record<MembershipPlan, string> = {
-    monthly: `Monthly - ₱${planPrices.monthly}`,
-    quarterly: `Quarterly - ₱${planPrices.quarterly}`,
-    annual: `Annual - ₱${planPrices.annual}`,
+  const planPrices = {
+    'Monthly - ₱100': 100,
+    'Quarterly - ₱200': 200,
+    'Yearly - ₱300': 300,
   };
 
   const setField = <K extends keyof FormData>(key: K, value: FormData[K]) => {
@@ -190,14 +180,12 @@ const Payment: React.FC = () => {
   };
 
   const processPayment = async (): Promise<PaymentResponse> => {
-    const selectedPlan = formData.plan as MembershipPlan;
-    const amount = planPrices[selectedPlan];
-    const selectedPlanLabel = planLabels[selectedPlan] || formData.plan;
+    const amount = planPrices[formData.plan as keyof typeof planPrices];
     
     const paymentData = {
       amount,
       currency: 'PHP',
-      description: `ActiveCore ${selectedPlanLabel}`,
+      description: `ActiveCore ${formData.plan}`,
       customer: {
         name: formData.fullName,
         email: formData.email,
@@ -279,8 +267,7 @@ const Payment: React.FC = () => {
 
       if (formData.paymentMethod === 'paypal') {
         // For PayPal payments
-        const selectedPlan = formData.plan as MembershipPlan;
-        await payWithPayPal(planPrices[selectedPlan], selectedPlan);
+        await payWithPayPal(planPrices[formData.plan as keyof typeof planPrices], formData.plan);
         return;
       }
 
@@ -427,8 +414,8 @@ const Payment: React.FC = () => {
                             onIonChange={(e) => setField('plan', (e.detail.value ?? '') as any)}
                           >
                             <IonList className="payment-radio-list">
-                              {(Object.keys(planLabels) as MembershipPlan[]).map((plan) => {
-                                const [name, price] = planLabels[plan].split(' - ');
+                              {Object.keys(planPrices).map((plan) => {
+                                const [name, price] = plan.split(' - ');
                                 return (
                                   <IonItem key={plan} className="payment-radio-item" lines="full">
                                     <IonLabel>

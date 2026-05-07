@@ -5253,20 +5253,10 @@ function isValidMembershipPlan(plan: any): plan is 'monthly' | 'quarterly' | 'an
   return normalized === 'monthly' || normalized === 'quarterly' || normalized === 'annual';
 }
 
-function shouldUseLowCostPayPalPricing(): boolean {
-  const explicit = String(process.env.PAYPAL_LOW_COST_PRICING || '').trim().toLowerCase();
-  if (explicit === '1' || explicit === 'true' || explicit === 'yes') return true;
-  if (explicit === '0' || explicit === 'false' || explicit === 'no') return false;
-
-  // Default to low-cost pricing on sandbox for testing, but use normal pricing on live.
-  return PAYPAL_MODE === 'sandbox';
-}
-
 function expectedAmountForPlan(plan: 'monthly' | 'quarterly' | 'annual'): number {
-  const useLowCostPricing = shouldUseLowCostPayPalPricing();
-  if (plan === 'quarterly') return useLowCostPricing ? 2 : 200;
-  if (plan === 'annual') return useLowCostPricing ? 3 : 300;
-  return useLowCostPricing ? 1 : 100;
+  if (plan === 'quarterly') return 200;
+  if (plan === 'annual') return 300;
+  return 100;
 }
 
 function isValidEmail(email?: string) {

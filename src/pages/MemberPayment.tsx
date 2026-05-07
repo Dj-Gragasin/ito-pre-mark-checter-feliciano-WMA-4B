@@ -35,12 +35,10 @@ interface Subscription {
   subscriptionStart?: string;
 }
 
-const IS_PRODUCTION_BUILD = process.env.NODE_ENV === 'production';
-
 const MEMBERSHIP_PRICES: { [key: string]: number } = {
-  monthly: IS_PRODUCTION_BUILD ? 1 : 100,
-  quarterly: IS_PRODUCTION_BUILD ? 2 : 200,
-  annual: IS_PRODUCTION_BUILD ? 3 : 300,
+  monthly: 100,
+  quarterly: 200,
+  annual: 300,
 };
 
 const API_URL = API_CONFIG.BASE_URL;
