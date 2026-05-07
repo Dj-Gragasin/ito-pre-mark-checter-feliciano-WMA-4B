@@ -41,6 +41,7 @@ import crypto from 'crypto';
 import qrTokenRouter from './routes/qrToken';
 import { sendAbsenceReminders } from './utils/absenceReminder.service';
 import { sendAbsenceReminderEmail } from './utils/brevo.service';
+import * as BrevoService from './utils/brevo.service';
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
@@ -5157,6 +5158,22 @@ if (smtpHost && smtpUser && smtpPass) {
 }
 
 async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
+  // Prefer Brevo transactional API when API key is available
+  if (process.env.BREVO_API_KEY && BrevoService && typeof BrevoService.sendEmail === 'function') {
+    try {
+      const sent = await BrevoService.sendEmail({
+        to,
+        subject,
+        htmlContent: html,
+        textContent: html,
+      } as any);
+      if (sent) return true;
+      // fallthrough to SMTP if Brevo send failed
+    } catch (err) {
+      // continue to attempt SMTP as fallback
+    }
+  }
+
   if (!transporter) {
     return false;
   }

@@ -199,7 +199,9 @@ const MemberDashboard: React.FC = () => {
           title: 'ActiveCore Attendance Reminder',
           body: `${daysText} Time to train today!`,
           schedule: {
-            on: { hour: reminderHour, minute: reminderMinute },
+            at: new Date(Date.now() + 1000), // Schedule 1 second from now to trigger the repeating schedule
+            repeats: true,
+            every: 'day',
             allowWhileIdle: true,
           },
         },
@@ -287,6 +289,10 @@ const MemberDashboard: React.FC = () => {
 
     // Sync reminder settings (same account) then load dashboard.
     (async () => {
+      // Request notification permission on app start if on native platform
+      if (Capacitor.isNativePlatform()) {
+        await ensureNotificationPermission();
+      }
       await loadAbsenceReminderSettings();
       await loadDashboardData();
     })();
@@ -297,6 +303,36 @@ const MemberDashboard: React.FC = () => {
     if (absenceStatus && reminderEnabled) {
       await scheduleAbsenceReminder(absenceStatus);
     }
+  };
+
+  const handleTestNotification = async () => {
+    if (!Capacitor.isNativePlatform()) {
+      alert('Notifications only work on mobile devices');
+      return;
+    }
+
+    const hasPerm = await ensureNotificationPermission();
+    if (!hasPerm) {
+      alert('Please grant notification permission first');
+      return;
+    }
+
+    // Schedule a test notification for 5 seconds from now
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: 99999,
+          title: 'Test Notification',
+          body: 'This is a test notification from ActiveCore!',
+          schedule: {
+            at: new Date(Date.now() + 5000), // 5 seconds from now
+            allowWhileIdle: true,
+          },
+        },
+      ],
+    });
+
+    alert('Test notification scheduled! Check your device in 5 seconds.');
   };
 
   const handleToggleReminder = async () => {
@@ -457,6 +493,10 @@ const MemberDashboard: React.FC = () => {
                                   Allow notifications
                                 </IonButton>
                               )}
+
+                              <IonButton fill="clear" color="secondary" onClick={handleTestNotification}>
+                                Test notification
+                              </IonButton>
                             </>
                           )}
                         </div>
